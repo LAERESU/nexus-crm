@@ -101,7 +101,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 
 ---
 
-### NX-007 · Dockerfile backend & frontend
+### NX-007 · Dockerfile backend & frontend ✅
 - **Sprint:** 1 · **SP:** 3 · **Bergantung pada:** NX-003, NX-004
 - **Langkah:**
   1. Dockerfile multi-stage untuk setiap service di `src/Services/<X>/NexUS.<X>.Api/Dockerfile` dan Gateway (pola ARCHITECTURE F.3, user non-root, port 8080).
