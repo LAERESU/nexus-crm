@@ -28,7 +28,7 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 
 ---
 
-### NX-012 · Login → access token + refresh token
+### NX-012 · Login → access token + refresh token ✅
 - **Sprint:** 2 · **SP:** 8 · **Bergantung pada:** NX-009, NX-011
 - **Langkah:**
   1. Migrasi `db/auth/V2__auth_tables.sql`: `CREDENTIALS`, `REFRESH_TOKENS`, `CLIENTS`, `LOGIN_HISTORY` (ARCHITECTURE B.1).
@@ -37,17 +37,18 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
   4. Terbitkan access token 15 menit dengan klaim `sub`, `tid`, `jti`, `roles`; refresh token 7 hari disimpan sebagai hash di Oracle dan dikirim lewat cookie `HttpOnly; Secure; SameSite=Strict`.
   5. Seed data dev: tenant demo dan user `admin@demo.local`.
 - **Acceptance criteria:**
-  - [ ] Login benar → 200 + access token + cookie refresh token.
-  - [ ] Login salah → 401 dengan pesan generik (tidak membocorkan apakah email terdaftar).
-  - [ ] 6 kali gagal berturut-turut → akun terkunci sementara.
-  - [ ] Token bisa diverifikasi memakai JWKS.
+  - [x] Login benar → 200 + access token + cookie refresh token. (tes integrasi dengan Oracle sungguhan di CI)
+  - [x] Login salah → 401 dengan pesan generik (tidak membocorkan apakah email terdaftar). (pesan dan waktu respons sama untuk email tak dikenal, password salah, dan akun terkunci)
+  - [x] 6 kali gagal berturut-turut → akun terkunci sementara. (tes integrasi: percobaan ke-6 dengan password benar tetap 401, `LOCKED_UNTIL` terisi)
+  - [x] Token bisa diverifikasi memakai JWKS. (tes unit dan integrasi memvalidasi token hanya dengan `/.well-known/jwks.json`)
 - **Catatan implementasi:**
   - Keputusan D2 dan turunannya di ADR-0006: Auth Service sendiri, token dengan `Microsoft.IdentityModel.JsonWebTokens` (RS256, bukan OpenIddict), email unik global (pencarian kredensial saat login adalah satu-satunya query tanpa filter `TENANT_ID`), klaim `roles` lewat port `IUserDirectory` dengan data sementara di `CREDENTIALS.ROLES`.
   - Lockout: percobaan gagal ke-5 dalam 15 menit mengunci akun 15 menit; percobaan ke-6 (walau password benar) tetap 401 dengan pesan generik yang sama, sehingga status akun tidak bocor. Email tidak dikenal tetap menjalankan verifikasi BCrypt palsu agar waktu respons tidak membocorkan keberadaan email.
   - Refresh token: 256 bit acak, hanya SHA-256-nya yang disimpan; cookie `nexus_rt` dengan `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`.
   - `LOGIN_HISTORY` tidak menyimpan email yang dicoba (data pribadi). Event `UserLoggedIn` dan `CredentialLocked` masuk `OUTBOX_MESSAGES` dalam transaksi yang sama.
   - Seed dev: `admin@demo.local` (tenant 1, role `admin`) dibuat saat start di Development bila `Seed:AdminPassword` diisi (`SEED_ADMIN_PASSWORD` di `deploy/.env`). Kunci RS256 wajib dari secret (`Auth:Jwt:SigningKeyPem`) di luar Development.
-  - Tes: 27 unit test (aturan lockout, handler, token terverifikasi lewat JWKS) dan tes integrasi dengan Oracle sungguhan lewat Testcontainers (trait `Oracle`, berjalan di CI).
+  - Tes: 30 unit test (aturan lockout, handler, retry konkurensi, token terverifikasi lewat JWKS) dan tes integrasi dengan Oracle sungguhan lewat Testcontainers (trait `Oracle`, berjalan di CI). Tes Oracle menemukan bug yang tidak terlihat di unit test: `HasConversion<int>()` pada kolom bool membuat filter soft delete gagal di provider Oracle.
+  - Hasil review: percobaan gagal paralel kini tetap terhitung (konflik `ROW_VERSION` → muat ulang → hitung lagi, maks 3 kali; konflik menjadi 409, bukan 500); BCrypt selalu dijalankan sebelum cek kunci agar akun terkunci tidak merespons lebih cepat; BCrypt "enhanced" (pre-hash SHA-384) agar password > 72 byte tidak terpotong; IP klien asli dari `X-Forwarded-For` Gateway; seeder berjalan di latar belakang dengan retry dan memfilter tenant; endpoint `openid-configuration` dihapus (jwks_uri dari header Host bisa dipalsukan); nama alasan gagal login dibuat netral (`UserNotFound`, `InvalidLogin`, `Locked`) atas temuan CodeQL.
 
 ---
 
