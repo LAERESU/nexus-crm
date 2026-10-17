@@ -160,6 +160,11 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   3. Health check `/health/ready` memeriksa Oracle, Redis, dan RabbitMQ.
   4. Pasang di semua service dan Gateway.
 - **Acceptance criteria:**
-  - [ ] Satu request lewat Gateway menghasilkan log dengan `correlationId` yang sama di Gateway dan service.
-  - [ ] `/health/ready` mengembalikan 503 saat Oracle mati.
-  - [ ] Tidak ada password/token yang tercatat di log.
+  - [ ] Satu request lewat Gateway menghasilkan log dengan `correlationId` yang sama di Gateway dan service. (sisi service ✅: id dari header dipakai ulang, dikembalikan di response, dan muncul di log JSON; sisi Gateway dikerjakan di NX-011)
+  - [x] `/health/ready` mengembalikan 503 saat Oracle mati. (diuji di compose: `docker stop nexus-oracle` → ready 503, live tetap 200)
+  - [x] Tidak ada password/token yang tercatat di log. (`SensitiveDataMasker` + tes; log 7 container diperiksa, tidak ada password)
+- **Catatan implementasi:**
+  - Properti log: `Service`, `Environment`, `CorrelationId`, `TenantId`, `UserId`. TenantId dan UserId dibaca dari claim `tenant_id` dan `NameIdentifier`; nama claim final ditetapkan di NX-012 (login) dan, bila berbeda, konstanta di `ApplicationBuilderExtensions` disesuaikan.
+  - `X-Correlation-Id` yang masuk hanya dipakai bila aman (huruf/angka/`-`/`_`, maks 64 karakter); selain itu diganti id baru agar tidak terjadi log injection.
+  - Pemeriksaan dependency hanya didaftarkan bila `ConnectionStrings:Oracle|Redis|RabbitMq` dikonfigurasi, sehingga service tetap bisa dijalankan dari IDE tanpa infrastruktur. `/health/live` tidak memeriksa dependency.
+  - `Oracle.ManagedDataAccess.Core` membawa `System.Security.Cryptography.Pkcs` 8.0.1 yang rentan (HIGH); versinya dipaku ke 10.0.13 lewat Central Package Management.

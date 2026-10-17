@@ -13,6 +13,7 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
   3. Tambahkan CORS (hanya origin frontend), header keamanan, dan correlation id.
   4. Teruskan `/hubs/notifications` (WebSocket) ke Notification Service.
   5. Tambahkan `Dockerfile` Gateway dengan pola yang sama seperti service lain (ditunda dari NX-007 karena project Gateway baru dibuat di sini).
+  6. Pasang `AddNexusSerilog`, `UseNexusObservability`, dan `AddNexusHealthChecks` di Gateway, lalu buktikan `correlationId` yang sama muncul di log Gateway dan service tujuan (ditunda dari NX-010 karena Gateway belum ada).
 - **Acceptance criteria:**
   - [ ] `GET /api/v1/projects/health` lewat Gateway diteruskan ke Project Service.
   - [ ] Request dari origin yang tidak diizinkan ditolak CORS.
