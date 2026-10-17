@@ -51,7 +51,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 
 ---
 
-### NX-004 · Inisialisasi frontend React
+### NX-004 · Inisialisasi frontend React ✅
 - **Sprint:** 1 · **SP:** 3 · **Bergantung pada:** NX-001
 - **Tujuan:** aplikasi React siap dikembangkan per fitur.
 - **Langkah:**
