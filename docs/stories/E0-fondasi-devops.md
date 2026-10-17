@@ -44,10 +44,10 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   5. Tambahkan test arsitektur (NetArchTest) yang gagal bila Domain mereferensi Application/Infrastructure.
   6. Tulis `docs/adr/0003-template-service.md` yang menjelaskan struktur ini, lalu buat kerangka kosong yang sama (project + `Program.cs` + health) untuk Auth, User, Task, Sop, Notification, Audit.
 - **Acceptance criteria:**
-  - [ ] Ketujuh service ter-build dan bisa dijalankan (`dotnet run`) dengan `/health/live` mengembalikan 200.
-  - [ ] Swagger tampil di `/swagger` untuk setiap service pada environment Development.
-  - [ ] Test arsitektur lulus.
-  - [ ] Exception yang tidak tertangani menghasilkan ProblemDetails tanpa stack trace.
+  - [x] Ketujuh service ter-build dan bisa dijalankan (`dotnet run`) dengan `/health/live` mengembalikan 200.
+  - [x] Swagger tampil di `/swagger` untuk setiap service pada environment Development.
+  - [x] Test arsitektur lulus.
+  - [x] Exception yang tidak tertangani menghasilkan ProblemDetails tanpa stack trace.
 
 ---
 
