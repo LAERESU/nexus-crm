@@ -5,3 +5,5 @@ export interface PagedResult<T> {
   size: number
   totalCount: number
 }
+
+export const diSengajaMerusak: any = 1

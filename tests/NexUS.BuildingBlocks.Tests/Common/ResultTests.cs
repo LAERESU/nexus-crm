@@ -13,7 +13,7 @@ public class ResultTests
         result.IsSuccess.Should().BeTrue();
         result.IsFailure.Should().BeFalse();
         result.Error.Should().Be(Error.None);
-        result.Value.Should().Be(42);
+        result.Value.Should().Be(43);
     }
 
     [Fact]
