@@ -30,23 +30,33 @@ NexUS/
 └── .github/             # workflow CI/CD & template PR
 ```
 
-## Menjalankan Infrastruktur Lokal
+## Menjalankan Lingkungan Lokal
 
-Prasyarat: Docker Desktop.
+Prasyarat: Docker Desktop (disarankan alokasi memori minimal 6 GB).
 
 ```bash
 cd deploy
-cp .env.example .env      # isi password sesuai kebutuhan
-docker compose up -d      # Oracle Free, Redis, RabbitMQ
+cp .env.example .env                 # isi password sesuai kebutuhan
+docker compose up -d --build         # infrastruktur + 7 service + web
+```
+
+Hanya infrastruktur (service dan web dijalankan dari IDE dengan `dotnet run` / `npm run dev`):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
 | Layanan | Alamat |
 | --- | --- |
-| Oracle Free | `localhost:1521/FREEPDB1` |
+| Oracle Free | `localhost:1521/FREEPDB1` (user schema: `AUTH_SCHEMA`, `USR_SCHEMA`, `PRJ_SCHEMA`, `TSK_SCHEMA`, `SOP_SCHEMA`, `NTF_SCHEMA`, `AUD_SCHEMA`) |
 | Redis | `localhost:6379` |
 | RabbitMQ | `localhost:5672`, UI di http://localhost:15672 |
+| RustFS (S3) | `localhost:9000`, console di http://localhost:9001/rustfs/console/index.html |
+| Mailpit | SMTP `localhost:1025`, UI di http://localhost:8025 |
+| Service Auth, User, Project, Task, Sop, Notification, Audit | http://localhost:5101 … 5107 (`/health/live`, `/swagger`) |
+| Web | http://localhost:3000 |
 
-Oracle membutuhkan beberapa menit saat pertama kali dijalankan. Cek dengan `docker compose ps` hingga statusnya `healthy`.
+Oracle membutuhkan beberapa menit saat pertama kali dijalankan. Cek dengan `docker compose ps` hingga semua container `healthy`. Hapus data lokal dengan `docker compose down -v`.
 
 ## Status
 

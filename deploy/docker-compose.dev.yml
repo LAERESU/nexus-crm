@@ -1,0 +1,20 @@
+# Mode dev: hanya infrastruktur yang berjalan; service dan web dijalankan dari IDE (dotnet run / npm run dev).
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Container aplikasi tetap bisa dijalankan: tambahkan --profile apps.
+services:
+  auth:
+    profiles: ["apps"]
+  user:
+    profiles: ["apps"]
+  project:
+    profiles: ["apps"]
+  task:
+    profiles: ["apps"]
+  sop:
+    profiles: ["apps"]
+  notification:
+    profiles: ["apps"]
+  audit:
+    profiles: ["apps"]
+  web:
+    profiles: ["apps"]

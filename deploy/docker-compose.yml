@@ -1,6 +1,15 @@
-# Infrastruktur lokal untuk pengembangan NexUS.
-# Service aplikasi (.NET & React) akan ditambahkan ke file ini pada story NX-005.
+# Lingkungan lokal NexUS: infrastruktur + semua service.
+#   Semua container      : docker compose up -d --build
+#   Hanya infrastruktur  : docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Salin .env.example menjadi .env lebih dulu.
 name: nexus
+
+x-dotnet-service: &dotnet-service
+  restart: unless-stopped
+  depends_on:
+    oracle: { condition: service_healthy }
+    redis: { condition: service_healthy }
+    rabbitmq: { condition: service_healthy }
 
 services:
   oracle:
@@ -8,12 +17,12 @@ services:
     container_name: nexus-oracle
     environment:
       ORACLE_PASSWORD: ${ORACLE_PASSWORD}
-      APP_USER: ${ORACLE_APP_USER}
-      APP_USER_PASSWORD: ${ORACLE_APP_PASSWORD}
+      ORACLE_APP_PASSWORD: ${ORACLE_APP_PASSWORD}
     ports:
       - "1521:1521"
     volumes:
       - oracle-data:/opt/oracle/oradata
+      - ./oracle-init:/container-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "healthcheck.sh"]
       interval: 15s
@@ -52,7 +61,199 @@ services:
       timeout: 10s
       retries: 5
 
+  rustfs:
+    image: rustfs/rustfs:1.0.2
+    container_name: nexus-rustfs
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+      RUSTFS_CONSOLE_ENABLE: "true"
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # console: http://localhost:9001/rustfs/console/index.html
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: nexus-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth:
+    <<: *dotnet-service
+    container_name: nexus-auth
+    build:
+      context: ..
+      dockerfile: src/Services/Auth/NexUS.Auth.Api/Dockerfile
+    image: nexus/auth:dev
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Oracle: "User Id=AUTH_SCHEMA;Password=${ORACLE_APP_PASSWORD};Data Source=oracle:1521/FREEPDB1"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD},abortConnect=false"
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+    ports:
+      - "5101:8080"
+    healthcheck:
+      test: ["CMD", "dotnet", "NexUS.Auth.Api.dll", "--healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  user:
+    <<: *dotnet-service
+    container_name: nexus-user
+    build:
+      context: ..
+      dockerfile: src/Services/User/NexUS.User.Api/Dockerfile
+    image: nexus/user:dev
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Oracle: "User Id=USR_SCHEMA;Password=${ORACLE_APP_PASSWORD};Data Source=oracle:1521/FREEPDB1"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD},abortConnect=false"
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+    ports:
+      - "5102:8080"
+    healthcheck:
+      test: ["CMD", "dotnet", "NexUS.User.Api.dll", "--healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  project:
+    <<: *dotnet-service
+    container_name: nexus-project
+    build:
+      context: ..
+      dockerfile: src/Services/Project/NexUS.Project.Api/Dockerfile
+    image: nexus/project:dev
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Oracle: "User Id=PRJ_SCHEMA;Password=${ORACLE_APP_PASSWORD};Data Source=oracle:1521/FREEPDB1"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD},abortConnect=false"
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+    ports:
+      - "5103:8080"
+    healthcheck:
+      test: ["CMD", "dotnet", "NexUS.Project.Api.dll", "--healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  task:
+    <<: *dotnet-service
+    container_name: nexus-task
+    build:
+      context: ..
+      dockerfile: src/Services/Task/NexUS.Task.Api/Dockerfile
+    image: nexus/task:dev
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Oracle: "User Id=TSK_SCHEMA;Password=${ORACLE_APP_PASSWORD};Data Source=oracle:1521/FREEPDB1"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD},abortConnect=false"
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+    ports:
+      - "5104:8080"
+    healthcheck:
+      test: ["CMD", "dotnet", "NexUS.Task.Api.dll", "--healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  sop:
+    <<: *dotnet-service
+    container_name: nexus-sop
+    build:
+      context: ..
+      dockerfile: src/Services/Sop/NexUS.Sop.Api/Dockerfile
+    image: nexus/sop:dev
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Oracle: "User Id=SOP_SCHEMA;Password=${ORACLE_APP_PASSWORD};Data Source=oracle:1521/FREEPDB1"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD},abortConnect=false"
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+    ports:
+      - "5105:8080"
+    healthcheck:
+      test: ["CMD", "dotnet", "NexUS.Sop.Api.dll", "--healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  notification:
+    <<: *dotnet-service
+    container_name: nexus-notification
+    build:
+      context: ..
+      dockerfile: src/Services/Notification/NexUS.Notification.Api/Dockerfile
+    image: nexus/notification:dev
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Oracle: "User Id=NTF_SCHEMA;Password=${ORACLE_APP_PASSWORD};Data Source=oracle:1521/FREEPDB1"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD},abortConnect=false"
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+    ports:
+      - "5106:8080"
+    healthcheck:
+      test: ["CMD", "dotnet", "NexUS.Notification.Api.dll", "--healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  audit:
+    <<: *dotnet-service
+    container_name: nexus-audit
+    build:
+      context: ..
+      dockerfile: src/Services/Audit/NexUS.Audit.Api/Dockerfile
+    image: nexus/audit:dev
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Oracle: "User Id=AUD_SCHEMA;Password=${ORACLE_APP_PASSWORD};Data Source=oracle:1521/FREEPDB1"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD},abortConnect=false"
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+    ports:
+      - "5107:8080"
+    healthcheck:
+      test: ["CMD", "dotnet", "NexUS.Audit.Api.dll", "--healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: ../web
+    image: nexus/web:dev
+    container_name: nexus-web
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
 volumes:
   oracle-data:
   redis-data:
   rabbitmq-data:
+  rustfs-data:

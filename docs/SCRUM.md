@@ -94,7 +94,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | NX-002 | Solution .NET + BuildingBlocks (Common, Auth, Caching, Messaging, Observability) | 5 | 1 | ✅ |
 | NX-003 | Template service Clean Architecture (Domain/Application/Infrastructure/Api + tests) | 5 | 1 | ✅ |
 | NX-004 | Inisialisasi frontend React + Vite + TypeScript + lint + struktur fitur | 3 | 1 | ✅ |
-| NX-005 | `docker-compose` lokal: Oracle Free, Redis, RabbitMQ, semua service | 5 | 1 | ⬜ |
+| NX-005 | `docker-compose` lokal: Oracle Free, Redis, RabbitMQ, semua service | 5 | 1 | 🔍 |
 | NX-006 | Pipeline CI: build, test, lint, scan untuk backend & frontend | 5 | 1 | ⬜ |
 | NX-007 | Dockerfile multi-stage backend & frontend (non-root) | 3 | 1 | ✅ |
 | NX-008 | Helm chart generik + deploy otomatis ke Kubernetes dev | 8 | 2 | ⬜ |

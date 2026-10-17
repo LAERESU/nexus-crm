@@ -73,15 +73,19 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 - **Sprint:** 1 · **SP:** 5 · **Bergantung pada:** NX-003, NX-007
 - **Tujuan:** satu perintah menjalankan semua infrastruktur dan service di laptop.
 - **Langkah:**
-  1. Lengkapi `deploy/docker-compose.yml` (sudah berisi Oracle, Redis, RabbitMQ) dengan MinIO (object storage) dan Mailpit (SMTP palsu untuk uji email).
+  1. Lengkapi `deploy/docker-compose.yml` (sudah berisi Oracle, Redis, RabbitMQ) dengan object storage S3 lokal (MinIO diganti RustFS, lihat ADR-0005) dan Mailpit (SMTP palsu untuk uji email).
   2. Tambahkan service aplikasi (gateway, 7 service, web) yang dibangun dari Dockerfile NX-007, dengan `depends_on` kondisi `service_healthy`.
   3. Buat skrip init Oracle `deploy/oracle-init/01-users.sql` yang membuat user/schema `AUTH_SCHEMA`, `USR_SCHEMA`, `PRJ_SCHEMA`, `TSK_SCHEMA`, `SOP_SCHEMA`, `NTF_SCHEMA`, `AUD_SCHEMA` beserta grant minimal.
   4. Buat `docker-compose.override.yml` untuk mode dev (hanya infrastruktur), sehingga service bisa dijalankan dari IDE.
   5. Dokumentasikan di `README.md`.
 - **Acceptance criteria:**
-  - [ ] `docker compose up -d` dari folder `deploy` menjalankan semua container sampai `healthy`.
-  - [ ] Ketujuh schema Oracle ada dan bisa diakses dengan user masing-masing.
-  - [ ] UI RabbitMQ, MinIO, dan Mailpit bisa dibuka di browser.
+  - [x] `docker compose up -d` dari folder `deploy` menjalankan semua container sampai `healthy`. (13 container; Gateway menyusul di NX-011)
+  - [x] Ketujuh schema Oracle ada dan bisa diakses dengan user masing-masing.
+  - [x] UI RabbitMQ, RustFS, dan Mailpit bisa dibuka di browser. (diverifikasi HTTP 200)
+- **Catatan implementasi:**
+  - Skrip init berupa `01-users.sh` (bukan `.sql`) agar password schema dibaca dari environment, bukan ditulis di repo.
+  - Mode dev memakai `docker-compose.dev.yml` yang dipilih eksplisit dengan `-f`, bukan `docker-compose.override.yml`, karena file override dimuat otomatis dan akan membuat `docker compose up -d` tidak menjalankan semua container.
+  - Healthcheck service memakai mode `--healthcheck` pada aplikasi karena image chiseled tidak punya shell/curl.
 
 ---
 

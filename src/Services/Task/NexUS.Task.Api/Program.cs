@@ -3,6 +3,8 @@ using NexUS.Tasks.Api.Middleware;
 using NexUS.Tasks.Application;
 using NexUS.Tasks.Infrastructure;
 
+if (HealthProbe.IsRequested(args)) return await HealthProbe.RunAsync();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.AddNexusSerilog();
@@ -32,5 +34,6 @@ app.MapHealthChecks("/health/live", new() { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains("ready") });
 
 app.Run();
+return 0;
 
 public partial class Program;
