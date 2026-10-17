@@ -14,7 +14,7 @@
 | Tanggal mulai sprint | — |
 | Tanggal selesai sprint | — |
 | Sprint goal | Menyiapkan repo, keputusan teknis awal, dan backlog siap dikerjakan |
-| Progres keseluruhan | 7 / 64 story selesai (11%) |
+| Progres keseluruhan | 9 / 64 story selesai (14%) |
 | Hambatan aktif | — |
 
 Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 🔍 Review · ✅ Done · 🟥 Blocked
@@ -73,7 +73,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 
 | ID | Epic | Fase | Story | Selesai | Progres |
 | --- | --- | --- | --- | --- | --- |
-| E0 | Fondasi & DevOps | 1 | 10 | 7 | 70% |
+| E0 | Fondasi & DevOps | 1 | 10 | 9 | 90% |
 | E1 | Auth & Gateway | 1 | 7 | 0 | 0% |
 | E2 | User & RBAC | 2 | 7 | 0 | 0% |
 | E3 | Project Management | 2 | 7 | 0 | 0% |
@@ -82,7 +82,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | E6 | SOP Builder | 3 | 11 | 0 | 0% |
 | E7 | Notification | 3 | 4 | 0 | 0% |
 | E8 | Audit, Observability & Go-live | 4 | 6 | 0 | 0% |
-| | **Total** | | **64** | **7** | **11%** |
+| | **Total** | | **64** | **9** | **14%** |
 
 ## 5. Product Backlog
 
@@ -95,11 +95,11 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | NX-003 | Template service Clean Architecture (Domain/Application/Infrastructure/Api + tests) | 5 | 1 | ✅ |
 | NX-004 | Inisialisasi frontend React + Vite + TypeScript + lint + struktur fitur | 3 | 1 | ✅ |
 | NX-005 | `docker-compose` lokal: Oracle Free, Redis, RabbitMQ, semua service | 5 | 1 | ✅ |
-| NX-006 | Pipeline CI: build, test, lint, scan untuk backend & frontend | 5 | 1 | 🔍 |
+| NX-006 | Pipeline CI: build, test, lint, scan untuk backend & frontend | 5 | 1 | ✅ |
 | NX-007 | Dockerfile multi-stage backend & frontend (non-root) | 3 | 1 | ✅ |
 | NX-008 | Helm chart generik + deploy otomatis ke Kubernetes dev | 8 | 2 | ⬜ |
 | NX-009 | Setup Flyway/Liquibase + user & schema Oracle per service | 5 | 1 | ✅ |
-| NX-010 | Logging terstruktur (Serilog) + correlation id + health check | 3 | 2 | ⬜ |
+| NX-010 | Logging terstruktur (Serilog) + correlation id + health check | 3 | 2 | ✅ |
 
 ### E1 · Auth & Gateway
 

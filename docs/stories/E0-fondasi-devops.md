@@ -89,7 +89,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 
 ---
 
-### NX-006 · Pipeline CI
+### NX-006 · Pipeline CI ✅
 - **Sprint:** 1 · **SP:** 5 · **Bergantung pada:** NX-002, NX-003, NX-004
 - **Tujuan:** setiap PR otomatis dicek build, test, lint, dan keamanan.
 - **Langkah:**
@@ -100,9 +100,9 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   5. Pindahkan `docs/pull_request_template.md` ke `.github/` (opsional), aktifkan branch protection di GitHub untuk `main` dan `develop`.
   6. Tambahkan job migrasi database (ditunda dari NX-009): jalankan `scripts/check-migrations-immutable.sh origin/develop`, lalu `flyway validate` dan `flyway migrate` terhadap Oracle Free sebagai service container.
 - **Acceptance criteria:**
-  - [ ] PR ke `develop` menjalankan workflow dan statusnya tampil di PR.
-  - [ ] Build gagal jika ada test gagal, lint gagal, atau dependency HIGH/CRITICAL.
-  - [ ] Badge status CI tampil di `README.md`.
+  - [x] PR ke `develop` menjalankan workflow dan statusnya tampil di PR. (PR #1: 18 check hijau)
+  - [ ] Build gagal jika ada test gagal, lint gagal, atau dependency HIGH/CRITICAL. (gate terbukti gagal di lokal; belum dibuktikan merah di GitHub)
+  - [x] Badge status CI tampil di `README.md`.
 - **Catatan implementasi:**
   - Workflow: `ci-backend`, `ci-frontend`, `ci-database`, `ci-images` (build + Trivy semua image, ditambahkan karena dijanjikan di NX-007), `codeql`, serta `dependabot.yml`.
   - Gate lokal sudah diuji: coverage 82,2% (ambang 70%), `check-coverage.sh 95` gagal sebagaimana mestinya, `npm audit` bersih, `actionlint` bersih.
@@ -159,7 +159,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 
 ---
 
-### NX-010 · Logging terstruktur, correlation id, health check
+### NX-010 · Logging terstruktur, correlation id, health check ✅
 - **Sprint:** 2 · **SP:** 3 · **Bergantung pada:** NX-003
 - **Langkah:**
   1. Lengkapi `NexUS.BuildingBlocks.Observability`: Serilog JSON ke console dengan enrich `service`, `environment`, `tenantId`, `userId`, `correlationId`.
@@ -167,6 +167,13 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   3. Health check `/health/ready` memeriksa Oracle, Redis, dan RabbitMQ.
   4. Pasang di semua service dan Gateway.
 - **Acceptance criteria:**
-  - [ ] Satu request lewat Gateway menghasilkan log dengan `correlationId` yang sama di Gateway dan service.
-  - [ ] `/health/ready` mengembalikan 503 saat Oracle mati.
-  - [ ] Tidak ada password/token yang tercatat di log.
+  - [ ] Satu request lewat Gateway menghasilkan log dengan `correlationId` yang sama di Gateway dan service. (sisi service ✅: id dari header dipakai ulang, dikembalikan di response, dan muncul di log JSON; sisi Gateway dikerjakan di NX-011)
+  - [x] `/health/ready` mengembalikan 503 saat Oracle mati. (diuji di compose: `docker stop nexus-oracle` → ready 503, live tetap 200; kegagalan Redis/RabbitMQ berstatus Degraded dan tetap 200, lihat catatan)
+  - [x] Tidak ada password/token yang tercatat di log. (`SensitiveDataMasker` + tes; log 7 container diperiksa, tidak ada password)
+- **Catatan implementasi:**
+  - Properti log: `Service`, `Environment`, `CorrelationId`, `TenantId`, `UserId`. TenantId dan UserId dibaca dari claim `tenant_id` dan `NameIdentifier`; nama claim final ditetapkan di NX-012 (login) dan, bila berbeda, konstanta di `ApplicationBuilderExtensions` disesuaikan.
+  - `X-Correlation-Id` yang masuk hanya dipakai bila aman (huruf/angka/`-`/`_`, maks 64 karakter); selain itu diganti id baru agar tidak terjadi log injection.
+  - Pemeriksaan dependency hanya didaftarkan bila `ConnectionStrings:Oracle|Redis|RabbitMq` dikonfigurasi, sehingga service tetap bisa dijalankan dari IDE tanpa infrastruktur. `/health/live` tidak memeriksa dependency.
+  - Hasil review: Redis (hanya cache, CONTEXT.md bagian 3 poin 7) dan RabbitMQ (Outbox) berstatus **Degraded** saat gagal sehingga pod tidak dikeluarkan dari Service; hanya Oracle yang membuat ready 503. Hasil health check tidak membawa exception asli (bisa memuat kredensial). `RedisHealthCheck` memakai satu multiplexer per proses. Request log `/health/*` diturunkan ke Verbose. Correlation id menerima `.` dan `:` (maks 128) agar format trace seperti W3C `traceparent` tidak diganti.
+  - Dari hasil review, ditunda dengan sengaja: urutan `UseNexusLogEnrichment` setelah autentikasi (dikerjakan di NX-015 saat autentikasi dipasang), dan pemisahan health check dependency ke project sendiri agar `Observability` tidak membawa klien Oracle/Redis/RabbitMQ ke semua consumer (catatan teknis; dipertimbangkan bila ukuran image atau CVE jadi masalah).
+  - `Oracle.ManagedDataAccess.Core` membawa `System.Security.Cryptography.Pkcs` 8.0.1 yang rentan (HIGH); versinya dipaku ke 10.0.13 lewat Central Package Management.

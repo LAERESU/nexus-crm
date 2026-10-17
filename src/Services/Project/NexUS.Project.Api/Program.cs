@@ -17,11 +17,13 @@ builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddHealthChecks();
+builder.Services.AddNexusHealthChecks(builder.Configuration);
 
 var app = builder.Build();
 
+app.UseNexusObservability();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseNexusLogEnrichment();
 
 if (app.Environment.IsDevelopment())
 {
