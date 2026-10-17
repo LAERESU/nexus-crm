@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Serilog.Context;
+using Serilog.Events;
 
 namespace NexUS.BuildingBlocks.Observability;
 
@@ -18,6 +19,11 @@ public static class ApplicationBuilderExtensions
         app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseSerilogRequestLogging(options =>
         {
+            // Probe health dipanggil terus-menerus; turunkan ke Verbose agar log tidak banjir.
+            options.GetLevel = (context, _, exception) =>
+                exception is not null || context.Response.StatusCode >= 500 ? LogEventLevel.Error
+                : context.Request.Path.StartsWithSegments("/health") ? LogEventLevel.Verbose
+                : LogEventLevel.Information;
             options.EnrichDiagnosticContext = (diagnostics, context) =>
             {
                 diagnostics.Set("TenantId", context.User.FindFirstValue(TenantClaim));

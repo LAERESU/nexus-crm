@@ -9,9 +9,10 @@ public static class CorrelationId
     public const string ItemKey = "NexUS.CorrelationId";
     public const string LogProperty = "CorrelationId";
 
-    /// <summary>Hanya menerima id yang aman ditulis ke log (huruf, angka, '-', '_'; maksimum 64 karakter).</summary>
+    /// <summary>Hanya menerima id yang aman ditulis ke log (huruf, angka, '-', '_', '.', ':'; maksimum 128 karakter).</summary>
     public static bool IsValid(string? value) =>
-        !string.IsNullOrEmpty(value) && value.Length <= 64 && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+        !string.IsNullOrEmpty(value) && value.Length <= 128 &&
+        value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.' or ':');
 }
 
 /// <summary>Membaca atau membuat X-Correlation-Id, mengembalikannya di response, dan menyertakannya di setiap log.</summary>

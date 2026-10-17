@@ -161,10 +161,12 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   4. Pasang di semua service dan Gateway.
 - **Acceptance criteria:**
   - [ ] Satu request lewat Gateway menghasilkan log dengan `correlationId` yang sama di Gateway dan service. (sisi service ✅: id dari header dipakai ulang, dikembalikan di response, dan muncul di log JSON; sisi Gateway dikerjakan di NX-011)
-  - [x] `/health/ready` mengembalikan 503 saat Oracle mati. (diuji di compose: `docker stop nexus-oracle` → ready 503, live tetap 200)
+  - [x] `/health/ready` mengembalikan 503 saat Oracle mati. (diuji di compose: `docker stop nexus-oracle` → ready 503, live tetap 200; kegagalan Redis/RabbitMQ berstatus Degraded dan tetap 200, lihat catatan)
   - [x] Tidak ada password/token yang tercatat di log. (`SensitiveDataMasker` + tes; log 7 container diperiksa, tidak ada password)
 - **Catatan implementasi:**
   - Properti log: `Service`, `Environment`, `CorrelationId`, `TenantId`, `UserId`. TenantId dan UserId dibaca dari claim `tenant_id` dan `NameIdentifier`; nama claim final ditetapkan di NX-012 (login) dan, bila berbeda, konstanta di `ApplicationBuilderExtensions` disesuaikan.
   - `X-Correlation-Id` yang masuk hanya dipakai bila aman (huruf/angka/`-`/`_`, maks 64 karakter); selain itu diganti id baru agar tidak terjadi log injection.
   - Pemeriksaan dependency hanya didaftarkan bila `ConnectionStrings:Oracle|Redis|RabbitMq` dikonfigurasi, sehingga service tetap bisa dijalankan dari IDE tanpa infrastruktur. `/health/live` tidak memeriksa dependency.
+  - Hasil review: Redis (hanya cache, CONTEXT.md bagian 3 poin 7) dan RabbitMQ (Outbox) berstatus **Degraded** saat gagal sehingga pod tidak dikeluarkan dari Service; hanya Oracle yang membuat ready 503. Hasil health check tidak membawa exception asli (bisa memuat kredensial). `RedisHealthCheck` memakai satu multiplexer per proses. Request log `/health/*` diturunkan ke Verbose. Correlation id menerima `.` dan `:` (maks 128) agar format trace seperti W3C `traceparent` tidak diganti.
+  - Dari hasil review, ditunda dengan sengaja: urutan `UseNexusLogEnrichment` setelah autentikasi (dikerjakan di NX-015 saat autentikasi dipasang), dan pemisahan health check dependency ke project sendiri agar `Observability` tidak membawa klien Oracle/Redis/RabbitMQ ke semua consumer (catatan teknis; dipertimbangkan bila ukuran image atau CVE jadi masalah).
   - `Oracle.ManagedDataAccess.Core` membawa `System.Security.Cryptography.Pkcs` 8.0.1 yang rentan (HIGH); versinya dipaku ke 10.0.13 lewat Central Package Management.

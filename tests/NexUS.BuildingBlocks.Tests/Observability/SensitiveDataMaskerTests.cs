@@ -69,9 +69,62 @@ public class SensitiveDataMaskerTests
     {
         var (logger, sink) = CreateLogger();
 
-        logger.Information("Header {Detail}", "Authorization gagal: Bearer abc.def.ghi");
+        logger.Information("Header {Detail}", "Authorization gagal: Bearer eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl");
 
-        Rendered(sink).Should().NotContain("abc.def.ghi");
+        Rendered(sink).Should().NotContain("eyJhbGciOiJSUzI1NiJ9");
+    }
+
+    [Fact]
+    public void Pola_token_apikey_json_dan_basic_di_dalam_teks_disamarkan()
+    {
+        var (logger, sink) = CreateLogger();
+
+        logger.Information("A {A} B {B} C {C}",
+            "gagal: token=abc123xyz apikey=kunci-rahasia",
+            "{\"password\":\"p@ss\",\"user\":\"budi\"}",
+            "Authorization: Basic dXNlcjpwYXNzd29yZA==");
+
+        var message = Rendered(sink);
+        message.Should().NotContain("abc123xyz").And.NotContain("kunci-rahasia")
+            .And.NotContain("p@ss").And.NotContain("dXNlcjpwYXNzd29yZA");
+        message.Should().Contain("budi");
+    }
+
+    [Theory]
+    [InlineData("CancellationToken")]
+    [InlineData("AuthorizationPolicy")]
+    [InlineData("TokenCount")]
+    [InlineData("ConnectionStringName")]
+    public void Nama_properti_yang_hanya_mirip_tidak_disamarkan(string name)
+    {
+        var (logger, sink) = CreateLogger();
+        logger.Write(LogEventLevel.Information, "{" + name + "}", "nilai-biasa");
+
+        Rendered(sink).Should().Contain("nilai-biasa");
+    }
+
+    [Theory]
+    [InlineData("AccessToken")]
+    [InlineData("RefreshToken")]
+    [InlineData("Token")]
+    [InlineData("DbPassword")]
+    [InlineData("ClientSecret")]
+    public void Nama_properti_sensitif_disamarkan(string name)
+    {
+        var (logger, sink) = CreateLogger();
+        logger.Write(LogEventLevel.Information, "{" + name + "}", "nilai-rahasia");
+
+        Rendered(sink).Should().NotContain("nilai-rahasia");
+    }
+
+    [Fact]
+    public void Kalimat_biasa_dengan_kata_bearer_tidak_diubah()
+    {
+        var (logger, sink) = CreateLogger();
+
+        logger.Information("Detail {Detail}", "bearer authentication failed; basic credentials missing");
+
+        Rendered(sink).Should().Contain("bearer authentication failed; basic credentials missing");
     }
 
     [Fact]

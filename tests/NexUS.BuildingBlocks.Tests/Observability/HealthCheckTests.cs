@@ -49,17 +49,38 @@ public class HealthCheckTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    [Fact]
+    public async Task Ready_503_bila_Oracle_mati()
+    {
+        using var host = await StartAsync(new() { ["ConnectionStrings:Oracle"] = Oracle });
+
+        var response = await host.GetTestClient().GetAsync("/health/ready");
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+    }
+
+    // Redis hanya cache dan RabbitMQ memakai Outbox: kegagalannya Degraded, service tetap menerima trafik.
     [Theory]
-    [InlineData("ConnectionStrings:Oracle", Oracle)]
     [InlineData("ConnectionStrings:Redis", Redis)]
     [InlineData("ConnectionStrings:RabbitMq", RabbitMq)]
-    public async Task Ready_503_bila_dependency_mati(string key, string connectionString)
+    public async Task Ready_tetap_200_tetapi_Degraded_bila_Redis_atau_RabbitMQ_mati(string key, string connectionString)
     {
         using var host = await StartAsync(new() { [key] = connectionString });
 
         var response = await host.GetTestClient().GetAsync("/health/ready");
 
-        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Should().Be("Degraded");
+    }
+
+    [Fact]
+    public async Task Respons_tidak_membocorkan_connection_string()
+    {
+        using var host = await StartAsync(new() { ["ConnectionStrings:Oracle"] = Oracle });
+
+        var body = await (await host.GetTestClient().GetAsync("/health/ready")).Content.ReadAsStringAsync();
+
+        body.Should().NotContain("Password").And.NotContain("127.0.0.1");
     }
 
     [Fact]

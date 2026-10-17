@@ -65,23 +65,27 @@ public class CorrelationIdTests
         response.Headers.GetValues(CorrelationId.HeaderName).Single().Should().HaveLength(32);
     }
 
-    [Fact]
-    public async Task Header_yang_valid_dipakai_ulang_dan_dikembalikan()
+    [Theory]
+    [InlineData("abc-123")]
+    [InlineData("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")]
+    [InlineData("gateway.trace:42")]
+    public async Task Header_yang_valid_dipakai_ulang_dan_dikembalikan(string id)
     {
         var (host, _) = await StartAsync();
         using var _h = host;
         var client = host.GetTestClient();
-        client.DefaultRequestHeaders.Add(CorrelationId.HeaderName, "abc-123");
+        client.DefaultRequestHeaders.Add(CorrelationId.HeaderName, id);
 
         var response = await client.GetAsync("/ping");
 
-        response.Headers.GetValues(CorrelationId.HeaderName).Single().Should().Be("abc-123");
+        response.Headers.GetValues(CorrelationId.HeaderName).Single().Should().Be(id);
     }
 
     [Theory]
     [InlineData("a b")]
     [InlineData("<script>")]
-    [InlineData("1234567890123456789012345678901234567890123456789012345678901234567890")]
+    [InlineData("")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
     public async Task Header_yang_tidak_aman_diganti_dengan_id_baru(string unsafeValue)
     {
         var (host, _) = await StartAsync();

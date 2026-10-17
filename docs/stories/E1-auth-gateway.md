@@ -64,6 +64,7 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
   1. Lengkapi `AddNexusJwtAuth()` di BuildingBlocks.Auth (ARCHITECTURE G.1): authority, audience, validasi lifetime, cek blacklist Redis.
   2. Pasang di Gateway (policy `default` untuk route non-auth) dan di setiap service (`[Authorize]` default via fallback policy).
   3. Implementasikan `ICurrentUser` dari klaim (`UserId`, `TenantId`).
+  4. Pindahkan `app.UseNexusLogEnrichment()` di setiap `Program.cs` ke setelah `UseAuthentication()`/`UseAuthorization()` (sekarang berada sebelum autentikasi sehingga `TenantId`/`UserId` masih null), dan pastikan `ExceptionHandlingMiddleware` berada di dalam scope enrichment tersebut (temuan review NX-010).
 - **Acceptance criteria:**
   - [ ] Request tanpa token ke `/api/v1/projects` → 401 di Gateway.
   - [ ] Service menolak token dengan signature atau audience salah, walau dipanggil langsung tanpa Gateway.
