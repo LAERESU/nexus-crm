@@ -5,7 +5,7 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 
 ---
 
-### NX-011 · API Gateway YARP
+### NX-011 · API Gateway YARP ✅
 - **Sprint:** 2 · **SP:** 3 · **Bergantung pada:** NX-003, NX-010
 - **Langkah:**
   1. Buat `src/ApiGateway/NexUS.Gateway.Api` dengan YARP.
