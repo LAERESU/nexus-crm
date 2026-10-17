@@ -2,6 +2,12 @@
 
 # NexUS
 
+[![ci-backend](https://github.com/LAERESU/nexus-crm/actions/workflows/ci-backend.yml/badge.svg?branch=develop)](https://github.com/LAERESU/nexus-crm/actions/workflows/ci-backend.yml)
+[![ci-frontend](https://github.com/LAERESU/nexus-crm/actions/workflows/ci-frontend.yml/badge.svg?branch=develop)](https://github.com/LAERESU/nexus-crm/actions/workflows/ci-frontend.yml)
+[![ci-database](https://github.com/LAERESU/nexus-crm/actions/workflows/ci-database.yml/badge.svg?branch=develop)](https://github.com/LAERESU/nexus-crm/actions/workflows/ci-database.yml)
+[![ci-images](https://github.com/LAERESU/nexus-crm/actions/workflows/ci-images.yml/badge.svg?branch=develop)](https://github.com/LAERESU/nexus-crm/actions/workflows/ci-images.yml)
+[![codeql](https://github.com/LAERESU/nexus-crm/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/LAERESU/nexus-crm/actions/workflows/codeql.yml)
+
 Platform enterprise multi-tenant untuk **manajemen proyek, tugas, dan SOP perusahaan**. Dibangun dengan arsitektur microservices: ASP.NET Core 10, Oracle Database, Redis, RabbitMQ, dan React.
 
 ## Dokumentasi

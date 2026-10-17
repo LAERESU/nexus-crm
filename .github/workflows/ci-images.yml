@@ -1,0 +1,74 @@
+name: ci-images
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - '.dockerignore'
+      - '.github/workflows/ci-images.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - '.dockerignore'
+      - '.github/workflows/ci-images.yml'
+
+concurrency:
+  group: ci-images-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  TRIVY_IMAGE: aquasec/trivy:0.58.1
+
+jobs:
+  build-scan:
+    name: build-scan (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: auth, context: ., dockerfile: src/Services/Auth/NexUS.Auth.Api/Dockerfile }
+          - { name: user, context: ., dockerfile: src/Services/User/NexUS.User.Api/Dockerfile }
+          - { name: project, context: ., dockerfile: src/Services/Project/NexUS.Project.Api/Dockerfile }
+          - { name: task, context: ., dockerfile: src/Services/Task/NexUS.Task.Api/Dockerfile }
+          - { name: sop, context: ., dockerfile: src/Services/Sop/NexUS.Sop.Api/Dockerfile }
+          - { name: notification, context: ., dockerfile: src/Services/Notification/NexUS.Notification.Api/Dockerfile }
+          - { name: audit, context: ., dockerfile: src/Services/Audit/NexUS.Audit.Api/Dockerfile }
+          - { name: web, context: web, dockerfile: web/Dockerfile }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -f ${{ matrix.dockerfile }} -t nexus/${{ matrix.name }}:ci ${{ matrix.context }}
+
+      - name: Ukuran image (service backend < 250 MB)
+        if: matrix.name != 'web'
+        run: |
+          size="$(docker image inspect nexus/${{ matrix.name }}:ci --format '{{.Size}}')"
+          echo "Ukuran: $((size / 1024 / 1024)) MB"
+          test "$size" -lt $((250 * 1024 * 1024))
+
+      - name: Container berjalan sebagai non-root
+        run: |
+          user="$(docker image inspect nexus/${{ matrix.name }}:ci --format '{{.Config.User}}')"
+          echo "User: ${user:-<kosong>}"
+          test -n "$user" && test "$user" != "root" && test "$user" != "0"
+
+      - name: Scan Trivy (gagal bila ada HIGH/CRITICAL yang bisa diperbaiki)
+        run: >
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock ${{ env.TRIVY_IMAGE }}
+          image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress
+          nexus/${{ matrix.name }}:ci

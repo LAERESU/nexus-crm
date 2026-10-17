@@ -1,0 +1,73 @@
+name: ci-database
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'db/**'
+      - 'deploy/flyway/**'
+      - 'deploy/oracle-init/**'
+      - 'deploy/docker-compose.yml'
+      - 'scripts/check-migrations-immutable.sh'
+      - '.github/workflows/ci-database.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'db/**'
+      - 'deploy/flyway/**'
+      - 'deploy/oracle-init/**'
+      - 'deploy/docker-compose.yml'
+      - 'scripts/check-migrations-immutable.sh'
+      - '.github/workflows/ci-database.yml'
+
+concurrency:
+  group: ci-database-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  migrations-immutable:
+    name: migrations-immutable
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: File migrasi lama tidak boleh diubah
+        run: scripts/check-migrations-immutable.sh "origin/${{ github.base_ref }}"
+
+  flyway:
+    name: flyway
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Siapkan .env dari contoh
+        working-directory: deploy
+        run: cp .env.example .env
+
+      - name: Jalankan Oracle Free (membuat schema)
+        working-directory: deploy
+        run: docker compose up -d oracle --wait --wait-timeout 600
+
+      - name: Flyway migrate
+        working-directory: deploy
+        run: docker compose run --rm flyway migrate
+
+      - name: Flyway validate (checksum)
+        working-directory: deploy
+        run: docker compose run --rm flyway validate
+
+      - name: Flyway migrate ulang (harus idempotent)
+        working-directory: deploy
+        run: docker compose run --rm flyway migrate
+
+      - name: Log Oracle bila gagal
+        if: failure()
+        working-directory: deploy
+        run: docker compose logs oracle --tail 100
