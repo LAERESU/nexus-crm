@@ -69,7 +69,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 
 ---
 
-### NX-005 · docker-compose lokal lengkap
+### NX-005 · docker-compose lokal lengkap ✅
 - **Sprint:** 1 · **SP:** 5 · **Bergantung pada:** NX-003, NX-007
 - **Tujuan:** satu perintah menjalankan semua infrastruktur dan service di laptop.
 - **Langkah:**

@@ -14,7 +14,7 @@
 | Tanggal mulai sprint | — |
 | Tanggal selesai sprint | — |
 | Sprint goal | Menyiapkan repo, keputusan teknis awal, dan backlog siap dikerjakan |
-| Progres keseluruhan | 5 / 64 story selesai (8%) |
+| Progres keseluruhan | 6 / 64 story selesai (9%) |
 | Hambatan aktif | — |
 
 Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 🔍 Review · ✅ Done · 🟥 Blocked
@@ -73,7 +73,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 
 | ID | Epic | Fase | Story | Selesai | Progres |
 | --- | --- | --- | --- | --- | --- |
-| E0 | Fondasi & DevOps | 1 | 10 | 5 | 50% |
+| E0 | Fondasi & DevOps | 1 | 10 | 6 | 60% |
 | E1 | Auth & Gateway | 1 | 7 | 0 | 0% |
 | E2 | User & RBAC | 2 | 7 | 0 | 0% |
 | E3 | Project Management | 2 | 7 | 0 | 0% |
@@ -82,7 +82,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | E6 | SOP Builder | 3 | 11 | 0 | 0% |
 | E7 | Notification | 3 | 4 | 0 | 0% |
 | E8 | Audit, Observability & Go-live | 4 | 6 | 0 | 0% |
-| | **Total** | | **64** | **5** | **8%** |
+| | **Total** | | **64** | **6** | **9%** |
 
 ## 5. Product Backlog
 
@@ -94,7 +94,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | NX-002 | Solution .NET + BuildingBlocks (Common, Auth, Caching, Messaging, Observability) | 5 | 1 | ✅ |
 | NX-003 | Template service Clean Architecture (Domain/Application/Infrastructure/Api + tests) | 5 | 1 | ✅ |
 | NX-004 | Inisialisasi frontend React + Vite + TypeScript + lint + struktur fitur | 3 | 1 | ✅ |
-| NX-005 | `docker-compose` lokal: Oracle Free, Redis, RabbitMQ, semua service | 5 | 1 | 🔍 |
+| NX-005 | `docker-compose` lokal: Oracle Free, Redis, RabbitMQ, semua service | 5 | 1 | ✅ |
 | NX-006 | Pipeline CI: build, test, lint, scan untuk backend & frontend | 5 | 1 | ⬜ |
 | NX-007 | Dockerfile multi-stage backend & frontend (non-root) | 3 | 1 | ✅ |
 | NX-008 | Helm chart generik + deploy otomatis ke Kubernetes dev | 8 | 2 | ⬜ |
