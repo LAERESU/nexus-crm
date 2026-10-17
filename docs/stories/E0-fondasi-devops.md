@@ -11,7 +11,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 
 ---
 
-### NX-002 · Solution .NET + BuildingBlocks
+### NX-002 · Solution .NET + BuildingBlocks ✅
 - **Sprint:** 1 · **SP:** 5 · **Bergantung pada:** NX-001
 - **Tujuan:** satu solution `NexUS.sln` dan pustaka bersama yang dipakai semua service.
 - **Langkah:**
