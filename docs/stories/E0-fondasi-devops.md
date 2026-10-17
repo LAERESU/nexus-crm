@@ -103,6 +103,13 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   - [ ] PR ke `develop` menjalankan workflow dan statusnya tampil di PR.
   - [ ] Build gagal jika ada test gagal, lint gagal, atau dependency HIGH/CRITICAL.
   - [ ] Badge status CI tampil di `README.md`.
+- **Catatan implementasi:**
+  - Workflow: `ci-backend`, `ci-frontend`, `ci-database`, `ci-images` (build + Trivy semua image, ditambahkan karena dijanjikan di NX-007), `codeql`, serta `dependabot.yml`.
+  - Gate lokal sudah diuji: coverage 82,2% (ambang 70%), `check-coverage.sh 95` gagal sebagaimana mestinya, `npm audit` bersih, `actionlint` bersih.
+  - Workflow baru bisa diverifikasi penuh setelah dijalankan di GitHub; centang tiga kriteria di atas setelah PR pertama hijau.
+  - Hasil review PR: nama job dibuat unik (`backend-build-test`, `frontend-build-test`) agar branch protection tidak salah cocok; `cancel-in-progress` hanya untuk PR (push ke develop/main tidak dibatalkan); skrip kerentanan gagal bila data kerentanan tidak terambil (NU1900) atau keluaran kosong; audit mingguan terjadwal; `NuGetAuditLevel=high` agar build dan gate memakai ambang yang sama; `timeout-minutes` di semua job; cache database Trivy; `npm audit --package-lock-only`; Dependabot mencakup Dockerfile service dan compose.
+  - Check yang diwajibkan di branch protection nanti: `backend-build-test`, `vulnerable-packages`, `frontend-build-test`, `npm-audit`, `flyway`, `migrations-immutable`, `analyze (...)`, `build-scan (...)`. Karena memakai path filter, wajibkan hanya check yang selalu muncul atau gunakan job penutup bila PR tertahan.
+  - Branch protection (langkah 5) diatur manual di GitHub oleh pemilik repo. Jangan wajibkan check yang memakai path filter (mis. `ci-backend`) pada PR yang tidak menyentuh path-nya, karena check itu tidak pernah muncul dan PR tertahan.
 
 ---
 
