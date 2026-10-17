@@ -56,6 +56,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 | Service Auth, User, Project, Task, Sop, Notification, Audit | http://localhost:5101 … 5107 (`/health/live`, `/swagger`) |
 | Web | http://localhost:3000 |
 
+Migrasi database dijalankan otomatis oleh container `flyway` (`db/<schema>/V<n>__*.sql`). Jalankan manual dengan `scripts/db-migrate.sh [migrate|validate|info]` atau `scripts/db-migrate.ps1 -Command info`. File migrasi yang sudah di-merge tidak boleh diubah; buat migrasi baru.
+
 Oracle membutuhkan beberapa menit saat pertama kali dijalankan. Cek dengan `docker compose ps` hingga semua container `healthy`. Hapus data lokal dengan `docker compose down -v`.
 
 ## Status
