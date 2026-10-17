@@ -13,8 +13,9 @@
 - **Dokumen terkait:**
   - `docs/PLANNING.md`: ruang lingkup, roadmap, milestone, keputusan terbuka
   - `docs/SCRUM.md`: backlog, sprint, dan progres (**sumber kebenaran status**)
+  - `docs/stories/`: langkah implementasi dan acceptance criteria per story
+  - `docs/ARCHITECTURE.md`: desain teknis lengkap
   - `docs/adr/`: catatan keputusan arsitektur
-  - Rencana Arsitektur Sistem Enterprise (Claude Docs): detail teknis lengkap
 
 ## 2. Struktur Repo
 

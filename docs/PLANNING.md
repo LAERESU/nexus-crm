@@ -1,6 +1,6 @@
 # NexUS — Perencanaan Proyek
 
-> Dokumen acuan tingkat tinggi. Detail teknis lengkap ada di dokumen **Rencana Arsitektur Sistem Enterprise** (Claude Docs).
+> Dokumen acuan tingkat tinggi. Detail teknis lengkap ada di `docs/ARCHITECTURE.md`; langkah per story ada di `docs/stories/`.
 > Terakhir diperbarui: 2026-10-17
 
 ---

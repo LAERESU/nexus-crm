@@ -1,6 +1,6 @@
 # NexUS — Scrum & Pelacak Progres
 
-> File ini dipakai untuk melihat **sudah sampai mana pengembangan**. Perbarui status story setiap hari, dan isi bagian Sprint Log di akhir setiap sprint.
+> File ini dipakai untuk melihat **sudah sampai mana pengembangan**. Langkah rinci setiap story ada di `docs/stories/`. Perbarui status story setiap hari, dan isi bagian Sprint Log di akhir setiap sprint.
 > Terakhir diperbarui: 2026-10-17
 
 ---

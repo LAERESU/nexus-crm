@@ -11,6 +11,8 @@ Platform enterprise multi-tenant untuk **manajemen proyek, tugas, dan SOP perusa
 | [docs/CONTEXT.md](docs/CONTEXT.md) | Konteks proyek, aturan arsitektur, konvensi kode, alur Git. **Baca ini terlebih dahulu.** |
 | [docs/PLANNING.md](docs/PLANNING.md) | Ruang lingkup, roadmap, milestone, keputusan terbuka, risiko |
 | [docs/SCRUM.md](docs/SCRUM.md) | Backlog, sprint, dan **status progres** |
+| [docs/stories/](docs/stories/) | Langkah implementasi & acceptance criteria per story |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Desain teknis lengkap |
 | [docs/adr/](docs/adr/) | Catatan keputusan arsitektur (ADR) |
 
 ## Struktur Repo
