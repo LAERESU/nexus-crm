@@ -18,3 +18,5 @@ services:
     profiles: ["apps"]
   web:
     profiles: ["apps"]
+  gateway:
+    profiles: ["apps"]

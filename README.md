@@ -59,6 +59,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 | RabbitMQ | `localhost:5672`, UI di http://localhost:15672 |
 | RustFS (S3) | `localhost:9000`, console di http://localhost:9001/rustfs/console/index.html |
 | Mailpit | SMTP `localhost:1025`, UI di http://localhost:8025 |
+| API Gateway | http://localhost:5100 (`/api/v1/<resource>`, `/api/v1/<resource>/health`) |
 | Service Auth, User, Project, Task, Sop, Notification, Audit | http://localhost:5101 … 5107 (`/health/live`, `/swagger`) |
 | Web | http://localhost:3000 |
 
