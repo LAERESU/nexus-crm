@@ -11,6 +11,9 @@ public interface ICredentialRepository
     Task<Credential?> FindByEmailAsync(string normalizedEmail, CancellationToken ct);
 
     Task AddAsync(Credential credential, CancellationToken ct);
+
+    /// <summary>Memuat ulang nilai terbaru dari database setelah konflik konkurensi.</summary>
+    Task ReloadAsync(Credential credential, CancellationToken ct);
 }
 
 public interface IRefreshTokenRepository

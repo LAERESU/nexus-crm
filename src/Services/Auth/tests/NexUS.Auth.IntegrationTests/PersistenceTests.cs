@@ -81,7 +81,10 @@ public class PersistenceTests(OracleAuthFixture fixture)
         });
 
         saved.Should().Be(2);
-        credential.Should().NotBeNull();
+        var readBack = await InScope(sp => sp.GetRequiredService<AuthDbContext>().LoginAttempts
+            .Where(a => a.TenantId == 0 || a.CredentialId == credential.Id).ToListAsync());
+        readBack.Should().Contain(a => a.TenantId == 0 && a.FailureReason == LoginFailureReason.UnknownEmail);
+        readBack.Should().Contain(a => a.Succeeded && a.CredentialId == credential.Id);
     }
 
     [Fact]

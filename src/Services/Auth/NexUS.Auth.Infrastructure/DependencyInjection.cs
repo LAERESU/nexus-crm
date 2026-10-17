@@ -32,7 +32,8 @@ public static class DependencyInjection
         services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
 
         services.Configure<DevSeedOptions>(configuration.GetSection(DevSeedOptions.SectionName));
-        services.AddHostedService<DevSeeder>();
+        services.AddSingleton<DevSeeder>();
+        services.AddHostedService(sp => sp.GetRequiredService<DevSeeder>());
 
         return services;
     }

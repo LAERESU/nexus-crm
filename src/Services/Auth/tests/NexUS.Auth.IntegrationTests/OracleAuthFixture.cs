@@ -3,6 +3,8 @@ using DotNet.Testcontainers.Containers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using NexUS.Auth.Infrastructure.Seeding;
 using Oracle.ManagedDataAccess.Client;
 
 namespace NexUS.Auth.IntegrationTests;
@@ -44,6 +46,7 @@ public sealed class OracleAuthFixture : IAsyncLifetime
                 ["Seed:AdminPassword"] = AdminPassword,
             })));
         _ = Factory.Server; // memicu start host (dan seeder) sekarang
+        await Factory.Services.GetRequiredService<DevSeeder>().Completion.WaitAsync(TimeSpan.FromMinutes(2));
     }
 
     public async Task DisposeAsync()

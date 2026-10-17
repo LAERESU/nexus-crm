@@ -22,14 +22,36 @@ public sealed class DevSeedOptions
     public string? AdminPassword { get; set; }
 }
 
-/// <summary>Membuat tenant demo dan user admin@demo.local di Development. Tidak pernah berjalan di environment lain.</summary>
+/// <summary>
+/// Membuat user admin@demo.local di Development. Berjalan di latar belakang dengan retry agar tidak menahan
+/// startup (dan /health/live) saat Oracle belum siap. Tidak pernah berjalan di environment lain.
+/// </summary>
 public sealed class DevSeeder(
     IServiceScopeFactory scopes,
     IOptions<DevSeedOptions> options,
     IHostEnvironment environment,
-    ILogger<DevSeeder> logger) : IHostedService
+    ILogger<DevSeeder> logger) : BackgroundService
 {
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public const int MaxAttempts = 10;
+    public static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(5);
+
+    /// <summary>Selesai saat seed berhasil, dilewati, atau menyerah (untuk tes).</summary>
+    public Task Completion => _completion.Task;
+    private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await SeedWithRetryAsync(stoppingToken);
+        }
+        finally
+        {
+            _completion.TrySetResult();
+        }
+    }
+
+    private async Task SeedWithRetryAsync(CancellationToken ct)
     {
         if (!environment.IsDevelopment()) return;
 
@@ -40,27 +62,34 @@ public sealed class DevSeeder(
             return;
         }
 
-        try
+        for (var attempt = 1; attempt <= MaxAttempts && !ct.IsCancellationRequested; attempt++)
         {
-            await using var scope = scopes.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
-            var email = Credential.NormalizeEmail(seed.AdminEmail);
-            if (await db.Credentials.AnyAsync(c => c.Email == email, cancellationToken)) return;
-
-            var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-            var credential = Credential.Create(seed.TenantId, seed.AdminUserId, email, hasher.Hash(seed.AdminPassword));
-            db.Credentials.Add(credential);
-            db.Entry(credential).Property(AuthDbContext.RolesProperty).CurrentValue = seed.AdminRoles;
-            await db.SaveChangesAsync(cancellationToken);
-
-            logger.LogInformation("User admin dev dibuat untuk tenant {TenantId}", seed.TenantId);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // Database belum termigrasi atau belum siap: aplikasi tetap jalan, seed bisa diulang dengan restart.
-            logger.LogWarning(ex, "Seed data dev gagal dijalankan");
+            try
+            {
+                await SeedAsync(seed, ct);
+                return;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Seed data dev gagal (percobaan {Attempt}/{MaxAttempts})", attempt, MaxAttempts);
+                await Task.Delay(RetryDelay, ct);
+            }
         }
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    private async Task SeedAsync(DevSeedOptions seed, CancellationToken ct)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+        var email = Credential.NormalizeEmail(seed.AdminEmail);
+        if (await db.Credentials.AnyAsync(c => c.TenantId == seed.TenantId && c.Email == email, ct)) return;
+
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var credential = Credential.Create(seed.TenantId, seed.AdminUserId, email, hasher.Hash(seed.AdminPassword!));
+        db.Credentials.Add(credential);
+        db.Entry(credential).Property(AuthDbContext.RolesProperty).CurrentValue = seed.AdminRoles;
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation("User admin dev dibuat untuk tenant {TenantId}", seed.TenantId);
+    }
 }

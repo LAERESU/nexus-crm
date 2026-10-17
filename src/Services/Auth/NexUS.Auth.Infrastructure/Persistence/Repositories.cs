@@ -12,6 +12,8 @@ public sealed class CredentialRepository(AuthDbContext db) : ICredentialReposito
 
     public async Task AddAsync(Credential credential, CancellationToken ct) =>
         await db.Credentials.AddAsync(credential, ct);
+
+    public Task ReloadAsync(Credential credential, CancellationToken ct) => db.Entry(credential).ReloadAsync(ct);
 }
 
 public sealed class RefreshTokenRepository(AuthDbContext db) : IRefreshTokenRepository
@@ -31,11 +33,15 @@ public sealed class CredentialRolesUserDirectory(AuthDbContext db) : IUserDirect
 {
     public async Task<IReadOnlyCollection<string>> GetRolesAsync(Credential credential, CancellationToken ct)
     {
-        var roles = await db.Credentials
-            .Where(c => c.TenantId == credential.TenantId && c.Id == credential.Id)
-            .Select(c => EF.Property<string?>(c, AuthDbContext.RolesProperty))
-            .FirstOrDefaultAsync(ct);
+        // Kredensial biasanya sudah dilacak DbContext yang sama (dimuat saat login), jadi tidak perlu query kedua.
+        var entry = db.Entry(credential);
+        if (entry.State == EntityState.Detached)
+        {
+            entry = db.Attach(credential);
+            await entry.ReloadAsync(ct);
+        }
 
+        var roles = entry.Property<string?>(AuthDbContext.RolesProperty).CurrentValue;
         return string.IsNullOrWhiteSpace(roles)
             ? []
             : roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

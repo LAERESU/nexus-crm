@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NexUS.Auth.Application.Common;
 using NexUS.Auth.Domain.Credentials;
 using NexUS.BuildingBlocks.Common.Domain;
+using NexUS.BuildingBlocks.Common.Exceptions;
 using NexUS.BuildingBlocks.Messaging;
 
 namespace NexUS.Auth.Infrastructure.Persistence;
@@ -58,11 +59,8 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options, TimeP
         {
             e.ToTable("LOGIN_HISTORY");
             MapEntity(e);
-            // TENANT_ID kosong bila email tidak dikenal.
-            e.Property(x => x.TenantId).HasColumnName("TENANT_ID")
-                .HasConversion(v => v == 0 ? (long?)null : v, v => v ?? 0);
             e.Property(x => x.CredentialId).HasColumnName("CREDENTIAL_ID");
-            e.Property(x => x.Succeeded).HasColumnName("SUCCEEDED").HasConversion<int>().HasColumnType("NUMBER(1)");
+            e.Property(x => x.Succeeded).HasColumnName("SUCCEEDED").HasColumnType("NUMBER(1)");
             e.Property(x => x.FailureReason).HasColumnName("FAILURE_REASON").HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.IpAddress).HasColumnName("IP_ADDRESS").HasMaxLength(45);
             e.Property(x => x.UserAgent).HasColumnName("USER_AGENT").HasMaxLength(500);
@@ -96,7 +94,9 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options, TimeP
         e.Property(x => x.UpdatedAt).HasColumnName("UPDATED_AT");
         e.Property(x => x.UpdatedBy).HasColumnName("UPDATED_BY");
         e.Property(x => x.RowVersion).HasColumnName("ROW_VERSION").IsConcurrencyToken();
-        e.Property(x => x.IsDeleted).HasColumnName("IS_DELETED").HasConversion<int>().HasColumnType("NUMBER(1)");
+        // Tanpa HasConversion<int>: provider Oracle sudah memetakan bool ke NUMBER(1); konversi manual membuat
+        // pembuatan literal filter soft delete gagal (InvalidCastException di OracleBoolTypeMapping).
+        e.Property(x => x.IsDeleted).HasColumnName("IS_DELETED").HasColumnType("NUMBER(1)");
         e.HasIndex(x => x.PublicId).IsUnique();
         e.HasQueryFilter(x => !x.IsDeleted);
     }
@@ -123,6 +123,13 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options, TimeP
         var events = ChangeTracker.Entries<AggregateRoot>().SelectMany(e => e.Entity.PopDomainEvents()).ToList();
         Outbox.AddRange(events.Select(OutboxMessage.From));
 
-        return await base.SaveChangesAsync(cancellationToken);
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new ConcurrencyException($"Data diubah oleh proses lain: {ex.Entries.Count} entitas bentrok.");
+        }
     }
 }

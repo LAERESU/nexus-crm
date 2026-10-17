@@ -106,6 +106,44 @@ public class LoginCommandHandlerTests
         (await Login()).AccessToken.Should().Be("jwt");
     }
 
+    [Fact]
+    public async Task Akun_terkunci_tetap_menjalankan_verifikasi_password_agar_waktu_respons_sama()
+    {
+        _credentials.FindByEmailAsync("budi@demo.local", Arg.Any<CancellationToken>()).Returns(_credential);
+        for (var i = 0; i < Credential.MaxFailedAttempts; i++)
+            await FluentActions.Awaiting(() => Login(password: "salah")).Should().ThrowAsync<UnauthorizedException>();
+        _hasher.ClearReceivedCalls();
+
+        await FluentActions.Awaiting(() => Login()).Should().ThrowAsync<UnauthorizedException>();
+
+        _hasher.Received(1).Verify(Password, "hash-asli");
+    }
+
+    [Fact]
+    public async Task Konflik_konkurensi_saat_mencatat_gagal_dimuat_ulang_lalu_disimpan_lagi()
+    {
+        _credentials.FindByEmailAsync("budi@demo.local", Arg.Any<CancellationToken>()).Returns(_credential);
+        var calls = 0;
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+            ++calls == 1 ? throw new ConcurrencyException("bentrok") : Task.FromResult(1));
+
+        await FluentActions.Awaiting(() => Login(password: "salah")).Should().ThrowAsync<UnauthorizedException>();
+
+        await _credentials.Received(1).ReloadAsync(_credential, Arg.Any<CancellationToken>());
+        calls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Konflik_konkurensi_terus_menerus_berhenti_setelah_batas_percobaan()
+    {
+        _credentials.FindByEmailAsync("budi@demo.local", Arg.Any<CancellationToken>()).Returns(_credential);
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns<int>(_ => throw new ConcurrencyException("bentrok"));
+
+        await FluentActions.Awaiting(() => Login(password: "salah")).Should().ThrowAsync<ConcurrencyException>();
+
+        await _credentials.Received(LoginCommandHandler.MaxConcurrencyRetries - 1).ReloadAsync(_credential, Arg.Any<CancellationToken>());
+    }
+
     [Theory]
     [InlineData("", Password)]
     [InlineData("bukan-email", Password)]
