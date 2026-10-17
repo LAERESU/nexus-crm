@@ -101,7 +101,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   6. Tambahkan job migrasi database (ditunda dari NX-009): jalankan `scripts/check-migrations-immutable.sh origin/develop`, lalu `flyway validate` dan `flyway migrate` terhadap Oracle Free sebagai service container.
 - **Acceptance criteria:**
   - [x] PR ke `develop` menjalankan workflow dan statusnya tampil di PR. (PR #1: 18 check hijau)
-  - [ ] Build gagal jika ada test gagal, lint gagal, atau dependency HIGH/CRITICAL. (gate terbukti gagal di lokal; belum dibuktikan merah di GitHub)
+  - [x] Build gagal jika ada test gagal, lint gagal, atau dependency HIGH/CRITICAL. (dibuktikan dengan PR percobaan #3 dan #4 yang ditutup: test gagal dan lint gagal membuat `backend-build-test` dan `frontend-build-test` merah; paket rentan membuat `vulnerable-packages` dan build merah)
   - [x] Badge status CI tampil di `README.md`.
 - **Catatan implementasi:**
   - Workflow: `ci-backend`, `ci-frontend`, `ci-database`, `ci-images` (build + Trivy semua image, ditambahkan karena dijanjikan di NX-007), `codeql`, serta `dependabot.yml`.
