@@ -98,6 +98,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   3. Tambahkan path filter agar workflow hanya jalan saat folder terkait berubah.
   4. Tambahkan job keamanan: `dotnet list package --vulnerable`, `npm audit --audit-level=high`, CodeQL.
   5. Pindahkan `docs/pull_request_template.md` ke `.github/` (opsional), aktifkan branch protection di GitHub untuk `main` dan `develop`.
+  6. Tambahkan job migrasi database (ditunda dari NX-009): jalankan `scripts/check-migrations-immutable.sh origin/develop`, lalu `flyway validate` dan `flyway migrate` terhadap Oracle Free sebagai service container.
 - **Acceptance criteria:**
   - [ ] PR ke `develop` menjalankan workflow dan statusnya tampil di PR.
   - [ ] Build gagal jika ada test gagal, lint gagal, atau dependency HIGH/CRITICAL.
@@ -141,9 +142,13 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   3. Tambahkan skrip `scripts/db-migrate.ps1` dan `.sh`.
   4. Tambahkan langkah validasi migrasi di CI (`flyway validate` terhadap Oracle Free di Testcontainers/service container).
 - **Acceptance criteria:**
-  - [ ] Migrasi berjalan ulang tanpa error (idempotent melalui riwayat Flyway).
-  - [ ] Setiap schema punya tabel `flyway_schema_history`.
-  - [ ] CI gagal bila file migrasi lama diubah (checksum mismatch).
+  - [x] Migrasi berjalan ulang tanpa error (idempotent melalui riwayat Flyway).
+  - [x] Setiap schema punya tabel `flyway_schema_history`.
+  - [x] CI gagal bila file migrasi lama diubah (checksum mismatch). (`flyway validate` gagal dengan "checksum mismatch" dan `scripts/check-migrations-immutable.sh` gagal bila file lama diubah; pemasangan di workflow CI dikerjakan di NX-006)
+- **Catatan implementasi:**
+  - Pemetaan folder ke schema: `db/auth`→`AUTH_SCHEMA`, `usr`→`USR_SCHEMA`, `prj`→`PRJ_SCHEMA`, `tsk`→`TSK_SCHEMA`, `sop`→`SOP_SCHEMA`, `ntf`→`NTF_SCHEMA`, `aud`→`AUD_SCHEMA`.
+  - Service `flyway` di compose dijalankan sekali dan wajib selesai sukses (`service_completed_successfully`) sebelum service aplikasi start.
+  - `flyway validate` pada database bersih tidak mendeteksi file lama yang diubah; karena itu ada pemeriksaan git terpisah (`check-migrations-immutable.sh`).
 
 ---
 

@@ -10,6 +10,7 @@ x-dotnet-service: &dotnet-service
     oracle: { condition: service_healthy }
     redis: { condition: service_healthy }
     rabbitmq: { condition: service_healthy }
+    flyway: { condition: service_completed_successfully }
 
 services:
   oracle:
@@ -60,6 +61,20 @@ services:
       interval: 15s
       timeout: 10s
       retries: 5
+
+  flyway:
+    image: flyway/flyway:11
+    container_name: nexus-flyway
+    entrypoint: ["/bin/sh", "/flyway/migrate.sh"]
+    command: ["migrate"]
+    environment:
+      ORACLE_APP_PASSWORD: ${ORACLE_APP_PASSWORD}
+    volumes:
+      - ../db:/flyway/db:ro
+      - ./flyway/migrate.sh:/flyway/migrate.sh:ro
+    depends_on:
+      oracle: { condition: service_healthy }
+    restart: "no"
 
   rustfs:
     image: rustfs/rustfs:1.0.2
