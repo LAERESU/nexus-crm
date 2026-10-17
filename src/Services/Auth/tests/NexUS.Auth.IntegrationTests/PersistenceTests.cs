@@ -101,7 +101,8 @@ public class PersistenceTests(OracleAuthFixture fixture)
             return await db.SaveChangesAsync();
         });
 
-        saved.Should().BeGreaterThanOrEqualTo(3); // update kredensial + refresh token + outbox
+        // Refresh token + outbox. Kredensial tanpa riwayat gagal tidak berubah, jadi tidak ikut di-UPDATE.
+        saved.Should().Be(2);
     }
 
     [Fact]

@@ -66,10 +66,11 @@ public class LoginEndpointTests(OracleAuthFixture fixture)
         var cookie = response.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("nexus_rt=", StringComparison.Ordinal));
         var rawToken = Uri.UnescapeDataString(cookie.Split(';')[0]["nexus_rt=".Length..]);
 
-        var byHash = await ScalarAsync("SELECT COUNT(*) FROM REFRESH_TOKENS WHERE TOKEN_HASH = :hash",
-            new OracleParameter("hash", RefreshTokenSecret.Hash(rawToken)));
-        var byRaw = await ScalarAsync("SELECT COUNT(*) FROM REFRESH_TOKENS WHERE TOKEN_HASH = :raw",
-            new OracleParameter("raw", rawToken));
+        var byHash = await ScalarAsync("SELECT COUNT(*) FROM REFRESH_TOKENS WHERE TOKEN_HASH = :tokenHash",
+            new OracleParameter("tokenHash", RefreshTokenSecret.Hash(rawToken)));
+        // Nama bind "raw" tidak boleh dipakai: RAW adalah kata tercadang Oracle (ORA-01745).
+        var byRaw = await ScalarAsync("SELECT COUNT(*) FROM REFRESH_TOKENS WHERE TOKEN_HASH = :plainToken",
+            new OracleParameter("plainToken", rawToken));
         var outbox = await ScalarAsync("SELECT COUNT(*) FROM OUTBOX_MESSAGES WHERE TYPE LIKE '%UserLoggedInDomainEvent%'");
 
         Convert.ToInt32(byHash).Should().Be(1);
