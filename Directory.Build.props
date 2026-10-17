@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- Hanya kerentanan High/Critical yang dilaporkan/menjadi error; selaras dengan scripts/check-vulnerable-packages.sh. Properti restore: harus tanpa kondisi Configuration. -->
+    <NuGetAuditLevel>high</NuGetAuditLevel>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">

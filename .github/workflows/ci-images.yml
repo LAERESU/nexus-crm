@@ -24,7 +24,7 @@ on:
 
 concurrency:
   group: ci-images-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -36,6 +36,7 @@ jobs:
   build-scan:
     name: build-scan (${{ matrix.name }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -67,8 +68,15 @@ jobs:
           echo "User: ${user:-<kosong>}"
           test -n "$user" && test "$user" != "root" && test "$user" != "0"
 
+      # Cache database Trivy agar 8 job paralel tidak sama-sama mengunduhnya dari ghcr.io (rate limit).
+      - uses: actions/cache@v4
+        with:
+          path: .trivycache
+          key: trivy-db-${{ github.run_id }}-${{ matrix.name }}
+          restore-keys: trivy-db-
+
+      # --ignore-unfixed sesuai ARCHITECTURE.md F.2: yang menggagalkan build adalah HIGH/CRITICAL yang sudah ada perbaikannya.
       - name: Scan Trivy (gagal bila ada HIGH/CRITICAL yang bisa diperbaiki)
-        run: >
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock ${{ env.TRIVY_IMAGE }}
-          image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress
-          nexus/${{ matrix.name }}:ci
+        run: |
+          mkdir -p .trivycache
+          docker run --rm             -v /var/run/docker.sock:/var/run/docker.sock             -v "$PWD/.trivycache:/cache"             ${{ env.TRIVY_IMAGE }} image --cache-dir /cache             --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress             nexus/${{ matrix.name }}:ci

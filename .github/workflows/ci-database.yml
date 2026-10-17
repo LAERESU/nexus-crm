@@ -8,6 +8,10 @@ on:
       - 'deploy/flyway/**'
       - 'deploy/oracle-init/**'
       - 'deploy/docker-compose.yml'
+      - 'deploy/.env.example'
+      - 'deploy/docker-compose.dev.yml'
+      - 'scripts/db-migrate.sh'
+      - 'scripts/db-migrate.ps1'
       - 'scripts/check-migrations-immutable.sh'
       - '.github/workflows/ci-database.yml'
   push:
@@ -17,12 +21,16 @@ on:
       - 'deploy/flyway/**'
       - 'deploy/oracle-init/**'
       - 'deploy/docker-compose.yml'
+      - 'deploy/.env.example'
+      - 'deploy/docker-compose.dev.yml'
+      - 'scripts/db-migrate.sh'
+      - 'scripts/db-migrate.ps1'
       - 'scripts/check-migrations-immutable.sh'
       - '.github/workflows/ci-database.yml'
 
 concurrency:
   group: ci-database-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -32,6 +40,7 @@ jobs:
     name: migrations-immutable
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
