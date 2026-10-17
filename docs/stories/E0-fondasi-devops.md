@@ -89,7 +89,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 
 ---
 
-### NX-006 · Pipeline CI
+### NX-006 · Pipeline CI ✅
 - **Sprint:** 1 · **SP:** 5 · **Bergantung pada:** NX-002, NX-003, NX-004
 - **Tujuan:** setiap PR otomatis dicek build, test, lint, dan keamanan.
 - **Langkah:**
@@ -100,9 +100,9 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   5. Pindahkan `docs/pull_request_template.md` ke `.github/` (opsional), aktifkan branch protection di GitHub untuk `main` dan `develop`.
   6. Tambahkan job migrasi database (ditunda dari NX-009): jalankan `scripts/check-migrations-immutable.sh origin/develop`, lalu `flyway validate` dan `flyway migrate` terhadap Oracle Free sebagai service container.
 - **Acceptance criteria:**
-  - [ ] PR ke `develop` menjalankan workflow dan statusnya tampil di PR.
-  - [ ] Build gagal jika ada test gagal, lint gagal, atau dependency HIGH/CRITICAL.
-  - [ ] Badge status CI tampil di `README.md`.
+  - [x] PR ke `develop` menjalankan workflow dan statusnya tampil di PR. (PR #1: 18 check hijau)
+  - [ ] Build gagal jika ada test gagal, lint gagal, atau dependency HIGH/CRITICAL. (gate terbukti gagal di lokal; belum dibuktikan merah di GitHub)
+  - [x] Badge status CI tampil di `README.md`.
 - **Catatan implementasi:**
   - Workflow: `ci-backend`, `ci-frontend`, `ci-database`, `ci-images` (build + Trivy semua image, ditambahkan karena dijanjikan di NX-007), `codeql`, serta `dependabot.yml`.
   - Gate lokal sudah diuji: coverage 82,2% (ambang 70%), `check-coverage.sh 95` gagal sebagaimana mestinya, `npm audit` bersih, `actionlint` bersih.
@@ -159,7 +159,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 
 ---
 
-### NX-010 · Logging terstruktur, correlation id, health check
+### NX-010 · Logging terstruktur, correlation id, health check ✅
 - **Sprint:** 2 · **SP:** 3 · **Bergantung pada:** NX-003
 - **Langkah:**
   1. Lengkapi `NexUS.BuildingBlocks.Observability`: Serilog JSON ke console dengan enrich `service`, `environment`, `tenantId`, `userId`, `correlationId`.
