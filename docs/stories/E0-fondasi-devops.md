@@ -108,9 +108,9 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   2. `web/Dockerfile` + `web/nginx.conf` (ARCHITECTURE F.4).
   3. `.dockerignore` di root dan `web/`.
 - **Acceptance criteria:**
-  - [ ] Semua image ter-build lokal; ukuran image service < 250 MB.
-  - [ ] Container berjalan sebagai non-root.
-  - [ ] Scan Trivy tanpa CVE HIGH/CRITICAL yang bisa diperbaiki.
+  - [x] Semua image ter-build lokal; ukuran image service < 250 MB. (7 service 186 MB, web 91 MB; Dockerfile Gateway dikerjakan di NX-011)
+  - [x] Container berjalan sebagai non-root. (service backend `app`, web `nginx` uid 101)
+  - [x] Scan Trivy tanpa CVE HIGH/CRITICAL yang bisa diperbaiki. (8 image: 0 temuan; scan otomatis di CI NX-006)
 
 ---
 
