@@ -14,7 +14,7 @@ public sealed record ReceivedRequest(string Path, string? CorrelationId);
 public sealed class GatewayFixture : IAsyncLifetime
 {
     public const string AllowedOrigin = "http://localhost:5173";
-    private static readonly string[] Clusters = ["auth", "user", "project", "task", "sop", "notification"];
+    private static readonly string[] Clusters = ["auth", "user", "project", "task", "sop", "notification", "notification-hub"];
 
     private WebApplication? _downstream;
     private WebApplicationFactory<Program>? _gateway;

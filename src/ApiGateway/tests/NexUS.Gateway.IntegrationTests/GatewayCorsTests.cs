@@ -38,6 +38,33 @@ public class GatewayCorsTests(GatewayFixture fixture) : IClassFixture<GatewayFix
     }
 
     [Fact]
+    public async Task Preflight_negotiate_SignalR_mengizinkan_header_klien_SignalR()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Options, "/hubs/notifications/negotiate");
+        request.Headers.Add("Origin", GatewayFixture.AllowedOrigin);
+        request.Headers.Add("Access-Control-Request-Method", "POST");
+        request.Headers.Add("Access-Control-Request-Headers", "x-requested-with,x-signalr-user-agent");
+
+        var response = await fixture.CreateClient().SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var allowed = string.Join(",", response.Headers.GetValues("Access-Control-Allow-Headers")).ToLowerInvariant();
+        allowed.Should().Contain("x-requested-with").And.Contain("x-signalr-user-agent");
+    }
+
+    [Fact]
+    public async Task Origin_Gateway_sendiri_yang_tidak_terdaftar_tetap_ditolak()
+    {
+        var client = fixture.CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/projects");
+        request.Headers.Add("Origin", client.BaseAddress!.GetLeftPart(UriPartial.Authority));
+
+        var response = await client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task Preflight_dari_origin_tidak_dikenal_ditolak_403()
     {
         var response = await fixture.CreateClient().SendAsync(Preflight("https://evil.example"));

@@ -8,12 +8,34 @@ public class GatewayRoutingTests(GatewayFixture fixture) : IClassFixture<Gateway
     private ReceivedRequest LastReceived() => fixture.Received.Last();
 
     [Fact]
-    public async Task Health_project_lewat_Gateway_diteruskan_ke_health_ready_Project_Service()
+    public async Task Health_project_lewat_Gateway_diteruskan_ke_health_live_Project_Service()
     {
         var response = await fixture.CreateClient().GetAsync("/api/v1/projects/health");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        LastReceived().Path.Should().Be("/health/ready");
+        LastReceived().Path.Should().Be("/health/live");
+    }
+
+    [Fact]
+    public async Task Hub_notifikasi_diteruskan_ke_Notification_Service()
+    {
+        var response = await fixture.CreateClient().PostAsync("/hubs/notifications/negotiate?negotiateVersion=1", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        LastReceived().Path.Should().Be("/hubs/notifications/negotiate");
+    }
+
+    [Theory]
+    [InlineData("/api/v1/users/42/permissions")]
+    [InlineData("/api/v1/users/abc/permissions")]
+    public async Task Endpoint_internal_tidak_diekspos_lewat_Gateway(string path)
+    {
+        var before = fixture.Received.Count;
+
+        var response = await fixture.CreateClient().GetAsync(path);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        fixture.Received.Count.Should().Be(before);
     }
 
     [Theory]

@@ -264,7 +264,6 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Cors__AllowedOrigins__0: http://localhost:3000
       Cors__AllowedOrigins__1: http://localhost:5173
-      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD},abortConnect=false"
     ports:
       - "5100:8080"
     depends_on:

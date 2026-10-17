@@ -1,20 +1,29 @@
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 
 namespace NexUS.Gateway.Api.Middleware;
 
 /// <summary>
-/// Menolak (403) request lintas origin dari origin yang tidak terdaftar. Middleware CORS bawaan hanya
-/// tidak menambahkan header CORS dan menyerahkan penolakan ke browser, sedangkan request tetap
-/// diteruskan ke service; di sini request seperti itu dihentikan di Gateway.
+/// Menolak (403) request lintas origin dari origin yang tidak diizinkan oleh policy CORS Gateway.
+/// Middleware CORS bawaan hanya tidak menambahkan header CORS dan menyerahkan penolakan ke browser,
+/// sedangkan request tetap diteruskan ke service; di sini request seperti itu dihentikan di Gateway.
+/// Keputusan memakai policy CORS yang sama agar keduanya tidak pernah berbeda. Origin publik aplikasi
+/// sendiri harus terdaftar di <c>Cors:AllowedOrigins</c> (tidak ada pengecualian "same-origin" karena
+/// Host/scheme di belakang ingress tidak dapat dipercaya tanpa forwarded headers).
 /// </summary>
-public sealed class RejectDisallowedOriginMiddleware(RequestDelegate next, IConfiguration configuration)
+public sealed class RejectDisallowedOriginMiddleware(RequestDelegate next, ICorsPolicyProvider policyProvider)
 {
-    private readonly HashSet<string> _allowed = new(GatewayCors.AllowedOrigins(configuration), StringComparer.OrdinalIgnoreCase);
-
     public async Task InvokeAsync(HttpContext context)
     {
         var origin = context.Request.Headers.Origin.ToString();
-        if (string.IsNullOrEmpty(origin) || _allowed.Contains(origin) || IsSameOrigin(context, origin))
+        if (string.IsNullOrEmpty(origin))
+        {
+            await next(context);
+            return;
+        }
+
+        var policy = await policyProvider.GetPolicyAsync(context, GatewayCors.PolicyName);
+        if (policy is not null && policy.IsOriginAllowed(origin))
         {
             await next(context);
             return;
@@ -25,7 +34,4 @@ public sealed class RejectDisallowedOriginMiddleware(RequestDelegate next, IConf
             new ProblemDetails { Status = StatusCodes.Status403Forbidden, Title = "Origin tidak diizinkan" },
             options: null, contentType: "application/problem+json", context.RequestAborted);
     }
-
-    private static bool IsSameOrigin(HttpContext context, string origin) =>
-        string.Equals(origin, $"{context.Request.Scheme}://{context.Request.Host}", StringComparison.OrdinalIgnoreCase);
 }

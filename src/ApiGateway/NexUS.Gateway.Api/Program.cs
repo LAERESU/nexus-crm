@@ -17,7 +17,8 @@ builder.Services.AddOptions<CorsOptions>().Configure<IConfiguration>((options, c
         .WithOrigins(GatewayCors.AllowedOrigins(configuration))
         .AllowCredentials() // refresh token dikirim lewat cookie httpOnly
         .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
-        .WithHeaders("Authorization", "Content-Type", "If-Match", CorrelationId.HeaderName)
+        // X-Requested-With dan X-SignalR-User-Agent dikirim klien SignalR saat negotiate ke /hubs/notifications.
+        .WithHeaders("Authorization", "Content-Type", "If-Match", CorrelationId.HeaderName, "X-Requested-With", "X-SignalR-User-Agent")
         .WithExposedHeaders(CorrelationId.HeaderName, "ETag", "Location")));
 
 builder.Services.AddProblemDetails();
@@ -41,12 +42,19 @@ var app = builder.Build();
 
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseNexusObservability();
+app.UseExceptionHandler(); // exception di pipeline Gateway → 500 ProblemDetails tanpa stack trace
 app.UseMiddleware<RejectDisallowedOriginMiddleware>();
 app.UseCors(GatewayCors.PolicyName);
 app.UseStatusCodePages(); // route tidak terdaftar → 404 ProblemDetails
 
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains(HealthCheckExtensions.ReadyTag) });
+
+// Endpoint internal antar service tidak boleh diekspos lewat Gateway (ARCHITECTURE.md: hanya untuk Auth/Gateway).
+// Path literal lebih diprioritaskan daripada route catch-all YARP.
+foreach (var internalPath in GatewayRoutes.InternalPaths)
+    app.Map(internalPath, () => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Not Found"));
+
 app.MapReverseProxy();
 
 app.Run();
