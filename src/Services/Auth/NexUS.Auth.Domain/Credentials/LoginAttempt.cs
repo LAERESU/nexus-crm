@@ -4,8 +4,8 @@ namespace NexUS.Auth.Domain.Credentials;
 
 public enum LoginFailureReason
 {
-    UnknownEmail,
-    WrongPassword,
+    UserNotFound,
+    InvalidLogin,
     Locked,
 }
 

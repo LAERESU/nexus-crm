@@ -32,9 +32,9 @@ public sealed class LoginCommandHandler(
         if (credential is null)
         {
             passwordHasher.VerifyDummy(command.Password); // biaya sama dengan verifikasi asli
-            await RecordFailureAsync(null, LoginFailureReason.UnknownEmail, command, now, ct);
+            await RecordFailureAsync(null, LoginFailureReason.UserNotFound, command, now, ct);
             await unitOfWork.SaveChangesAsync(ct);
-            throw Failure(null, LoginFailureReason.UnknownEmail);
+            throw Failure(null, LoginFailureReason.UserNotFound);
         }
 
         // Selalu verifikasi sebelum cek kunci agar akun terkunci tidak merespons lebih cepat (timing leak).
@@ -49,10 +49,10 @@ public sealed class LoginCommandHandler(
 
         if (!passwordValid)
         {
-            await RecordFailureAsync(credential, LoginFailureReason.WrongPassword, command, now, ct);
+            await RecordFailureAsync(credential, LoginFailureReason.InvalidLogin, command, now, ct);
             // Dihitung juga saat ada request paralel: konflik ROW_VERSION → muat ulang → hitung lagi.
             await SaveWithRetryAsync(credential, c => c.RegisterFailedLogin(now), ct);
-            throw Failure(credential, LoginFailureReason.WrongPassword);
+            throw Failure(credential, LoginFailureReason.InvalidLogin);
         }
 
         var roles = await userDirectory.GetRolesAsync(credential, ct);

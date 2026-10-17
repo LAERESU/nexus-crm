@@ -64,7 +64,7 @@ public class LoginCommandHandlerTests
         (await act.Should().ThrowAsync<UnauthorizedException>()).Which.Message.Should().Be(LoginCommandHandler.GenericFailureMessage);
         _hasher.Received(1).VerifyDummy(Password);
         await _attempts.Received(1).AddAsync(
-            Arg.Is<LoginAttempt>(a => !a.Succeeded && a.FailureReason == LoginFailureReason.UnknownEmail), Arg.Any<CancellationToken>());
+            Arg.Is<LoginAttempt>(a => !a.Succeeded && a.FailureReason == LoginFailureReason.UserNotFound), Arg.Any<CancellationToken>());
     }
 
     [Fact]

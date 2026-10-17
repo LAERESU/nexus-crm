@@ -75,7 +75,7 @@ public class PersistenceTests(OracleAuthFixture fixture)
         {
             var db = sp.GetRequiredService<AuthDbContext>();
             var tracked = await db.Credentials.SingleAsync(c => c.Email == "riwayat@demo.local");
-            db.LoginAttempts.Add(LoginAttempt.Failure(null, LoginFailureReason.UnknownEmail, DateTimeOffset.UtcNow, "10.0.0.1", "ua"));
+            db.LoginAttempts.Add(LoginAttempt.Failure(null, LoginFailureReason.UserNotFound, DateTimeOffset.UtcNow, "10.0.0.1", "ua"));
             db.LoginAttempts.Add(LoginAttempt.Success(tracked, DateTimeOffset.UtcNow, "10.0.0.1", "ua"));
             return await db.SaveChangesAsync();
         });
@@ -83,7 +83,7 @@ public class PersistenceTests(OracleAuthFixture fixture)
         saved.Should().Be(2);
         var readBack = await InScope(sp => sp.GetRequiredService<AuthDbContext>().LoginAttempts
             .Where(a => a.TenantId == 0 || a.CredentialId == credential.Id).ToListAsync());
-        readBack.Should().Contain(a => a.TenantId == 0 && a.FailureReason == LoginFailureReason.UnknownEmail);
+        readBack.Should().Contain(a => a.TenantId == 0 && a.FailureReason == LoginFailureReason.UserNotFound);
         readBack.Should().Contain(a => a.Succeeded && a.CredentialId == credential.Id);
     }
 
