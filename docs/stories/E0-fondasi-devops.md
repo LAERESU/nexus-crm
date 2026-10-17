@@ -33,7 +33,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 
 ---
 
-### NX-003 · Template service Clean Architecture
+### NX-003 · Template service Clean Architecture ✅
 - **Sprint:** 1 · **SP:** 5 · **Bergantung pada:** NX-002
 - **Tujuan:** pola service yang bisa disalin untuk ketujuh service.
 - **Langkah:**
