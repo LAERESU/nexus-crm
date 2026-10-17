@@ -117,6 +117,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Oracle: "User Id=AUTH_SCHEMA;Password=${ORACLE_APP_PASSWORD};Data Source=oracle:1521/FREEPDB1"
       ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD},abortConnect=false"
+      Seed__AdminPassword: "${SEED_ADMIN_PASSWORD:-}"
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
     ports:
       - "5101:8080"

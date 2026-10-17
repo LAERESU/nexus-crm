@@ -102,7 +102,7 @@ Legenda status: ⬜ Belum · 🟨 Berjalan · ✅ Selesai · 🟥 Terhambat
 | ID | Pertanyaan | Opsi | Keputusan | Tanggal |
 | --- | --- | --- | --- | --- |
 | D1 | Message broker | RabbitMQ / Kafka | (default: RabbitMQ) | |
-| D2 | Identity provider | Auth Service sendiri (OpenIddict) / Keycloak / Azure AD | | |
+| D2 | Identity provider | Auth Service sendiri (OpenIddict) / Keycloak / Azure AD | Auth Service sendiri, JWT RS256 via Microsoft.IdentityModel (ADR-0006) | 2026-10-18 |
 | D3 | Lokasi deployment | K8s on-prem / OpenShift / cloud terkelola | | |
 | D4 | Lisensi Oracle | Partitioning & TDE tersedia? | | |
 | D5 | Stack observability | Grafana (Loki/Tempo/Prometheus) / ELK | | |

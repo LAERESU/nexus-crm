@@ -41,6 +41,13 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
   - [ ] Login salah → 401 dengan pesan generik (tidak membocorkan apakah email terdaftar).
   - [ ] 6 kali gagal berturut-turut → akun terkunci sementara.
   - [ ] Token bisa diverifikasi memakai JWKS.
+- **Catatan implementasi:**
+  - Keputusan D2 dan turunannya di ADR-0006: Auth Service sendiri, token dengan `Microsoft.IdentityModel.JsonWebTokens` (RS256, bukan OpenIddict), email unik global (pencarian kredensial saat login adalah satu-satunya query tanpa filter `TENANT_ID`), klaim `roles` lewat port `IUserDirectory` dengan data sementara di `CREDENTIALS.ROLES`.
+  - Lockout: percobaan gagal ke-5 dalam 15 menit mengunci akun 15 menit; percobaan ke-6 (walau password benar) tetap 401 dengan pesan generik yang sama, sehingga status akun tidak bocor. Email tidak dikenal tetap menjalankan verifikasi BCrypt palsu agar waktu respons tidak membocorkan keberadaan email.
+  - Refresh token: 256 bit acak, hanya SHA-256-nya yang disimpan; cookie `nexus_rt` dengan `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`.
+  - `LOGIN_HISTORY` tidak menyimpan email yang dicoba (data pribadi). Event `UserLoggedIn` dan `CredentialLocked` masuk `OUTBOX_MESSAGES` dalam transaksi yang sama.
+  - Seed dev: `admin@demo.local` (tenant 1, role `admin`) dibuat saat start di Development bila `Seed:AdminPassword` diisi (`SEED_ADMIN_PASSWORD` di `deploy/.env`). Kunci RS256 wajib dari secret (`Auth:Jwt:SigningKeyPem`) di luar Development.
+  - Tes: 27 unit test (aturan lockout, handler, token terverifikasi lewat JWKS) dan tes integrasi dengan Oracle sungguhan lewat Testcontainers (trait `Oracle`, berjalan di CI).
 
 ---
 

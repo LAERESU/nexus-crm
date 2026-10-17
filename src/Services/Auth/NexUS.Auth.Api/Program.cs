@@ -11,7 +11,7 @@ builder.Host.AddNexusSerilog();
 
 builder.Services
     .AddAuthApplication()
-    .AddAuthInfrastructure();
+    .AddAuthInfrastructure(builder.Configuration);
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
