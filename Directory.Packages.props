@@ -36,5 +36,6 @@
     <PackageVersion Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <!-- Pin transitif: Oracle.ManagedDataAccess.Core membawa versi 8.0.1 yang rentan -->
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageVersion Include="Newtonsoft.Json" Version="9.0.1" />
   </ItemGroup>
 </Project>
