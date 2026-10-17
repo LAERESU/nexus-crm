@@ -15,9 +15,15 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
   5. Tambahkan `Dockerfile` Gateway dengan pola yang sama seperti service lain (ditunda dari NX-007 karena project Gateway baru dibuat di sini).
   6. Pasang `AddNexusSerilog`, `UseNexusObservability`, dan `AddNexusHealthChecks` di Gateway, lalu buktikan `correlationId` yang sama muncul di log Gateway dan service tujuan (ditunda dari NX-010 karena Gateway belum ada).
 - **Acceptance criteria:**
-  - [ ] `GET /api/v1/projects/health` lewat Gateway diteruskan ke Project Service.
-  - [ ] Request dari origin yang tidak diizinkan ditolak CORS.
-  - [ ] Route yang tidak terdaftar mengembalikan 404.
+  - [x] `GET /api/v1/projects/health` lewat Gateway diteruskan ke Project Service. (route khusus menulis ulang ke `/health/ready` milik service; tes integrasi)
+  - [x] Request dari origin yang tidak diizinkan ditolak CORS. (403 di Gateway, request tidak sampai ke service; tes integrasi)
+  - [x] Route yang tidak terdaftar mengembalikan 404. (404 ProblemDetails; tes integrasi)
+- **Catatan implementasi:**
+  - Route: `auth`→Auth, `users` dan `roles`→User, `projects`→Project, `tasks`→Task, `sops`→Sop, `notifications` dan `/hubs/notifications`→Notification. Audit belum diekspos karena belum ada story API-nya.
+  - Alamat cluster default = nama service di docker compose (`http://<service>:8080`); `appsettings.Development.json` memakai `localhost:5101…5106`; Kubernetes menimpanya lewat `ReverseProxy__Clusters__<cluster>__Destinations__d1__Address`. Gateway lokal di port 5100 (sesuai proxy Vite).
+  - CORS bawaan ASP.NET hanya tidak menambahkan header untuk origin asing sehingga request tetap sampai ke service; karena itu ada `RejectDisallowedOriginMiddleware` yang menolak 403 di Gateway. Request tanpa `Origin` (antar service, curl) tetap diteruskan.
+  - Correlation id yang dibuat Gateway ditambahkan ke request yang diteruskan (transform YARP), sehingga service memakai id yang sama.
+  - Belum: rate limiting (NX-016) dan validasi JWT (NX-015). Proxy `/api` di `web/nginx.conf` ke Gateway dikerjakan saat halaman login dibuat (NX-017).
 
 ---
 

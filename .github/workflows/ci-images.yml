@@ -48,6 +48,7 @@ jobs:
           - { name: sop, context: ., dockerfile: src/Services/Sop/NexUS.Sop.Api/Dockerfile }
           - { name: notification, context: ., dockerfile: src/Services/Notification/NexUS.Notification.Api/Dockerfile }
           - { name: audit, context: ., dockerfile: src/Services/Audit/NexUS.Audit.Api/Dockerfile }
+          - { name: gateway, context: ., dockerfile: src/ApiGateway/NexUS.Gateway.Api/Dockerfile }
           - { name: web, context: web, dockerfile: web/Dockerfile }
     steps:
       - uses: actions/checkout@v4

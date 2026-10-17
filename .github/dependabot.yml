@@ -16,6 +16,7 @@ updates:
     directories:
       - /web
       - /src/Services/*/NexUS.*.Api
+      - /src/ApiGateway/NexUS.Gateway.Api
     schedule: { interval: weekly }
     target-branch: develop
   - package-ecosystem: docker-compose
