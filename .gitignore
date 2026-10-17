@@ -1,0 +1,46 @@
+# ---- File & folder lokal yang tidak masuk repo ----
+/1/
+*.zip
+Logo_NexUS_imgupscaler*.jpg
+
+# ---- .NET ----
+bin/
+obj/
+*.user
+*.suo
+*.rsuser
+.vs/
+TestResults/
+coverage*/
+*.coverage
+appsettings.*.local.json
+
+# ---- Node / React ----
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- Lingkungan & secret ----
+.env
+.env.*
+!.env.example
+*.pfx
+*.key
+
+# ---- IDE & OS ----
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Log ----
+logs/
+*.log
