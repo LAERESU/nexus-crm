@@ -31,6 +31,7 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Ex
         var (status, title) = ex switch
         {
             ValidationException => (StatusCodes.Status400BadRequest, "Validasi gagal"),
+            UnauthorizedException => (StatusCodes.Status401Unauthorized, "Autentikasi gagal"),
             ForbiddenException => (StatusCodes.Status403Forbidden, "Akses ditolak"),
             NotFoundException => (StatusCodes.Status404NotFound, "Data tidak ditemukan"),
             ConcurrencyException => (StatusCodes.Status409Conflict, "Konflik versi data"),

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using NexUS.BuildingBlocks.Observability;
 using NexUS.Auth.Api.Middleware;
 using NexUS.Auth.Application;
@@ -11,7 +12,7 @@ builder.Host.AddNexusSerilog();
 
 builder.Services
     .AddAuthApplication()
-    .AddAuthInfrastructure();
+    .AddAuthInfrastructure(builder.Configuration);
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
@@ -19,7 +20,19 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddNexusHealthChecks(builder.Configuration);
 
+// Auth hanya dapat dijangkau lewat Gateway (jaringan internal), jadi X-Forwarded-For dari hop terakhir dipercaya
+// agar LOGIN_HISTORY dan REFRESH_TOKENS mencatat IP klien asli, bukan IP Gateway.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
+    options.ForwardLimit = 1;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 app.UseNexusObservability();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
