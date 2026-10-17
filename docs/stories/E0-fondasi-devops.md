@@ -15,7 +15,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 - **Sprint:** 1 · **SP:** 5 · **Bergantung pada:** NX-001
 - **Tujuan:** satu solution `NexUS.sln` dan pustaka bersama yang dipakai semua service.
 - **Langkah:**
-  1. Buat `global.json` (SDK .NET 8) dan `Directory.Build.props` di root: `Nullable=enable`, `ImplicitUsings=enable`, `TreatWarningsAsErrors=true` untuk Release, `LangVersion=latest`.
+  1. Buat `global.json` (SDK .NET 10) dan `Directory.Build.props` di root: `Nullable=enable`, `ImplicitUsings=enable`, `TreatWarningsAsErrors=true` untuk Release, `LangVersion=latest`.
   2. Buat `Directory.Packages.props` (Central Package Management) dan daftarkan versi paket: MediatR, FluentValidation, Serilog.AspNetCore, StackExchange.Redis, MassTransit.RabbitMQ, Oracle.ManagedDataAccess.Core, Oracle.EntityFrameworkCore, Dapper, OpenTelemetry.*, xUnit, FluentAssertions, Testcontainers.
   3. Buat `NexUS.sln` dan class library di `src/BuildingBlocks/`:
      - `NexUS.BuildingBlocks.Common` — `Result<T>`, `PagedResult<T>`, `Error`, exception dasar (`DomainException`, `NotFoundException`, `ForbiddenException`), `AggregateRoot`, `IDomainEvent`, `ICurrentUser`.
@@ -26,10 +26,10 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   4. Buat project test `tests/NexUS.BuildingBlocks.Tests` dengan test untuk `Result<T>`, `PagedResult<T>`, dan `RedisCacheService` (mock `IConnectionMultiplexer`).
   5. Hapus `.gitkeep` di folder yang sekarang sudah berisi file.
 - **Acceptance criteria:**
-  - [ ] `dotnet build NexUS.sln -c Release` sukses tanpa warning.
-  - [ ] `dotnet test` lulus.
-  - [ ] Versi paket hanya didefinisikan di `Directory.Packages.props`.
-  - [ ] `RedisCacheService` mengembalikan `default` (bukan exception) ketika Redis tidak tersedia.
+  - [x] `dotnet build NexUS.sln -c Release` sukses tanpa warning.
+  - [x] `dotnet test` lulus.
+  - [x] Versi paket hanya didefinisikan di `Directory.Packages.props`.
+  - [x] `RedisCacheService` mengembalikan `default` (bukan exception) ketika Redis tidak tersedia.
 
 ---
 
@@ -42,7 +42,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   3. Di Application: daftarkan MediatR, FluentValidation, dan pipeline behavior `ValidationBehavior` dan `LoggingBehavior`.
   4. Di Api: `Program.cs` dengan Swagger, ProblemDetails, `ExceptionHandlingMiddleware` (pemetaan exception → status, ARCHITECTURE D.6), endpoint `/health/live` dan `/health/ready`.
   5. Tambahkan test arsitektur (NetArchTest) yang gagal bila Domain mereferensi Application/Infrastructure.
-  6. Tulis `docs/adr/0002-template-service.md` yang menjelaskan struktur ini, lalu buat kerangka kosong yang sama (project + `Program.cs` + health) untuk Auth, User, Task, Sop, Notification, Audit.
+  6. Tulis `docs/adr/0003-template-service.md` yang menjelaskan struktur ini, lalu buat kerangka kosong yang sama (project + `Program.cs` + health) untuk Auth, User, Task, Sop, Notification, Audit.
 - **Acceptance criteria:**
   - [ ] Ketujuh service ter-build dan bisa dijalankan (`dotnet run`) dengan `/health/live` mengembalikan 200.
   - [ ] Swagger tampil di `/swagger` untuk setiap service pada environment Development.
@@ -89,7 +89,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 - **Sprint:** 1 · **SP:** 5 · **Bergantung pada:** NX-002, NX-003, NX-004
 - **Tujuan:** setiap PR otomatis dicek build, test, lint, dan keamanan.
 - **Langkah:**
-  1. Buat `.github/workflows/ci-backend.yml`: setup .NET 8, restore, build Release, test dengan coverage, gagal bila coverage < 70%.
+  1. Buat `.github/workflows/ci-backend.yml`: setup .NET 10, restore, build Release, test dengan coverage, gagal bila coverage < 70%.
   2. Buat `.github/workflows/ci-frontend.yml`: Node 20, `npm ci`, lint, test, build.
   3. Tambahkan path filter agar workflow hanya jalan saat folder terkait berubah.
   4. Tambahkan job keamanan: `dotnet list package --vulnerable`, `npm audit --audit-level=high`, CodeQL.

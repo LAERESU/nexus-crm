@@ -20,7 +20,7 @@ Platform ini dibangun sebagai enam microservice ASP.NET Core di belakang satu AP
 | Pengguna | Multi-tenant (banyak perusahaan), 1 tenant = 1 organisasi |
 | Skala awal | ±5.000 pengguna aktif, ±1 juta task, pertumbuhan audit log tinggi |
 | Database | Oracle 19c/23ai, satu instance (atau RAC) dengan schema terpisah per service |
-| Runtime | .NET 8 LTS, React 18 + TypeScript + Vite |
+| Runtime | .NET 10 LTS, React 18 + TypeScript + Vite |
 | Infrastruktur | Kubernetes (on-prem/OpenShift atau AKS/EKS), Redis 7 |
 | Identitas | OAuth2/OIDC + JWT; SSO korporat (Azure AD/Keycloak) sebagai opsi |
 
@@ -30,7 +30,7 @@ Platform ini dibangun sebagai enam microservice ASP.NET Core di belakang satu AP
 | --- | --- | --- |
 | Frontend | React 18, TypeScript, React Router, Zustand, TanStack Query, TipTap | SPA, state UI, data fetching, editor SOP |
 | Gateway | YARP (ASP.NET Core) atau Kong/NGINX Ingress | Routing, validasi JWT, rate limiting, CORS |
-| Backend | ASP.NET Core 8 Web API, MediatR, FluentValidation, Dapper/EF Core (Oracle provider) | Logika bisnis per bounded context |
+| Backend | ASP.NET Core 10 Web API, MediatR, FluentValidation, Dapper/EF Core (Oracle provider) | Logika bisnis per bounded context |
 | Messaging | RabbitMQ atau Kafka (MassTransit) | Event antar service (asinkron) |
 | Database | Oracle Database | Data transaksional per service |
 | Cache | Redis 7 (StackExchange.Redis) | Cache, sesi, token blacklist, rate limit, pub/sub ringan |
@@ -1231,7 +1231,7 @@ Padanan di platform lain: GitLab CI memakai `stages: [build, test, scan, image, 
 
 ```dockerfile
 # src/Services/Task/Task.Api/Dockerfile
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY ["src/Services/Task/Task.Api/Task.Api.csproj", "src/Services/Task/Task.Api/"]
 COPY ["src/Services/Task/Task.Application/Task.Application.csproj", "src/Services/Task/Task.Application/"]
@@ -1242,12 +1242,12 @@ RUN dotnet restore "src/Services/Task/Task.Api/Task.Api.csproj"
 COPY . .
 RUN dotnet publish "src/Services/Task/Task.Api/Task.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8080 \
     DOTNET_RUNNING_IN_CONTAINER=true
 COPY --from=build /app/publish .
-# user non-root bawaan image .NET 8
+# user non-root bawaan image .NET 10
 USER app
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Task.Api.dll"]

@@ -2,7 +2,7 @@
 
 # NexUS
 
-Platform enterprise multi-tenant untuk **manajemen proyek, tugas, dan SOP perusahaan**. Dibangun dengan arsitektur microservices: ASP.NET Core 8, Oracle Database, Redis, RabbitMQ, dan React.
+Platform enterprise multi-tenant untuk **manajemen proyek, tugas, dan SOP perusahaan**. Dibangun dengan arsitektur microservices: ASP.NET Core 10, Oracle Database, Redis, RabbitMQ, dan React.
 
 ## Dokumentasi
 

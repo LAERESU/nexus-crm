@@ -13,7 +13,7 @@ NexUS adalah platform enterprise multi-tenant untuk **manajemen proyek, tugas, d
 | --- | --- |
 | Frontend | React 18 + TypeScript + Vite, React Router, Zustand, TanStack Query, TipTap |
 | API Gateway | YARP (ASP.NET Core) |
-| Backend | ASP.NET Core 8, Clean Architecture + DDD, MediatR, FluentValidation |
+| Backend | ASP.NET Core 10, Clean Architecture + DDD, MediatR, FluentValidation |
 | Data access | EF Core (Oracle provider) untuk tulis, Dapper untuk baca |
 | Database | Oracle Database (1 schema per service) |
 | Cache | Redis 7 |

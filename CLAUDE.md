@@ -1,6 +1,6 @@
 # CLAUDE.md — NexUS
 
-Platform enterprise multi-tenant untuk manajemen proyek, tugas, dan SOP. Microservices ASP.NET Core 8 + Oracle + Redis + RabbitMQ + React. Bahasa komunikasi dan dokumentasi: **Bahasa Indonesia**.
+Platform enterprise multi-tenant untuk manajemen proyek, tugas, dan SOP. Microservices ASP.NET Core 10 + Oracle + Redis + RabbitMQ + React. Bahasa komunikasi dan dokumentasi: **Bahasa Indonesia**.
 
 ## Wajib dibaca
 

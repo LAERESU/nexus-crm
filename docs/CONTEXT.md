@@ -9,7 +9,7 @@
 
 - **Produk:** platform enterprise multi-tenant untuk manajemen proyek, tugas, dan SOP perusahaan.
 - **Pengguna:** karyawan, manajer proyek, penulis SOP, reviewer/approver SOP, admin tenant, auditor.
-- **Stack:** ASP.NET Core 8 (microservices) · Oracle Database · Redis 7 · RabbitMQ · React 18 + TypeScript · Docker · Kubernetes · GitHub Actions.
+- **Stack:** ASP.NET Core 10 (microservices) · Oracle Database · Redis 7 · RabbitMQ · React 18 + TypeScript · Docker · Kubernetes · GitHub Actions.
 - **Dokumen terkait:**
   - `docs/PLANNING.md`: ruang lingkup, roadmap, milestone, keputusan terbuka
   - `docs/SCRUM.md`: backlog, sprint, dan progres (**sumber kebenaran status**)
@@ -57,7 +57,7 @@ NexUS/
 
 | Aspek | Aturan |
 | --- | --- |
-| Versi | .NET 8 LTS, `Nullable` enable, `TreatWarningsAsErrors` di CI |
+| Versi | .NET 10 LTS, `Nullable` enable, `TreatWarningsAsErrors` di CI |
 | Penamaan | PascalCase untuk class/method/property, camelCase untuk variabel lokal, `_camelCase` untuk field privat, prefix `I` untuk interface |
 | Use case | Satu folder per command/query: `Command`, `Validator`, `Handler` (MediatR) |
 | Validasi | FluentValidation di Application layer (wajib), bukan di controller |

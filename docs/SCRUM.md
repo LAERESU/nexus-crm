@@ -91,7 +91,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | ID | Story | SP | Sprint | Status |
 | --- | --- | --- | --- | --- |
 | NX-001 | Inisialisasi monorepo (struktur folder, `.editorconfig`, `.gitignore`, README) | 2 | 0 | ✅ |
-| NX-002 | Solution .NET + BuildingBlocks (Common, Auth, Caching, Messaging, Observability) | 5 | 1 | ⬜ |
+| NX-002 | Solution .NET + BuildingBlocks (Common, Auth, Caching, Messaging, Observability) | 5 | 1 | 🟨 |
 | NX-003 | Template service Clean Architecture (Domain/Application/Infrastructure/Api + tests) | 5 | 1 | ⬜ |
 | NX-004 | Inisialisasi frontend React + Vite + TypeScript + lint + struktur fitur | 3 | 1 | ⬜ |
 | NX-005 | `docker-compose` lokal: Oracle Free, Redis, RabbitMQ, semua service | 5 | 1 | ⬜ |
