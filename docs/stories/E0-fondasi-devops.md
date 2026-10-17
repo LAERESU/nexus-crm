@@ -63,9 +63,9 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
   6. Tambahkan `.env.example` (`VITE_API_BASE_URL=/api/v1`) dan proxy dev Vite ke Gateway.
   7. Script npm: `dev`, `build`, `lint`, `test`, `format`.
 - **Acceptance criteria:**
-  - [ ] `npm run build`, `npm run lint`, dan `npm test` lulus.
-  - [ ] `npm run dev` menampilkan layout dengan sidebar dan halaman Dashboard kosong.
-  - [ ] Tidak ada pemakaian `any` di kode awal.
+  - [x] `npm run build`, `npm run lint`, dan `npm test` lulus.
+  - [x] `npm run dev` menampilkan layout dengan sidebar dan halaman Dashboard kosong.
+  - [x] Tidak ada pemakaian `any` di kode awal.
 
 ---
 
