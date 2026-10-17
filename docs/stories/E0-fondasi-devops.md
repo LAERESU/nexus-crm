@@ -134,7 +134,7 @@ Referensi utama: `ARCHITECTURE.md` bagian D dan F.
 
 ---
 
-### NX-009 · Flyway + schema Oracle per service
+### NX-009 · Flyway + schema Oracle per service ✅
 - **Sprint:** 1 · **SP:** 5 · **Bergantung pada:** NX-005
 - **Langkah:**
   1. Tambahkan service `flyway` di docker-compose yang menjalankan migrasi untuk setiap folder `db/<schema>/`.
