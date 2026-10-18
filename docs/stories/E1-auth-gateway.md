@@ -52,15 +52,15 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 
 ---
 
-### NX-013 · Refresh token rotasi + deteksi reuse
+### NX-013 · Refresh token rotasi + deteksi reuse ✅
 - **Sprint:** 2 · **SP:** 5 · **Bergantung pada:** NX-012
 - **Langkah:**
   1. `POST /api/v1/auth/refresh` membaca cookie, memvalidasi hash, menerbitkan pasangan token baru, dan menandai token lama `revoked_at`.
   2. Jika token yang sudah di-revoke dipakai lagi → revoke seluruh token keluarga sesi tersebut.
   3. Simpan cache `auth:rt:{tokenId}` di Redis.
 - **Acceptance criteria:**
-  - [ ] Refresh berhasil menghasilkan token baru dan token lama tidak bisa dipakai lagi.
-  - [ ] Pemakaian ulang token lama mencabut semua sesi terkait dan mengembalikan 401.
+  - [x] Refresh berhasil menghasilkan token baru dan token lama tidak bisa dipakai lagi. (tes integrasi Oracle)
+  - [x] Pemakaian ulang token lama mencabut semua sesi terkait dan mengembalikan 401. (tes integrasi Oracle: token terbaru di keluarga ikut dicabut, sesi lain user tetap hidup)
 - **Catatan implementasi:**
   - Migrasi baru `V3__refresh_token_family.sql` (V2 sudah di-merge): `FAMILY_ID` mengelompokkan token hasil rotasi dari satu login, `REVOKED_REASON` (`Rotated`, `ReuseDetected`, `Logout`).
   - Nilai refresh token berformat `{tenantId}.{acak}` sehingga pencarian token berdasarkan hash tetap memfilter `TENANT_ID`; pengecualian ADR-0006 tetap hanya satu (pencarian email saat login).

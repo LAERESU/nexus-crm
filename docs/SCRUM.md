@@ -14,7 +14,7 @@
 | Tanggal mulai sprint | — |
 | Tanggal selesai sprint | — |
 | Sprint goal | Menyiapkan repo, keputusan teknis awal, dan backlog siap dikerjakan |
-| Progres keseluruhan | 11 / 64 story selesai (17%) |
+| Progres keseluruhan | 12 / 64 story selesai (19%) |
 | Hambatan aktif | — |
 
 Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 🔍 Review · ✅ Done · 🟥 Blocked
@@ -74,7 +74,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | ID | Epic | Fase | Story | Selesai | Progres |
 | --- | --- | --- | --- | --- | --- |
 | E0 | Fondasi & DevOps | 1 | 10 | 9 | 90% |
-| E1 | Auth & Gateway | 1 | 7 | 2 | 29% |
+| E1 | Auth & Gateway | 1 | 7 | 3 | 43% |
 | E2 | User & RBAC | 2 | 7 | 0 | 0% |
 | E3 | Project Management | 2 | 7 | 0 | 0% |
 | E4 | Task Management | 2 | 9 | 0 | 0% |
@@ -82,7 +82,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | E6 | SOP Builder | 3 | 11 | 0 | 0% |
 | E7 | Notification | 3 | 4 | 0 | 0% |
 | E8 | Audit, Observability & Go-live | 4 | 6 | 0 | 0% |
-| | **Total** | | **64** | **11** | **17%** |
+| | **Total** | | **64** | **12** | **19%** |
 
 ## 5. Product Backlog
 
@@ -107,7 +107,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | --- | --- | --- | --- | --- |
 | NX-011 | API Gateway YARP dengan routing ke semua service | 3 | 2 | ✅ |
 | NX-012 | Login username/password → access token + refresh token | 8 | 2 | ✅ |
-| NX-013 | Refresh token dengan rotasi & deteksi reuse | 5 | 2 | 🔍 |
+| NX-013 | Refresh token dengan rotasi & deteksi reuse | 5 | 2 | ✅ |
 | NX-014 | Logout + blacklist `jti` di Redis | 3 | 2 | ⬜ |
 | NX-015 | Validasi JWT di Gateway & setiap service (JWKS) | 3 | 2 | ⬜ |
 | NX-016 | Rate limiting di Gateway (login, per-user, per-tenant) | 5 | 2 | ⬜ |
