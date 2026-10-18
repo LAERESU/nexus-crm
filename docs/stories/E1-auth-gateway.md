@@ -147,3 +147,11 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
   - [ ] Login berhasil membawa user ke Dashboard; refresh halaman tidak mengeluarkan user.
   - [ ] Token tidak ada di `localStorage` maupun `sessionStorage`.
   - [ ] Akses route terproteksi tanpa login diarahkan ke `/login`.
+- **Catatan implementasi:**
+  - Access token hanya di memori (Zustand); info user (`sub`, `tid`, `roles`) dibaca dari payload JWT untuk tampilan saja. Status sesi `unknown` → `authenticated`/`anonymous`; `RequireAuth` menunggu pemulihan sesi sebelum memutuskan.
+  - Interceptor axios: Bearer token + `X-Correlation-Id`; saat 401, **satu** refresh dipakai bersama semua request yang gagal bersamaan (single-flight, syarat rotasi NX-013), request diulang sekali; refresh gagal → sesi dibersihkan dan router mengarahkan ke `/login`. Endpoint auth menandai `skipAuthRefresh`.
+  - Saat aplikasi dimuat, `AuthBootstrap` memanggil `/auth/refresh` (cookie httpOnly) untuk memulihkan sesi.
+  - Form login: React Hook Form + Zod; pesan 401 generik; 429 menampilkan waktu tunggu dari `Retry-After`. Tombol Keluar memanggil `/auth/logout` dan tetap mengakhiri sesi lokal bila server tidak terjangkau.
+  - nginx (image web) meneruskan `/api/` dan `/hubs/` ke Gateway lewat template `templates/default.conf.template` dengan variabel `API_UPSTREAM` (default `http://gateway:8080`), sehingga SPA dan API satu origin dan cookie refresh ikut terkirim.
+  - `web/src/App.tsx` sisa template Vite yang ikut ter-commit di NX-004 dihapus.
+  - Belum: E2E Playwright (dikerjakan bersama alur utama lain). Gateway di belakang nginx/ingress melihat IP proxy; forwarded headers tepercaya dikonfigurasi di NX-008 agar rate limit per IP akurat.

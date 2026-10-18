@@ -8,6 +8,26 @@ server {
   # Ant Design menyisipkan style inline (CSS-in-JS), sehingga style-src membutuhkan 'unsafe-inline'.
   add_header Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss:; img-src 'self' data:;" always;
 
+  # API dan hub SignalR diteruskan ke API Gateway (same-origin, sehingga cookie refresh token ikut terkirim).
+  # ${API_UPSTREAM} diisi saat container start oleh envsubst bawaan image nginx (mis. http://gateway:8080).
+  location /api/ {
+    proxy_pass ${API_UPSTREAM};
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location /hubs/ {
+    proxy_pass ${API_UPSTREAM};
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_read_timeout 120s;
+  }
+
   # SPA fallback
   location / {
     try_files $uri /index.html;

@@ -1,38 +1,59 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useAuthStore } from '@/features/auth/store/authStore'
-
-const user = { id: 'u1', name: 'Budi', tenantId: 't1' }
+import { decodeSessionUser, useAuthStore } from '@/features/auth/store/authStore'
+import { fakeJwt } from '@/test/tokens'
 
 describe('authStore', () => {
-  beforeEach(() => useAuthStore.getState().clear())
+  beforeEach(() =>
+    useAuthStore.setState({
+      accessToken: null,
+      user: null,
+      status: 'unknown',
+      isAuthenticated: false,
+    }),
+  )
 
-  it('awalnya belum terautentikasi', () => {
-    const state = useAuthStore.getState()
-    expect(state.isAuthenticated).toBe(false)
-    expect(state.accessToken).toBeNull()
+  it('awalnya status unknown sampai sesi dipulihkan', () => {
+    expect(useAuthStore.getState().status).toBe('unknown')
+    expect(useAuthStore.getState().accessToken).toBeNull()
   })
 
-  it('setSession menyimpan token, user, dan permission', () => {
-    useAuthStore.getState().setSession('token', user, ['project.read'])
+  it('setSession membaca user dari klaim sub, tid, dan roles', () => {
+    useAuthStore.getState().setSession(fakeJwt({ sub: 'u-9', tid: '3', roles: ['pm', 'member'] }))
 
     const state = useAuthStore.getState()
-    expect(state.isAuthenticated).toBe(true)
-    expect(state.accessToken).toBe('token')
-    expect(state.hasPermission('project.read')).toBe(true)
-    expect(state.hasPermission('sop.approve')).toBe(false)
+    expect(state.status).toBe('authenticated')
+    expect(state.user).toEqual({ id: 'u-9', tenantId: '3', roles: ['pm', 'member'] })
+    expect(state.hasRole('pm')).toBe(true)
+    expect(state.hasRole('admin')).toBe(false)
   })
 
-  it('clear menghapus sesi', () => {
-    useAuthStore.getState().setSession('token', user, ['project.read'])
+  it('token rusak tidak membuat sesi', () => {
+    useAuthStore.getState().setSession('bukan.jwt')
+
+    expect(useAuthStore.getState().status).toBe('anonymous')
+    expect(useAuthStore.getState().accessToken).toBeNull()
+  })
+
+  it('clear mengakhiri sesi', () => {
+    useAuthStore.getState().setSession(fakeJwt())
     useAuthStore.getState().clear()
 
-    expect(useAuthStore.getState().isAuthenticated).toBe(false)
-    expect(useAuthStore.getState().permissions).toEqual([])
+    expect(useAuthStore.getState().status).toBe('anonymous')
+    expect(useAuthStore.getState().user).toBeNull()
   })
 
-  it('tidak menyimpan token di localStorage', () => {
-    useAuthStore.getState().setSession('rahasia', user, [])
+  it('token tidak disimpan di localStorage maupun sessionStorage', () => {
+    const token = fakeJwt()
+    useAuthStore.getState().setSession(token)
 
-    expect(JSON.stringify({ ...localStorage })).not.toContain('rahasia')
+    expect(JSON.stringify({ ...localStorage })).not.toContain(token)
+    expect(JSON.stringify({ ...sessionStorage })).not.toContain(token)
+    expect(localStorage.length).toBe(0)
+    expect(sessionStorage.length).toBe(0)
+  })
+
+  it('decodeSessionUser menerima roles tunggal berupa string dan menolak klaim yang hilang', () => {
+    expect(decodeSessionUser(fakeJwt({ roles: 'admin' }))?.roles).toEqual(['admin'])
+    expect(decodeSessionUser(fakeJwt({ tid: undefined }))).toBeNull()
   })
 })

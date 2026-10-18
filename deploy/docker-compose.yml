@@ -304,6 +304,10 @@ services:
     image: nexus/web:dev
     container_name: nexus-web
     restart: unless-stopped
+    environment:
+      API_UPSTREAM: http://gateway:8080 # /api dan /hubs diteruskan nginx ke Gateway
+    depends_on:
+      gateway: { condition: service_started } # nginx me-resolve host gateway saat start
     ports:
       - "3000:8080"
     healthcheck:
