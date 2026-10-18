@@ -14,8 +14,15 @@ interface AuthState {
   accessToken: string | null
   user: SessionUser | null
   status: AuthStatus
-  isAuthenticated: boolean
-  setSession: (accessToken: string) => void
+  /**
+   * Naik setiap login dan logout. Refresh yang dimulai pada generasi lama hasilnya diabaikan, agar refresh yang
+   * selesai terlambat tidak menimpa sesi yang lebih baru (mis. login baru atau logout).
+   */
+  generation: number
+  /** Sesi baru dari login (generasi naik). */
+  login: (accessToken: string) => void
+  /** Token baru dari refresh untuk sesi yang sama (generasi tetap). */
+  setAccessToken: (accessToken: string) => void
   clear: () => void
   hasRole: (role: string) => boolean
 }
@@ -48,19 +55,30 @@ export function decodeSessionUser(accessToken: string): SessionUser | null {
   }
 }
 
-export const useAuthStore = create<AuthState>()((set, get) => ({
-  accessToken: null,
-  user: null,
-  status: 'unknown',
-  isAuthenticated: false,
-  setSession: (accessToken) => {
+export const useAuthStore = create<AuthState>()((set, get) => {
+  const apply = (accessToken: string, nextGeneration: number) => {
     const user = decodeSessionUser(accessToken)
-    if (!user) {
-      set({ accessToken: null, user: null, status: 'anonymous', isAuthenticated: false })
-      return
-    }
-    set({ accessToken, user, status: 'authenticated', isAuthenticated: true })
-  },
-  clear: () => set({ accessToken: null, user: null, status: 'anonymous', isAuthenticated: false }),
-  hasRole: (role) => get().user?.roles.includes(role) ?? false,
-}))
+    set(
+      user
+        ? { accessToken, user, status: 'authenticated', generation: nextGeneration }
+        : { accessToken: null, user: null, status: 'anonymous', generation: nextGeneration },
+    )
+  }
+
+  return {
+    accessToken: null,
+    user: null,
+    status: 'unknown',
+    generation: 0,
+    login: (accessToken) => apply(accessToken, get().generation + 1),
+    setAccessToken: (accessToken) => apply(accessToken, get().generation),
+    clear: () =>
+      set((s) => ({
+        accessToken: null,
+        user: null,
+        status: 'anonymous',
+        generation: s.generation + 1,
+      })),
+    hasRole: (role) => get().user?.roles.includes(role) ?? false,
+  }
+})

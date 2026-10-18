@@ -4,12 +4,13 @@ import { fakeJwt } from '@/test/tokens'
 
 describe('authStore', () => {
   beforeEach(() =>
-    useAuthStore.setState({
+    useAuthStore.setState((s) => ({
       accessToken: null,
       user: null,
       status: 'unknown',
-      isAuthenticated: false,
-    }),
+      // Generasi selalu naik (seperti di aplikasi) agar refresh yang tertinggal dari tes sebelumnya diabaikan.
+      generation: s.generation + 1,
+    })),
   )
 
   it('awalnya status unknown sampai sesi dipulihkan', () => {
@@ -18,7 +19,7 @@ describe('authStore', () => {
   })
 
   it('setSession membaca user dari klaim sub, tid, dan roles', () => {
-    useAuthStore.getState().setSession(fakeJwt({ sub: 'u-9', tid: '3', roles: ['pm', 'member'] }))
+    useAuthStore.getState().login(fakeJwt({ sub: 'u-9', tid: '3', roles: ['pm', 'member'] }))
 
     const state = useAuthStore.getState()
     expect(state.status).toBe('authenticated')
@@ -28,14 +29,14 @@ describe('authStore', () => {
   })
 
   it('token rusak tidak membuat sesi', () => {
-    useAuthStore.getState().setSession('bukan.jwt')
+    useAuthStore.getState().login('bukan.jwt')
 
     expect(useAuthStore.getState().status).toBe('anonymous')
     expect(useAuthStore.getState().accessToken).toBeNull()
   })
 
   it('clear mengakhiri sesi', () => {
-    useAuthStore.getState().setSession(fakeJwt())
+    useAuthStore.getState().login(fakeJwt())
     useAuthStore.getState().clear()
 
     expect(useAuthStore.getState().status).toBe('anonymous')
@@ -44,12 +45,22 @@ describe('authStore', () => {
 
   it('token tidak disimpan di localStorage maupun sessionStorage', () => {
     const token = fakeJwt()
-    useAuthStore.getState().setSession(token)
+    useAuthStore.getState().login(token)
 
     expect(JSON.stringify({ ...localStorage })).not.toContain(token)
     expect(JSON.stringify({ ...sessionStorage })).not.toContain(token)
     expect(localStorage.length).toBe(0)
     expect(sessionStorage.length).toBe(0)
+  })
+
+  it('login dan clear menaikkan generasi, refresh (setAccessToken) tidak', () => {
+    const start = useAuthStore.getState().generation
+    useAuthStore.getState().login(fakeJwt())
+    useAuthStore.getState().setAccessToken(fakeJwt({ jti: 'baru' }))
+    expect(useAuthStore.getState().generation).toBe(start + 1)
+
+    useAuthStore.getState().clear()
+    expect(useAuthStore.getState().generation).toBe(start + 2)
   })
 
   it('decodeSessionUser menerima roles tunggal berupa string dan menolak klaim yang hilang', () => {

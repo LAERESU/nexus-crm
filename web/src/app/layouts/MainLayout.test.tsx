@@ -11,7 +11,7 @@ function renderAt(path: string) {
 }
 
 describe('MainLayout', () => {
-  beforeEach(() => useAuthStore.getState().setSession(fakeJwt({ tid: '7' })))
+  beforeEach(() => useAuthStore.getState().login(fakeJwt({ tid: '7' })))
 
   it('menampilkan sidebar, tenant, dan halaman Dashboard kosong di /', async () => {
     renderAt('/')

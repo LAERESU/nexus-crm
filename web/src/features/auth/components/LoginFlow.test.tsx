@@ -8,6 +8,7 @@ import { routes } from '@/app/router'
 import { AuthBootstrap } from '@/features/auth/components/AuthBootstrap'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import { httpClient } from '@/shared/api/httpClient'
+import { queryClient } from '@/shared/api/queryClient'
 import { fakeJwt } from '@/test/tokens'
 
 const originalAdapter = httpClient.defaults.adapter
@@ -58,12 +59,13 @@ function renderApp(path: string) {
 
 describe('alur login', () => {
   beforeEach(() =>
-    useAuthStore.setState({
+    useAuthStore.setState((s) => ({
       accessToken: null,
       user: null,
       status: 'unknown',
-      isAuthenticated: false,
-    }),
+      // Generasi selalu naik (seperti di aplikasi) agar refresh yang tertinggal dari tes sebelumnya diabaikan.
+      generation: s.generation + 1,
+    })),
   )
   afterEach(() => {
     httpClient.defaults.adapter = originalAdapter
@@ -149,5 +151,30 @@ describe('alur login', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
     expect(requests.some((r) => r.url === '/auth/logout')).toBe(true)
     expect(useAuthStore.getState().status).toBe('anonymous')
+  })
+
+  it('logout membersihkan cache data server agar user berikutnya tidak melihat data sebelumnya', async () => {
+    backend({ session: true })
+    renderApp('/')
+    queryClient.setQueryData(['projects', 'list'], [{ id: 'p-tenant-7' }])
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /Keluar/ }, slow))
+
+    await waitFor(() => expect(queryClient.getQueryData(['projects', 'list'])).toBeUndefined())
+  })
+
+  it('setelah login kembali ke halaman asal lengkap dengan query string', async () => {
+    backend({ session: false })
+    const router = renderApp('/403?tab=2#bagian')
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByLabelText('Email', {}, slow), 'admin@demo.local')
+    await user.type(screen.getByLabelText('Password'), 'Rahasia#2026')
+    await user.click(screen.getByRole('button', { name: 'Masuk' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/403'))
+    expect(router.state.location.search).toBe('?tab=2')
+    expect(router.state.location.hash).toBe('#bagian')
   })
 })

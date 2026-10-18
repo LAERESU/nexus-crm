@@ -149,9 +149,12 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
   - [ ] Akses route terproteksi tanpa login diarahkan ke `/login`.
 - **Catatan implementasi:**
   - Access token hanya di memori (Zustand); info user (`sub`, `tid`, `roles`) dibaca dari payload JWT untuk tampilan saja. Status sesi `unknown` → `authenticated`/`anonymous`; `RequireAuth` menunggu pemulihan sesi sebelum memutuskan.
-  - Interceptor axios: Bearer token + `X-Correlation-Id`; saat 401, **satu** refresh dipakai bersama semua request yang gagal bersamaan (single-flight, syarat rotasi NX-013), request diulang sekali; refresh gagal → sesi dibersihkan dan router mengarahkan ke `/login`. Endpoint auth menandai `skipAuthRefresh`.
+  - Interceptor axios: Bearer token + `X-Correlation-Id`; saat 401, **satu** refresh dipakai bersama semua request yang gagal bersamaan (single-flight), dan antar tab diserialkan dengan Web Locks (`navigator.locks`) karena rotasi NX-013 menolak refresh bersamaan; request diulang sekali. Request yang berangkat dengan token lama padahal token sudah diperbarui diulang dengan token terbaru tanpa refresh kedua. Endpoint auth menandai `skipAuthRefresh`.
+  - Hanya **401** dari refresh yang mengakhiri sesi; error lain (jaringan, 429, 5xx) diteruskan tanpa mengeluarkan user.
+  - **Generasi sesi** (naik setiap login/logout): hasil refresh yang dimulai sebelum login atau logout terbaru diabaikan, sehingga refresh yang terlambat tidak mengeluarkan user yang baru login atau memasukkan kembali user yang baru logout. Tombol Masuk dinonaktifkan selama pemulihan sesi awal agar respons refresh yang terlambat tidak menghapus cookie login baru.
+  - Cache TanStack Query dibersihkan saat sesi berakhir atau user berganti. Redirect setelah login mempertahankan query string dan hash.
   - Saat aplikasi dimuat, `AuthBootstrap` memanggil `/auth/refresh` (cookie httpOnly) untuk memulihkan sesi.
   - Form login: React Hook Form + Zod; pesan 401 generik; 429 menampilkan waktu tunggu dari `Retry-After`. Tombol Keluar memanggil `/auth/logout` dan tetap mengakhiri sesi lokal bila server tidak terjangkau.
-  - nginx (image web) meneruskan `/api/` dan `/hubs/` ke Gateway lewat template `templates/default.conf.template` dengan variabel `API_UPSTREAM` (default `http://gateway:8080`), sehingga SPA dan API satu origin dan cookie refresh ikut terkirim.
+  - nginx (image web) meneruskan `/api/` (batas body 25 MB untuk upload; validasi sebenarnya di service) dan `/hubs/` ke Gateway lewat template `templates/default.conf.template` dengan variabel `API_UPSTREAM` (default `http://gateway:8080`), sehingga SPA dan API satu origin dan cookie refresh ikut terkirim.
   - `web/src/App.tsx` sisa template Vite yang ikut ter-commit di NX-004 dihapus.
   - Belum: E2E Playwright (dikerjakan bersama alur utama lain). Gateway di belakang nginx/ingress melihat IP proxy; forwarded headers tepercaya dikonfigurasi di NX-008 agar rate limit per IP akurat.

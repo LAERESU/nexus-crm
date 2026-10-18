@@ -42,7 +42,7 @@ function fakeServer(options: { refreshFails?: boolean } = {}) {
 }
 
 describe('httpClient', () => {
-  beforeEach(() => useAuthStore.getState().setSession(oldToken))
+  beforeEach(() => useAuthStore.getState().login(oldToken))
   afterEach(() => {
     httpClient.defaults.adapter = originalAdapter
     useAuthStore.getState().clear()
@@ -119,5 +119,47 @@ describe('httpClient', () => {
     await expect(httpClient.get('/forbidden')).rejects.toBeInstanceOf(AxiosError)
 
     expect(calls).toEqual(['/forbidden', '/auth/refresh', '/forbidden'])
+  })
+
+  it('refresh gagal karena 429 atau jaringan tidak mengeluarkan user', async () => {
+    httpClient.defaults.adapter = async (config) =>
+      config.url === '/auth/refresh' ? respond(config, 429) : respond(config, 401)
+
+    await expect(httpClient.get('/projects')).rejects.toBeInstanceOf(AxiosError)
+
+    expect(useAuthStore.getState().status).toBe('authenticated')
+    expect(useAuthStore.getState().accessToken).toBe(oldToken)
+  })
+
+  it('refresh yang selesai setelah logout diabaikan dan tidak memulihkan sesi', async () => {
+    let releaseRefresh: () => void = () => undefined
+    httpClient.defaults.adapter = async (config) => {
+      if (config.url === '/auth/refresh') {
+        await new Promise<void>((r) => (releaseRefresh = r))
+        return respond(config, 200, { accessToken: newToken })
+      }
+      return respond(config, 401)
+    }
+
+    const pending = httpClient.get('/projects').catch(() => undefined)
+    await new Promise((r) => setTimeout(r, 5))
+    useAuthStore.getState().clear() // user menekan Keluar saat refresh berjalan
+    releaseRefresh()
+    await pending
+
+    expect(useAuthStore.getState().status).toBe('anonymous')
+    expect(useAuthStore.getState().accessToken).toBeNull()
+  })
+
+  it('request dengan token lama setelah token diperbarui diulang dengan token terbaru tanpa refresh kedua', async () => {
+    const calls = fakeServer()
+    useAuthStore.getState().setAccessToken(newToken)
+
+    const response = await httpClient.get('/projects', {
+      headers: { Authorization: `Bearer ${oldToken}` },
+    })
+
+    expect(response.status).toBe(200)
+    expect(calls.filter((c) => c.url === '/auth/refresh')).toHaveLength(0)
   })
 })

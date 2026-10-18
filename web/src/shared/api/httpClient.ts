@@ -1,5 +1,6 @@
-import axios, { AxiosError } from 'axios'
+import axios, { AxiosError, AxiosHeaders } from 'axios'
 import type { InternalAxiosRequestConfig } from 'axios'
+import type { TokenResponse } from '@/features/auth/api/authApi'
 import { useAuthStore } from '@/features/auth/store/authStore'
 
 declare module 'axios' {
@@ -13,15 +14,10 @@ declare module 'axios' {
   }
 }
 
-interface TokenResponse {
-  accessToken: string
-}
-
 /**
  * Satu-satunya pintu HTTP aplikasi; komponen tidak boleh memanggil axios/fetch langsung.
  * Access token disisipkan sebagai Bearer; saat 401, refresh dilakukan **satu kali** untuk semua request yang
- * sedang gagal (single-flight, syarat rotasi refresh token NX-013), lalu request diulang sekali. Bila refresh gagal,
- * sesi dibersihkan dan router mengarahkan ke /login.
+ * sedang gagal, lalu request diulang sekali (lihat {@link refreshAccessToken}).
  */
 export const httpClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api/v1',
@@ -35,24 +31,51 @@ httpClient.interceptors.request.use((config) => {
   return config
 })
 
-let refreshInFlight: Promise<string> | null = null
+/** Refresh yang sedang berjalan, dipakai bersama hanya oleh pemanggil dari generasi sesi yang sama. */
+let refreshInFlight: { generation: number; promise: Promise<string> } | null = null
 
-/** Menukar refresh token (cookie) dengan access token baru; panggilan bersamaan berbagi satu request. */
+/** Menjalankan fungsi di bawah kunci lintas tab (Web Locks) bila tersedia, agar refresh berjalan satu per satu. */
+function withCrossTabLock<T>(action: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
+  return locks ? locks.request('nexus-auth-refresh', action) : action()
+}
+
+/**
+ * Menukar refresh token (cookie) dengan access token baru.
+ * - Panggilan bersamaan di tab ini berbagi satu request; antar tab diserialkan dengan Web Locks, karena rotasi
+ *   refresh token (NX-013) menolak refresh bersamaan. Cookie dipakai bersama semua tab, sehingga tab yang menunggu
+ *   kunci memakai cookie terbaru.
+ * - Hasilnya diabaikan bila sesi sudah berganti (login baru atau logout) selama refresh berjalan.
+ * - Hanya 401 yang mengakhiri sesi; error lain (jaringan, 429, 5xx) diteruskan tanpa mengeluarkan user.
+ */
 export function refreshAccessToken(): Promise<string> {
-  refreshInFlight ??= httpClient
-    .post<TokenResponse>('/auth/refresh', undefined, { skipAuthRefresh: true })
+  const startedAt = useAuthStore.getState().generation
+
+  if (refreshInFlight?.generation === startedAt) return refreshInFlight.promise
+
+  const promise: Promise<string> = withCrossTabLock(() =>
+    httpClient.post<TokenResponse>('/auth/refresh', undefined, { skipAuthRefresh: true }),
+  )
     .then((response) => {
-      useAuthStore.getState().setSession(response.data.accessToken)
+      const store = useAuthStore.getState()
+      if (store.generation === startedAt) store.setAccessToken(response.data.accessToken)
       return response.data.accessToken
     })
     .catch((error: unknown) => {
-      useAuthStore.getState().clear()
+      const store = useAuthStore.getState()
+      if (
+        store.generation === startedAt &&
+        error instanceof AxiosError &&
+        error.response?.status === 401
+      )
+        store.clear()
       throw error
     })
     .finally(() => {
-      refreshInFlight = null
+      if (refreshInFlight?.promise === promise) refreshInFlight = null
     })
-  return refreshInFlight
+  refreshInFlight = { generation: startedAt, promise }
+  return promise
 }
 
 httpClient.interceptors.response.use(undefined, async (error: unknown) => {
@@ -61,7 +84,12 @@ httpClient.interceptors.response.use(undefined, async (error: unknown) => {
   const original: InternalAxiosRequestConfig = error.config
   if (original.skipAuthRefresh || original.retriedAfterRefresh) throw error
 
-  const token = await refreshAccessToken() // gagal → sesi dibersihkan, error refresh diteruskan
+  // Request yang berangkat dengan token lama padahal token sudah diperbarui request lain: cukup ulang dengan token
+  // terbaru, tanpa refresh kedua (setiap refresh merotasi token dan memakai kuota rate limit).
+  const current = useAuthStore.getState().accessToken
+  const sentWith = AxiosHeaders.from(original.headers).get('Authorization')?.toString()
+  const token = current && sentWith !== `Bearer ${current}` ? current : await refreshAccessToken()
+
   original.retriedAfterRefresh = true
   original.headers.set('Authorization', `Bearer ${token}`)
   return httpClient(original)

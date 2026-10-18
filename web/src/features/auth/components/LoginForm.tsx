@@ -15,7 +15,9 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>
 
 export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
-  const setSession = useAuthStore((s) => s.setSession)
+  const login = useAuthStore((s) => s.login)
+  // Tunggu pemulihan sesi saat aplikasi dimuat selesai: respons refresh yang datang setelah login bisa menghapus cookie baru.
+  const restoring = useAuthStore((s) => s.status === 'unknown')
   const [error, setError] = useState<string | null>(null)
   const {
     control,
@@ -33,7 +35,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         email: values.email.trim(),
         password: values.password,
       })
-      setSession(accessToken)
+      login(accessToken)
       onSuccess()
     } catch (e) {
       setError(loginErrorMessage(e))
@@ -73,7 +75,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           )}
         />
       </Form.Item>
-      <Button type="primary" htmlType="submit" block loading={isSubmitting}>
+      <Button type="primary" htmlType="submit" block loading={isSubmitting} disabled={restoring}>
         Masuk
       </Button>
     </Form>
