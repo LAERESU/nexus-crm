@@ -8,6 +8,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NexUS.BuildingBlocks.Auth;
 
+using NexUS.Testing;
+
 namespace NexUS.Gateway.IntegrationTests;
 
 /// <summary>Request yang diterima service tiruan di belakang Gateway.</summary>

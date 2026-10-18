@@ -44,6 +44,9 @@ builder.Services.AddReverseProxy()
 
 var app = builder.Build();
 
+// Route YARP tanpa AuthorizationPolicy akan publik (Gateway tidak memakai fallback policy): tolak saat start.
+GatewayRoutes.EnsureAuthorizationPolicies(app.Configuration);
+
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseNexusObservability();
 app.UseExceptionHandler(); // exception di pipeline Gateway → 500 ProblemDetails tanpa stack trace
@@ -51,7 +54,6 @@ app.UseMiddleware<RejectDisallowedOriginMiddleware>();
 app.UseCors(GatewayCors.PolicyName);
 app.UseStatusCodePages(); // route tidak terdaftar → 404 ProblemDetails
 app.UseAuthentication();
-app.UseNexusLogEnrichment();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();

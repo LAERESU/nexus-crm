@@ -109,6 +109,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexUS.Gateway.Api", "src\Ap
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexUS.Gateway.IntegrationTests", "src\ApiGateway\tests\NexUS.Gateway.IntegrationTests\NexUS.Gateway.IntegrationTests.csproj", "{80059F40-0316-4899-BE05-1C60AB90AE1E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexUS.Testing", "tests\NexUS.Testing\NexUS.Testing.csproj", "{E4C16064-3347-48E6-9D32-DABE9214690A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -719,6 +721,18 @@ Global
 		{80059F40-0316-4899-BE05-1C60AB90AE1E}.Release|x64.Build.0 = Release|Any CPU
 		{80059F40-0316-4899-BE05-1C60AB90AE1E}.Release|x86.ActiveCfg = Release|Any CPU
 		{80059F40-0316-4899-BE05-1C60AB90AE1E}.Release|x86.Build.0 = Release|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Debug|x64.Build.0 = Debug|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Debug|x86.Build.0 = Debug|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Release|x64.ActiveCfg = Release|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Release|x64.Build.0 = Release|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Release|x86.ActiveCfg = Release|Any CPU
+		{E4C16064-3347-48E6-9D32-DABE9214690A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -732,5 +746,6 @@ Global
 		{BDE1E842-C0F9-4F1C-87B3-1F437BE83AAE} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{F6229BAE-6C2F-4A05-9932-7607010FE2BC} = {25D181DD-5CC9-F0B3-C64F-91E1AA77FD70}
 		{80059F40-0316-4899-BE05-1C60AB90AE1E} = {25D181DD-5CC9-F0B3-C64F-91E1AA77FD70}
+		{E4C16064-3347-48E6-9D32-DABE9214690A} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

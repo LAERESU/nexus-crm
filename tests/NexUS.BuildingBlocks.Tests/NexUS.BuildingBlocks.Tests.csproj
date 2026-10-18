@@ -31,6 +31,7 @@
     <ProjectReference Include="..\..\src\BuildingBlocks\Caching\NexUS.BuildingBlocks.Caching.csproj" />
     <ProjectReference Include="..\..\src\BuildingBlocks\Messaging\NexUS.BuildingBlocks.Messaging.csproj" />
     <ProjectReference Include="..\..\src\BuildingBlocks\Observability\NexUS.BuildingBlocks.Observability.csproj" />
+    <ProjectReference Include="..\NexUS.Testing\NexUS.Testing.csproj" />
   </ItemGroup>
 
 </Project>

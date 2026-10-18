@@ -3,16 +3,12 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
-using Serilog.Context;
 using Serilog.Events;
 
 namespace NexUS.BuildingBlocks.Observability;
 
 public static class ApplicationBuilderExtensions
 {
-    public const string TenantClaim = "tenant_id";
-    public const string UserClaim = ClaimTypes.NameIdentifier;
-
     /// <summary>Correlation id + log ringkas per request (tanpa header, query string, maupun body).</summary>
     public static IApplicationBuilder UseNexusObservability(this IApplicationBuilder app)
     {
@@ -26,23 +22,12 @@ public static class ApplicationBuilderExtensions
                 : LogEventLevel.Information;
             options.EnrichDiagnosticContext = (diagnostics, context) =>
             {
-                diagnostics.Set("TenantId", context.User.FindFirstValue(TenantClaim));
-                diagnostics.Set("UserId", context.User.FindFirstValue(UserClaim));
+                diagnostics.Set("TenantId", context.User.FindFirstValue(HttpContextUserEnricher.TenantClaim));
+                diagnostics.Set("UserId", context.User.FindFirstValue(HttpContextUserEnricher.UserClaim));
             };
         });
         return app;
     }
-
-    /// <summary>Tambahkan TenantId dan UserId ke semua log di dalam request. Pasang setelah autentikasi.</summary>
-    public static IApplicationBuilder UseNexusLogEnrichment(this IApplicationBuilder app) =>
-        app.Use(async (context, next) =>
-        {
-            using (LogContext.PushProperty("TenantId", context.User.FindFirstValue(TenantClaim)))
-            using (LogContext.PushProperty("UserId", context.User.FindFirstValue(UserClaim)))
-            {
-                await next(context);
-            }
-        });
 
     /// <summary>Teruskan X-Correlation-Id pada HttpClient ini.</summary>
     public static IHttpClientBuilder AddCorrelationIdPropagation(this IHttpClientBuilder builder)

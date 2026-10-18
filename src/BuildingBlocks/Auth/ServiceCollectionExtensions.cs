@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
@@ -39,14 +40,24 @@ public static class ServiceCollectionExtensions
     /// masa berlaku dengan <see cref="NexusJwt.ClockSkew"/>, dan blacklist <c>jti</c>/<c>sid</c>. Semua endpoint wajib
     /// terautentikasi (fallback policy) kecuali yang ditandai <c>AllowAnonymous</c>.
     /// </summary>
+    /// <param name="requireJwksUrl">
+    /// False hanya untuk Auth Service, yang memvalidasi token dengan kunci miliknya sendiri tanpa JWKS lewat HTTP.
+    /// </param>
     /// <param name="requireAuthenticationByDefault">
     /// False untuk Gateway: fallback policy juga berlaku untuk request tanpa endpoint, sehingga path tak terdaftar
     /// menjadi 401 alih-alih 404. Gateway menetapkan policy per route YARP (<c>default</c> atau <c>anonymous</c>).
     /// </param>
     public static IServiceCollection AddNexusJwtAuth(
-        this IServiceCollection services, IConfiguration configuration, bool requireAuthenticationByDefault = true)
+        this IServiceCollection services, IConfiguration configuration, bool requireAuthenticationByDefault = true,
+        bool requireJwksUrl = true)
     {
-        services.Configure<NexusJwtOptions>(configuration.GetSection(NexusJwtOptions.SectionName));
+        services.AddOptions<NexusJwtOptions>()
+            .Bind(configuration.GetSection(NexusJwtOptions.SectionName))
+            // Tanpa JWKS semua token ditolak diam-diam; di luar Development aplikasi harus gagal start.
+            .Validate<IHostEnvironment>(
+                (options, environment) => !requireJwksUrl || environment.IsDevelopment() || !string.IsNullOrWhiteSpace(options.JwksUrl),
+                "Auth:Jwt:JwksUrl wajib diisi di luar Development.")
+            .ValidateOnStart();
         services.AddNexusCaching(configuration);
         services.AddNexusTokenRevocation();
         services.AddHttpClient(JwksHttpClient, client => client.Timeout = TimeSpan.FromSeconds(10));
@@ -100,7 +111,12 @@ public static class ServiceCollectionExtensions
             options.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
                 nexus.JwksUrl,
                 new JwksConfigurationRetriever(nexus.Issuer),
-                new HttpDocumentRetriever(httpClients.CreateClient(JwksHttpClient)) { RequireHttps = nexus.RequireHttpsMetadata });
+                new HttpClientFactoryDocumentRetriever(httpClients, nexus.RequireHttpsMetadata))
+            {
+                // Kid baru (Auth restart/rotasi kunci) memicu ambil ulang JWKS paling cepat 30 detik sekali.
+                RefreshInterval = TimeSpan.FromSeconds(30),
+                AutomaticRefreshInterval = TimeSpan.FromHours(1),
+            };
         }
 
         options.Events = new JwtBearerEvents
@@ -129,6 +145,23 @@ public static class ServiceCollectionExtensions
                     context.Fail("Token sudah dicabut.");
             },
         };
+    }
+}
+
+/// <summary>
+/// Mengambil dokumen lewat <see cref="IHttpClientFactory"/> setiap kali, agar rotasi handler (DNS baru saat pod
+/// Auth berpindah) tetap berlaku; HttpClient tunggal di dalam ConfigurationManager singleton akan memakai koneksi lama selamanya.
+/// </summary>
+public sealed class HttpClientFactoryDocumentRetriever(IHttpClientFactory httpClients, bool requireHttps) : IDocumentRetriever
+{
+    public async Task<string> GetDocumentAsync(string address, CancellationToken cancel)
+    {
+        if (requireHttps && !address.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException($"JWKS wajib https: {address}", nameof(address));
+
+        using var response = await httpClients.CreateClient(ServiceCollectionExtensions.JwksHttpClient).GetAsync(address, cancel);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync(cancel);
     }
 }
 

@@ -5,7 +5,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using NexUS.BuildingBlocks.Auth;
 
-namespace NexUS.Gateway.IntegrationTests;
+namespace NexUS.Testing;
 
 /// <summary>Penerbit token tes dengan kunci RSA sendiri dan dokumen JWKS-nya.</summary>
 public sealed class TestTokens : IDisposable

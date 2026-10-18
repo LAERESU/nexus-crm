@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\NexUS.Gateway.Api\NexUS.Gateway.Api.csproj" />
+    <ProjectReference Include="..\..\..\..\tests\NexUS.Testing\NexUS.Testing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

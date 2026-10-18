@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using FluentAssertions;
 
+using NexUS.Testing;
+
 namespace NexUS.Gateway.IntegrationTests;
 
 public class GatewayAuthTests(GatewayFixture fixture) : IClassFixture<GatewayFixture>

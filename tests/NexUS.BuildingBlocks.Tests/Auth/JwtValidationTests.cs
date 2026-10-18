@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NexUS.BuildingBlocks.Auth;
 using NexUS.BuildingBlocks.Common.Domain;
+using NexUS.Testing;
 
 namespace NexUS.BuildingBlocks.Tests.Auth;
 
@@ -164,6 +165,27 @@ public sealed class JwtValidationTests : IAsyncLifetime
         var response = await _host.GetTestClient().GetAsync($"/api/v1/projects?access_token={_tokens.Create()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Di_luar_Development_tanpa_JwksUrl_aplikasi_gagal_start()
+    {
+        using var host = new HostBuilder()
+            .ConfigureWebHost(web => web
+                .UseTestServer()
+                .UseEnvironment(Environments.Production)
+                .ConfigureAppConfiguration(config => config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:Redis"] = "localhost:1,abortConnect=false",
+                }))
+                .ConfigureServices((context, services) => services.AddRouting().AddNexusJwtAuth(context.Configuration))
+                .Configure(app => app.UseRouting()))
+            .Build();
+
+        var act = () => host.StartAsync();
+
+        (await act.Should().ThrowAsync<Microsoft.Extensions.Options.OptionsValidationException>())
+            .Which.Message.Should().Contain("Auth:Jwt:JwksUrl");
     }
 
     private sealed class StaticJwksHandler(string jwks) : HttpMessageHandler

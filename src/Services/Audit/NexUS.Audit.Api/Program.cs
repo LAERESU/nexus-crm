@@ -24,6 +24,7 @@ builder.Services.AddNexusJwtAuth(builder.Configuration);
 var app = builder.Build();
 
 app.UseNexusObservability();
+app.UseMiddleware<ExceptionHandlingMiddleware>(); // juga menangkap error saat autentikasi (mis. Redis salah konfigurasi)
 // Swagger sebelum autentikasi: fallback policy juga berlaku untuk request tanpa endpoint (middleware Swagger).
 if (app.Environment.IsDevelopment())
 {
@@ -31,9 +32,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseAuthentication();
-app.UseNexusLogEnrichment(); // setelah autentikasi agar TenantId/UserId terisi
-app.UseMiddleware<ExceptionHandlingMiddleware>(); // di dalam scope enrichment: log error memuat tenant dan user
+app.UseAuthentication(); // TenantId/UserId di log diisi HttpContextUserEnricher saat log ditulis
 app.UseAuthorization();
 
 app.MapControllers();
