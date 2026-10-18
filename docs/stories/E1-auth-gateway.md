@@ -74,7 +74,7 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 
 ---
 
-### NX-014 · Logout + blacklist jti
+### NX-014 · Logout + blacklist jti ✅
 - **Sprint:** 2 · **SP:** 3 · **Bergantung pada:** NX-012
 - **Langkah:**
   1. `POST /api/v1/auth/logout`: revoke refresh token, hapus cookie, simpan `auth:revoked:{jti}` di Redis dengan TTL sisa umur access token.
