@@ -5,13 +5,14 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using NexUS.BuildingBlocks.Caching;
 
 namespace NexUS.Gateway.Api.RateLimiting;
 
 /// <summary>
-/// Menerapkan kebijakan ARCHITECTURE.md G.4 di Gateway, setelah autentikasi (agar <c>sub</c>/<c>tid</c> tersedia):
-/// <c>login</c> untuk POST /api/v1/auth/login, lalu <c>per-tenant</c>, <c>per-user</c>, dan <c>upload</c> untuk user
-/// yang terautentikasi. Request yang ditolak mendapat 429 + <c>Retry-After</c>.
+/// Menerapkan kebijakan ARCHITECTURE.md G.4 di Gateway, setelah autentikasi (agar <c>sub</c>/<c>tid</c> tersedia).
+/// User terautentikasi: <c>per-user</c>, <c>upload</c>, lalu <c>per-tenant</c>. Request anonim (termasuk token tidak
+/// valid): batas per IP, ditambah <c>login</c> untuk POST /api/v1/auth/login. Ditolak → 429 + <c>Retry-After</c>.
 /// </summary>
 public sealed class RateLimitMiddleware(
     RequestDelegate next,
@@ -20,65 +21,66 @@ public sealed class RateLimitMiddleware(
     ILogger<RateLimitMiddleware> logger)
 {
     public const string LoginPath = "/api/v1/auth/login";
+    private const int MaxLoginBodyBytes = 16 * 1024;
 
     public async Task InvokeAsync(HttpContext context)
     {
         var settings = options.CurrentValue;
-        if (!settings.Enabled)
+        if (settings.Enabled)
         {
-            await next(context);
-            return;
-        }
-
-        var decision = await EvaluateAsync(context, settings);
-        if (decision is { } rejected)
-        {
-            await RejectAsync(context, rejected.Policy, rejected.Decision.RetryAfter);
-            return;
+            var decision = await limiter.EvaluateAsync(await RulesAsync(context, settings));
+            if (!decision.Allowed)
+            {
+                await RejectAsync(context, decision);
+                return;
+            }
         }
 
         await next(context);
     }
 
-    private async Task<(string Policy, RateLimitDecision Decision)?> EvaluateAsync(HttpContext context, RateLimitingOptions settings)
+    private static async Task<IReadOnlyList<RateLimitRule>> RulesAsync(HttpContext context, RateLimitingOptions settings)
     {
         var request = context.Request;
-
-        if (HttpMethods.IsPost(request.Method) && request.Path.Equals(LoginPath, StringComparison.OrdinalIgnoreCase))
-        {
-            // Kunci IP + email; email di-hash karena data pribadi. Key global (belum ada tenant saat login).
-            var email = await ReadLoginEmailAsync(request);
-            var key = $"rl:login:{Hash($"{ClientIp(context)}|{email}")}";
-            var login = await limiter.FixedWindowAsync(key, settings.Login);
-            if (!login.Allowed) return ("login", login);
-        }
-
         var user = context.User;
-        if (user.Identity?.IsAuthenticated != true) return null;
 
-        var tenantId = user.FindFirstValue("tid");
-        var userId = user.FindFirstValue("sub");
-        if (string.IsNullOrEmpty(tenantId) || string.IsNullOrEmpty(userId)) return null;
-
-        var tenant = await limiter.TokenBucketAsync($"tnt:{tenantId}:rl:tenant", settings.PerTenant);
-        if (!tenant.Allowed) return ("per-tenant", tenant);
-
-        var perUser = await limiter.SlidingWindowAsync($"tnt:{tenantId}:rl:user:{userId}", settings.PerUser);
-        if (!perUser.Allowed) return ("per-user", perUser);
-
-        if (request.HasFormContentType && request.ContentType?.StartsWith("multipart/form-data", StringComparison.OrdinalIgnoreCase) == true)
+        if (user.Identity?.IsAuthenticated == true
+            && long.TryParse(user.FindFirstValue("tid"), NumberStyles.None, CultureInfo.InvariantCulture, out var tenantId)
+            && user.FindFirstValue("sub") is { Length: > 0 } userId)
         {
-            var upload = await limiter.FixedWindowAsync($"tnt:{tenantId}:rl:upload:{userId}", settings.Upload);
-            if (!upload.Allowed) return ("upload", upload);
+            // Urutan menentukan kebijakan yang dilaporkan; kuota hanya dipakai bila semuanya lolos (satu skrip atomik).
+            var rules = new List<RateLimitRule>
+            {
+                new("per-user", RateLimitAlgorithm.SlidingLog, CacheKeys.Tenant(tenantId, $"rl:user:{userId}"), settings.PerUser),
+            };
+            if (request.ContentType?.StartsWith("multipart/form-data", StringComparison.OrdinalIgnoreCase) == true)
+                rules.Add(new("upload", RateLimitAlgorithm.FixedWindow, CacheKeys.Tenant(tenantId, $"rl:upload:{userId}"), settings.Upload));
+            rules.Add(new("per-tenant", RateLimitAlgorithm.TokenBucket, CacheKeys.Tenant(tenantId, "rl:tenant"), settings.PerTenant));
+            return rules;
         }
 
-        return null;
+        // Anonim (tanpa token atau token tidak valid): dibatasi per IP sebagai pengganti per-user (ARCHITECTURE.md G.4).
+        // Key global karena tenant belum diketahui (ADR-0008).
+        var ip = ClientIp(context);
+        var anonymous = new List<RateLimitRule>
+        {
+            new("per-ip", RateLimitAlgorithm.SlidingLog, $"rl:ip:{Hash(ip)}", settings.PerIp),
+        };
+
+        // StartsWithSegments: /login, /login/ dan variasi huruf besar-kecil sama-sama terkena batas login.
+        if (HttpMethods.IsPost(request.Method) && request.Path.StartsWithSegments(LoginPath, StringComparison.OrdinalIgnoreCase))
+        {
+            var email = await ReadLoginEmailAsync(request);
+            anonymous.Insert(0, new("login", RateLimitAlgorithm.FixedWindow, $"rl:login:{Hash($"{ip}|{email}")}", settings.Login));
+        }
+
+        return anonymous;
     }
 
-    private async Task RejectAsync(HttpContext context, string policy, TimeSpan retryAfter)
+    private async Task RejectAsync(HttpContext context, RateLimitDecision decision)
     {
-        var seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
-        logger.LogInformation("Rate limit {Policy} terlampaui; coba lagi dalam {RetryAfterSeconds} detik", policy, seconds);
+        var seconds = Math.Max(1, (int)Math.Ceiling(decision.RetryAfter.TotalSeconds));
+        logger.LogInformation("Rate limit {Policy} terlampaui; coba lagi dalam {RetryAfterSeconds} detik", decision.Policy, seconds);
 
         context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
         context.Response.Headers.RetryAfter = seconds.ToString(CultureInfo.InvariantCulture);
@@ -92,21 +94,31 @@ public sealed class RateLimitMiddleware(
             options: null, contentType: "application/problem+json", context.RequestAborted);
     }
 
-    /// <summary>Membaca email dari body JSON login tanpa menghabiskan stream (body tetap diteruskan ke Auth).</summary>
+    /// <summary>
+    /// Membaca email login dengan aturan yang sama seperti Auth (System.Text.Json web: nama properti tidak peka huruf
+    /// besar-kecil, properti terakhir yang menang), tanpa menghabiskan stream. Body tanpa Content-Length (chunked) atau
+    /// lebih dari 16 KB tidak dibaca dan dikunci per IP saja, agar Gateway tidak bisa dipaksa menyangga body besar.
+    /// </summary>
     private static async Task<string> ReadLoginEmailAsync(HttpRequest request)
     {
-        if (request.ContentLength is > 16 * 1024 || request.ContentType?.Contains("json", StringComparison.OrdinalIgnoreCase) != true)
+        if (request.ContentLength is not (> 0 and <= MaxLoginBodyBytes)
+            || request.ContentType?.Contains("json", StringComparison.OrdinalIgnoreCase) != true)
             return "";
 
         request.EnableBuffering();
         try
         {
             using var document = await JsonDocument.ParseAsync(request.Body, cancellationToken: request.HttpContext.RequestAborted);
-            return document.RootElement.ValueKind == JsonValueKind.Object
-                   && document.RootElement.TryGetProperty("email", out var email)
-                   && email.ValueKind == JsonValueKind.String
-                ? email.GetString()!.Trim().ToLowerInvariant()
-                : "";
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return "";
+
+            string? email = null;
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (property.Name.Equals("email", StringComparison.OrdinalIgnoreCase))
+                    email = property.Value.ValueKind == JsonValueKind.String ? property.Value.GetString() : null;
+            }
+
+            return email?.Trim().ToLowerInvariant() ?? "";
         }
         catch (JsonException)
         {

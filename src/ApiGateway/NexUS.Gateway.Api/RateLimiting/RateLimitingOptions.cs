@@ -13,6 +13,9 @@ public sealed class RateLimitingOptions
     /// <summary><c>per-user</c>: klaim <c>sub</c>, sliding window.</summary>
     public WindowLimit PerUser { get; set; } = new() { PermitLimit = 300, Window = TimeSpan.FromMinutes(1) };
 
+    /// <summary>Request anonim (tanpa token atau token tidak valid): IP klien, sliding window (pengganti per-user, G.4).</summary>
+    public WindowLimit PerIp { get; set; } = new() { PermitLimit = 300, Window = TimeSpan.FromMinutes(1) };
+
     /// <summary><c>per-tenant</c>: klaim <c>tid</c>, token bucket (kapasitas = batas, terisi rata selama periode).</summary>
     public WindowLimit PerTenant { get; set; } = new() { PermitLimit = 5000, Window = TimeSpan.FromMinutes(1) };
 

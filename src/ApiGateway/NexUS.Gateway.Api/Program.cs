@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NexUS.BuildingBlocks.Auth;
 using NexUS.BuildingBlocks.Observability;
 using NexUS.Gateway.Api;
@@ -30,6 +31,7 @@ builder.Services.AddNexusHealthChecks(builder.Configuration);
 builder.Services.AddNexusJwtAuth(builder.Configuration, requireAuthenticationByDefault: false);
 
 builder.Services.Configure<RateLimitingOptions>(builder.Configuration.GetSection(RateLimitingOptions.SectionName));
+builder.Services.TryAddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<RedisRateLimiter>();
 
 builder.Services.AddReverseProxy()

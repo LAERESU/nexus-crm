@@ -52,6 +52,7 @@ public sealed class GatewayRateLimitFixture : IAsyncLifetime
             // Batas kecil untuk login/upload/tenant agar tes cepat; per-user memakai batas asli (300/menit).
             ["RateLimiting:Login:PermitLimit"] = "3",
             ["RateLimiting:Upload:PermitLimit"] = "2",
+            ["RateLimiting:PerTenant:PermitLimit"] = "320",
         };
         foreach (var cluster in new[] { "auth", "user", "project", "task", "sop", "notification", "notification-hub" })
             settings[$"ReverseProxy:Clusters:{cluster}:Destinations:d1:Address"] = downstreamUrl;
@@ -143,6 +144,47 @@ public class GatewayRateLimitTests(GatewayRateLimitFixture fixture) : IClassFixt
             .StatusCode.Should().Be(HttpStatusCode.OK, "email lain punya hitungan sendiri");
     }
 
+    [Theory]
+    [InlineData("/api/v1/auth/login/")]
+    [InlineData("/API/V1/AUTH/LOGIN")]
+    public async Task Varian_path_login_tetap_terkena_batas_login(string path)
+    {
+        var client = fixture.Client(fixture.GatewayA, null);
+        var email = $"{Guid.NewGuid():N}@demo.local";
+
+        for (var i = 0; i < 3; i++) await client.PostAsJsonAsync(path, new { email, password = "x" });
+
+        (await client.PostAsJsonAsync(path, new { email, password = "x" })).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
+    public async Task Email_ganda_atau_beda_huruf_besar_kecil_dibaca_sama_seperti_Auth()
+    {
+        var client = fixture.Client(fixture.GatewayA, null);
+        var victim = $"{Guid.NewGuid():N}@demo.local";
+        HttpContent Body(int n) => new StringContent(
+            $"{{\"email\":\"acak-{n}@x.local\",\"Email\":\"{victim}\",\"password\":\"x\"}}",
+            System.Text.Encoding.UTF8, "application/json");
+
+        for (var i = 0; i < 3; i++) await client.PostAsync("/api/v1/auth/login", Body(i));
+
+        (await client.PostAsync("/api/v1/auth/login", Body(99))).StatusCode
+            .Should().Be(HttpStatusCode.TooManyRequests, "kunci memakai email terakhir tanpa peduli huruf besar-kecil, sama seperti Auth");
+    }
+
+    [Fact]
+    public async Task User_yang_sudah_ditolak_tidak_menguras_kuota_tenant()
+    {
+        // Batas tenant di fixture: 320/menit. User A memakai 300 lalu terus ditolak; user B di tenant yang sama tetap bisa.
+        var tenant = 105;
+        var a = fixture.Client(fixture.GatewayA, fixture.Tokens.Create(tenantId: tenant, userId: Guid.NewGuid()));
+        for (var i = 0; i < 400; i++) await a.GetAsync("/api/v1/projects");
+
+        var b = fixture.Client(fixture.GatewayA, fixture.Tokens.Create(tenantId: tenant, userId: Guid.NewGuid()));
+
+        (await b.GetAsync("/api/v1/projects")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     [Fact]
     public async Task Upload_multipart_dibatasi_terpisah_dari_request_biasa()
     {
@@ -155,4 +197,22 @@ public class GatewayRateLimitTests(GatewayRateLimitFixture fixture) : IClassFixt
         (await client.PostAsync("/api/v1/tasks/1/attachments", Upload())).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
         (await client.GetAsync("/api/v1/tasks/1")).StatusCode.Should().Be(HttpStatusCode.OK, "request biasa tidak terkena batas upload");
     }
+}
+
+/// <summary>Kelas terpisah (fixture dan Redis sendiri): menguras kuota IP bersama tidak boleh memengaruhi tes lain.</summary>
+[Trait("Category", "Docker")]
+public class GatewayAnonymousRateLimitTests(GatewayRateLimitFixture fixture) : IClassFixture<GatewayRateLimitFixture>
+{
+    [Fact]
+    public async Task Request_anonim_dibatasi_per_IP()
+    {
+        // Semua request tes berasal dari IP yang sama; batas per-IP 300/menit.
+        var client = fixture.Client(fixture.GatewayB, null);
+        HttpStatusCode last = HttpStatusCode.OK;
+        for (var i = 0; i < 400 && last != HttpStatusCode.TooManyRequests; i++)
+            last = (await client.PostAsync("/api/v1/auth/refresh", null)).StatusCode;
+
+        last.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
 }

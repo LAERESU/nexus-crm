@@ -64,9 +64,14 @@ public sealed class GatewayFixture : IAsyncLifetime
         settings["Auth:Jwt:RequireHttpsMetadata"] = "false";
 
         _gateway = new WebApplicationFactory<Program>().WithWebHostBuilder(web => web
-            .UseEnvironment("Development") // tanpa Redis: cache, blacklist, dan rate limit lolos (lihat GatewayRateLimitFixture untuk Redis)
+            .UseEnvironment("Testing") // konfigurasi mirip produksi; Redis diganti koneksi kosong di bawah
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(settings))
-            .ConfigureTestServices(services => services.AddSingleton<ITokenRevocationStore>(Revocations)));
+            .ConfigureTestServices(services =>
+            {
+                services.AddSingleton<ITokenRevocationStore>(Revocations);
+                // Tanpa Redis (tes tanpa Docker): rate limit fail open. Tes rate limit memakai GatewayRateLimitFixture.
+                services.AddSingleton<NexUS.BuildingBlocks.Caching.IRedisConnection, NoRedisConnection>();
+            }));
     }
 
     public async Task DisposeAsync()

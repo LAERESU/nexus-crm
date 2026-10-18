@@ -125,13 +125,14 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
   - [ ] Request ke-301 dalam satu menit oleh user yang sama → 429.
   - [ ] Dua instance Gateway berbagi hitungan yang sama.
 - **Catatan implementasi:**
-  - Limiter Redis ditulis sendiri (skrip Lua atomik, jam Redis `TIME`) alih-alih paket pihak ketiga `RedisRateLimiting` yang disebut ARCHITECTURE.md G.4, agar tidak menambah dependency keamanan pihak ketiga.
-  - Kebijakan: `login` POST `/api/v1/auth/login`, kunci IP + email (email di-hash), 5/15 menit fixed window; `per-user` `sub`, 300/menit sliding window (perkiraan dua window terboboti); `per-tenant` `tid`, 5.000/menit token bucket; `upload` `sub` untuk request `multipart/form-data`, 20/menit fixed window. Batas bisa ditimpa lewat bagian konfigurasi `RateLimiting`.
-  - Key: `rl:login:{hash}` (global, tenant belum diketahui saat login) dan `tnt:{tid}:rl:...` untuk user/tenant.
-  - Respons 429 berupa ProblemDetails dengan header `Retry-After` (detik). Request yang ditolak oleh sliding window tidak ikut dihitung.
-  - Bila Redis tidak terjangkau: request diizinkan (fail open, dicatat), sesuai CONTEXT.md bagian 3 poin 7.
-  - IP klien dibaca dari koneksi. Di belakang ingress, Gateway perlu forwarded headers dari ingress tepercaya (dikonfigurasi bersama Helm di NX-008), agar kunci `login` tidak memakai IP ingress.
-  - Tes dengan Redis sungguhan dan dua instance Gateway (trait `Docker`, berjalan di CI).
+  - Desain di ADR-0008: limiter ditulis sendiri sebagai **satu skrip Lua atomik per request** (jam Redis `TIME`), bukan paket pihak ketiga `RedisRateLimiting`. Kuota hanya dipakai bila semua kebijakan lolos, sehingga user yang sudah ditolak tidak menguras kuota tenant.
+  - Kebijakan: `login` (POST `/api/v1/auth/login`, dicocokkan per segmen sehingga `/login/` dan beda huruf tetap kena; kunci IP + email yang dibaca seperti Auth: tidak peka huruf besar-kecil, kunci terakhir menang; email di-hash), 5/15 menit fixed window; `per-user` `sub`, 300/menit **sliding log eksak**; `per-ip` untuk request anonim, 300/menit; `per-tenant` `tid`, 5.000/menit token bucket; `upload` untuk `multipart/form-data`, 20/menit fixed window. Batas bisa ditimpa lewat bagian konfigurasi `RateLimiting`.
+  - Body login tanpa `Content-Length` (chunked) atau lebih dari 16 KB tidak dibaca dan dikunci per IP saja, agar Gateway tidak bisa dipaksa menyangga body besar.
+  - Key `rl:login:*` dan `rl:ip:*` global (tenant belum diketahui; pengecualian dicatat di ADR-0008), key user/tenant `tnt:{tid}:rl:*`.
+  - Respons 429 berupa ProblemDetails dengan header `Retry-After` (detik).
+  - Bila Redis tidak terjangkau: request diizinkan (fail open, dicatat) dan pemeriksaan dilewati 30 detik (circuit breaker), sesuai CONTEXT.md bagian 3 poin 7.
+  - IP klien dibaca dari koneksi. Di belakang ingress, Gateway perlu forwarded headers dari ingress tepercaya (dikonfigurasi bersama Helm di NX-008), agar kunci `login`/`per-ip` tidak memakai IP ingress.
+  - Tes dengan Redis sungguhan dan dua instance Gateway (trait `Docker`, berjalan di CI). Tes Gateway lain tetap memakai environment `Testing` dengan koneksi Redis kosong.
 
 ---
 
