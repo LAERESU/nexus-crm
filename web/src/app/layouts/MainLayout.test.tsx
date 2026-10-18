@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { routes } from '@/app/router'
+import { useAuthStore } from '@/features/auth/store/authStore'
+import { fakeJwt } from '@/test/tokens'
 
 function renderAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] })
@@ -9,10 +11,13 @@ function renderAt(path: string) {
 }
 
 describe('MainLayout', () => {
-  it('menampilkan sidebar dan halaman Dashboard kosong di /', async () => {
+  beforeEach(() => useAuthStore.getState().login(fakeJwt({ tid: '7' })))
+
+  it('menampilkan sidebar, tenant, dan halaman Dashboard kosong di /', async () => {
     renderAt('/')
 
     expect(screen.getByLabelText('Sidebar')).toBeInTheDocument()
+    expect(screen.getByText('Tenant 7')).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
     expect(screen.getByText('Belum ada data')).toBeInTheDocument()
   })

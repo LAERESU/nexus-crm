@@ -74,8 +74,8 @@ Estimasi dengan asumsi tim 4–6 developer dan sprint 2 minggu. Fase berikutnya 
 
 | ID | Milestone | Target sprint | Status |
 | --- | --- | --- | --- |
-| M1 | Repo & pipeline CI/CD berjalan | Sprint 1 | ⬜ Belum |
-| M2 | Login & JWT end-to-end via Gateway | Sprint 2 | ⬜ Belum |
+| M1 | Repo & pipeline CI/CD berjalan | Sprint 1 | ✅ Selesai (CI; deploy otomatis ke dev di NX-008) |
+| M2 | Login & JWT end-to-end via Gateway | Sprint 2 | 🟨 Berjalan (E1 selesai dan teruji di CI; uji di stack berjalan dan NX-008 belum) |
 | M3 | User & RBAC selesai | Sprint 3 | ⬜ Belum |
 | M4 | Project & Task (kanban) selesai | Sprint 5 | ⬜ Belum |
 | M5 | SOP editor + versioning | Sprint 7 | ⬜ Belum |

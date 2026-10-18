@@ -12,7 +12,9 @@ FROM nginxinc/nginx-unprivileged:1.30-alpine
 USER root
 RUN apk upgrade --no-cache
 USER 101
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Template diproses envsubst saat start → /etc/nginx/conf.d/default.conf
+COPY templates/default.conf.template /etc/nginx/templates/default.conf.template
+ENV API_UPSTREAM=http://gateway:8080
 COPY --from=build /app/dist /usr/share/nginx/html
 # nginx-unprivileged sudah berjalan sebagai user non-root (uid 101)
 EXPOSE 8080
