@@ -48,8 +48,12 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options, TimeP
             e.Property(x => x.CredentialId).HasColumnName("CREDENTIAL_ID");
             e.Property(x => x.TokenHash).HasColumnName("TOKEN_HASH").HasMaxLength(64);
             e.Property(x => x.ExpiresAt).HasColumnName("EXPIRES_AT");
+            e.Property(x => x.FamilyId).HasColumnName("FAMILY_ID");
             e.Property(x => x.RevokedAt).HasColumnName("REVOKED_AT");
+            e.Property(x => x.RevokedReason).HasColumnName("REVOKED_REASON").HasConversion<string>().HasMaxLength(30);
             e.Property(x => x.ReplacedById).HasColumnName("REPLACED_BY_ID");
+            e.HasOne(x => x.ReplacedBy).WithMany().HasForeignKey(x => x.ReplacedById);
+            e.HasIndex(x => x.FamilyId);
             e.Property(x => x.DeviceInfo).HasColumnName("DEVICE_INFO").HasMaxLength(500);
             e.Property(x => x.CreatedIp).HasColumnName("CREATED_IP").HasMaxLength(45);
             e.HasOne<Credential>().WithMany().HasForeignKey(x => x.CredentialId);

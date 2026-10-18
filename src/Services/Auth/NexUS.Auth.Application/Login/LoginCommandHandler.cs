@@ -56,7 +56,7 @@ public sealed class LoginCommandHandler(
         }
 
         var roles = await userDirectory.GetRolesAsync(credential, ct);
-        var refreshTokenValue = RefreshTokenSecret.Generate();
+        var refreshTokenValue = RefreshTokenSecret.Generate(credential.TenantId);
         var refreshToken = RefreshToken.Issue(credential, RefreshTokenSecret.Hash(refreshTokenValue), now, command.UserAgent, command.IpAddress);
         await refreshTokens.AddAsync(refreshToken, ct);
         await loginAttempts.AddAsync(LoginAttempt.Success(credential, now, command.IpAddress, command.UserAgent), ct);

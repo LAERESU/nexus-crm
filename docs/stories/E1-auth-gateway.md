@@ -61,6 +61,13 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 - **Acceptance criteria:**
   - [ ] Refresh berhasil menghasilkan token baru dan token lama tidak bisa dipakai lagi.
   - [ ] Pemakaian ulang token lama mencabut semua sesi terkait dan mengembalikan 401.
+- **Catatan implementasi:**
+  - Migrasi baru `V3__refresh_token_family.sql` (V2 sudah di-merge): `FAMILY_ID` mengelompokkan token hasil rotasi dari satu login, `REVOKED_REASON` (`Rotated`, `ReuseDetected`, `Logout`).
+  - Nilai refresh token berformat `{tenantId}.{acak}` sehingga pencarian token berdasarkan hash tetap memfilter `TENANT_ID`; pengecualian ADR-0006 tetap hanya satu (pencarian email saat login).
+  - Pemakaian ulang token yang sudah dicabut → seluruh token aktif keluarga itu dicabut dengan satu `UPDATE` atomik (`ROW_VERSION` ikut naik, jadi rotasi yang berjalan bersamaan gagal). Sesi lain user yang sama (keluarga berbeda) tidak terpengaruh.
+  - Dua refresh bersamaan dengan token yang sama: yang kalah mendapat 401 tanpa mencabut keluarga. **Frontend (NX-017) wajib melakukan refresh satu per satu** dengan token terbaru.
+  - Cookie yang ditolak dihapus. Refresh ditolak juga bila kredensial terkunci.
+  - **Penyimpangan:** cache Redis `auth:rt:{tokenId}` (langkah 3) sengaja tidak dibuat. Setiap refresh wajib menulis ke Oracle (rotasi), sehingga cache tidak menghemat apa pun, sedangkan status pencabutan yang dibaca dari cache berisiko basi dan meloloskan token yang sudah dicabut (Redis bukan sumber kebenaran, CONTEXT.md bagian 3 poin 7). Redis dipakai untuk blacklist `jti` di NX-014.
 
 ---
 
