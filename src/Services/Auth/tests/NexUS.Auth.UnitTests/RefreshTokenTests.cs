@@ -28,7 +28,26 @@ public class RefreshTokenTests
         next.FamilyId.Should().Be(current.FamilyId);
         next.TenantId.Should().Be(current.TenantId);
         next.IsActive(Now.AddHours(1)).Should().BeTrue();
-        next.ExpiresAt.Should().Be(Now.AddHours(1) + RefreshToken.Lifetime);
+        next.ExpiresAt.Should().Be(current.ExpiresAt, "rotasi tidak memperpanjang umur sesi");
+    }
+
+    [Fact]
+    public void Token_baru_dirotasi_dikenali_selama_masa_tenggang()
+    {
+        var current = RefreshToken.Issue(Credential, "lama", Now, null, null);
+        current.Rotate("baru", Now, null, null);
+
+        current.WasJustRotated(Now + RefreshToken.ReuseGracePeriod).Should().BeTrue();
+        current.WasJustRotated(Now + RefreshToken.ReuseGracePeriod + TimeSpan.FromSeconds(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Token_yang_dicabut_karena_alasan_lain_bukan_rotasi_baru()
+    {
+        var token = RefreshToken.Issue(Credential, "x", Now, null, null);
+        token.Revoke(Now, RefreshTokenRevocationReason.Logout);
+
+        token.WasJustRotated(Now).Should().BeFalse();
     }
 
     [Fact]
@@ -130,16 +149,31 @@ public class RefreshTokenCommandHandlerTests
     }
 
     [Fact]
-    public async Task Pemakaian_ulang_token_yang_sudah_dirotasi_mencabut_keluarga_dan_401()
+    public async Task Pemakaian_ulang_token_lama_setelah_masa_tenggang_mencabut_keluarga_dan_mencatat_audit()
     {
         _current.Rotate("pengganti", _time.GetUtcNow(), null, null);
+        _time.Advance(RefreshToken.ReuseGracePeriod + TimeSpan.FromSeconds(1));
+        _tokens.RevokeFamilyAsync(default, default, default, default, default).ReturnsForAnyArgs(2);
 
-        var act = () => Refresh(_tokenValue);
+        var ex = await FluentActions.Awaiting(() => Refresh(_tokenValue)).Should().ThrowAsync<RefreshRejectedException>();
 
-        await act.Should().ThrowAsync<UnauthorizedException>();
+        ex.Which.ClearCookie.Should().BeTrue();
         await _tokens.Received(1).RevokeFamilyAsync(5, _current.FamilyId, Arg.Any<DateTimeOffset>(),
             RefreshTokenRevocationReason.ReuseDetected, Arg.Any<CancellationToken>());
+        _credential.DomainEvents.Should().ContainSingle(e => e is RefreshTokenReuseDetectedDomainEvent);
         _issuer.DidNotReceiveWithAnyArgs().Issue(default!, default!);
+    }
+
+    [Fact]
+    public async Task Pemakaian_ulang_dalam_masa_tenggang_dianggap_refresh_bersamaan_tanpa_mencabut_keluarga()
+    {
+        _current.Rotate("pengganti", _time.GetUtcNow(), null, null);
+        _time.Advance(TimeSpan.FromSeconds(5));
+
+        var ex = await FluentActions.Awaiting(() => Refresh(_tokenValue)).Should().ThrowAsync<RefreshRejectedException>();
+
+        ex.Which.ClearCookie.Should().BeFalse("cookie klien mungkin sudah diganti token baru oleh tab lain");
+        await _tokens.DidNotReceiveWithAnyArgs().RevokeFamilyAsync(default, default, default, default, default);
     }
 
     [Fact]
@@ -170,11 +204,24 @@ public class RefreshTokenCommandHandlerTests
     }
 
     [Fact]
-    public async Task Kredensial_terkunci_401()
+    public async Task Kredensial_terkunci_tidak_mengeluarkan_sesi_yang_sudah_ada()
     {
+        // Lockout bisa dipicu siapa pun yang tahu email korban; sesi aktif korban tidak boleh ikut hilang.
         for (var i = 0; i < Credential.MaxFailedAttempts; i++) _credential.RegisterFailedLogin(_time.GetUtcNow());
 
-        await FluentActions.Awaiting(() => Refresh(_tokenValue)).Should().ThrowAsync<UnauthorizedException>();
+        (await Refresh(_tokenValue)).AccessToken.Should().Be("jwt-baru");
+    }
+
+    [Fact]
+    public async Task Rotasi_tidak_tersimpan_bila_penerbitan_access_token_gagal()
+    {
+        _issuer.Issue(Arg.Any<Credential>(), Arg.Any<IReadOnlyCollection<string>>())
+            .Returns(_ => throw new InvalidOperationException("kunci rusak"));
+
+        await FluentActions.Awaiting(() => Refresh(_tokenValue)).Should().ThrowAsync<InvalidOperationException>();
+
+        await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        _current.IsRevoked.Should().BeFalse();
     }
 
     [Fact]
@@ -182,8 +229,9 @@ public class RefreshTokenCommandHandlerTests
     {
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns<int>(_ => throw new ConcurrencyException("bentrok"));
 
-        await FluentActions.Awaiting(() => Refresh(_tokenValue)).Should().ThrowAsync<UnauthorizedException>();
+        var ex = await FluentActions.Awaiting(() => Refresh(_tokenValue)).Should().ThrowAsync<RefreshRejectedException>();
 
+        ex.Which.ClearCookie.Should().BeFalse();
         await _tokens.DidNotReceiveWithAnyArgs().RevokeFamilyAsync(default, default, default, default, default);
     }
 }

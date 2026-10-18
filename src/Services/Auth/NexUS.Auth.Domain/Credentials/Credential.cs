@@ -63,6 +63,10 @@ public sealed class Credential : AggregateRoot
         AddDomainEvent(new CredentialLockedDomainEvent(PublicId, TenantId, UserId, LockedUntil.Value));
     }
 
+    /// <summary>Mencatat indikasi pencurian refresh token (dicatat lewat outbox untuk audit).</summary>
+    public void RecordRefreshTokenReuse(Guid familyId, int revokedTokens, string? ipAddress) =>
+        AddDomainEvent(new RefreshTokenReuseDetectedDomainEvent(PublicId, TenantId, UserId, familyId, revokedTokens, ipAddress));
+
     public void RegisterSuccessfulLogin(DateTimeOffset now)
     {
         if (IsLocked(now)) throw new DomainException("Akun sedang terkunci.");
@@ -73,6 +77,9 @@ public sealed class Credential : AggregateRoot
         AddDomainEvent(new UserLoggedInDomainEvent(PublicId, TenantId, UserId));
     }
 }
+
+public sealed record RefreshTokenReuseDetectedDomainEvent(
+    Guid CredentialId, long TenantId, Guid UserId, Guid FamilyId, int RevokedTokens, string? IpAddress) : DomainEvent;
 
 public sealed record UserLoggedInDomainEvent(Guid CredentialId, long TenantId, Guid UserId) : DomainEvent;
 

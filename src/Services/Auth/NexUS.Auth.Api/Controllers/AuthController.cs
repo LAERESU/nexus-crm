@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NexUS.Auth.Application.Login;
 using NexUS.Auth.Application.Refresh;
-using NexUS.BuildingBlocks.Common.Exceptions;
 
 namespace NexUS.Auth.Api.Controllers;
 
@@ -47,9 +46,10 @@ public sealed class AuthController(ISender mediator, TimeProvider timeProvider) 
                 new RefreshTokenCommand(Request.Cookies[RefreshTokenCookie], ClientIp(), UserAgent()), ct);
             return Tokens(result);
         }
-        catch (UnauthorizedException)
+        catch (RefreshRejectedException ex) when (ex.ClearCookie)
         {
-            // Cookie yang ditolak dihapus agar browser tidak terus mengirimnya.
+            // Cookie yang ditolak dihapus agar browser tidak terus mengirimnya. Tidak dilakukan pada refresh
+            // bersamaan, karena cookie klien mungkin sudah diganti token baru milik request yang menang.
             Response.Cookies.Delete(RefreshTokenCookie, CookieOptions(expires: null));
             throw;
         }
