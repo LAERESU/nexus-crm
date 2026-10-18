@@ -68,7 +68,7 @@ public sealed class LoginCommandHandler(
             c.RegisterSuccessfulLogin(now);
         }, ct);
 
-        var accessToken = accessTokenIssuer.Issue(credential, roles);
+        var accessToken = accessTokenIssuer.Issue(credential, roles, refreshToken.FamilyId);
         logger.LogInformation("Login berhasil untuk user {UserId} di tenant {TenantId}", credential.UserId, credential.TenantId);
         return new LoginResult(accessToken.Value, accessToken.ExpiresAt, refreshTokenValue, refreshToken.ExpiresAt);
     }

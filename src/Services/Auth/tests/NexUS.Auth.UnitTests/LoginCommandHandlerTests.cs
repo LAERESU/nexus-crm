@@ -28,7 +28,7 @@ public class LoginCommandHandlerTests
     {
         _hasher.Verify(Password, "hash-asli").Returns(true);
         _directory.GetRolesAsync(Arg.Any<Credential>(), Arg.Any<CancellationToken>()).Returns(["admin"]);
-        _issuer.Issue(Arg.Any<Credential>(), Arg.Any<IReadOnlyCollection<string>>())
+        _issuer.Issue(Arg.Any<Credential>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<Guid>())
             .Returns(new AccessToken("jwt", _time.GetUtcNow().AddMinutes(15)));
     }
 
@@ -51,7 +51,7 @@ public class LoginCommandHandlerTests
         result.AccessToken.Should().Be("jwt");
         result.RefreshToken.Should().NotBeNullOrEmpty();
         stored!.TokenHash.Should().Be(RefreshTokenSecret.Hash(result.RefreshToken)).And.NotBe(result.RefreshToken);
-        _issuer.Received(1).Issue(_credential, Arg.Is<IReadOnlyCollection<string>>(r => r.Contains("admin")));
+        _issuer.Received(1).Issue(_credential, Arg.Is<IReadOnlyCollection<string>>(r => r.Contains("admin")), stored!.FamilyId);
         await _attempts.Received(1).AddAsync(Arg.Is<LoginAttempt>(a => a.Succeeded), Arg.Any<CancellationToken>());
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -76,7 +76,7 @@ public class LoginCommandHandlerTests
 
         (await act.Should().ThrowAsync<UnauthorizedException>()).Which.Message.Should().Be(LoginCommandHandler.GenericFailureMessage);
         _credential.FailedAttempts.Should().Be(1);
-        _issuer.DidNotReceiveWithAnyArgs().Issue(default!, default!);
+        _issuer.DidNotReceiveWithAnyArgs().Issue(default!, default!, default);
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public class LoginCommandHandlerTests
         (await act.Should().ThrowAsync<UnauthorizedException>()).Which.Message.Should().Be(LoginCommandHandler.GenericFailureMessage);
         await _attempts.Received(1).AddAsync(
             Arg.Is<LoginAttempt>(a => a.FailureReason == LoginFailureReason.Locked), Arg.Any<CancellationToken>());
-        _issuer.DidNotReceiveWithAnyArgs().Issue(default!, default!);
+        _issuer.DidNotReceiveWithAnyArgs().Issue(default!, default!, default);
     }
 
     [Fact]

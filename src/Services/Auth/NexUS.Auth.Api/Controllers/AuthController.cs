@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NexUS.Auth.Application.Login;
+using NexUS.Auth.Application.Logout;
 using NexUS.Auth.Application.Refresh;
 
 namespace NexUS.Auth.Api.Controllers;
@@ -53,6 +54,31 @@ public sealed class AuthController(ISender mediator, TimeProvider timeProvider) 
             Response.Cookies.Delete(RefreshTokenCookie, CookieOptions(expires: null));
             throw;
         }
+    }
+
+    /// <summary>Logout sesi saat ini.</summary>
+    /// <remarks>
+    /// Mencabut refresh token sesi ini (cookie) beserta semua hasil rotasinya, memasukkan access token (header
+    /// Authorization) dan seluruh sesinya ke blacklist, lalu menghapus cookie. 204 juga bila token tidak valid.
+    /// </remarks>
+    [HttpPost("logout")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Logout(CancellationToken ct)
+    {
+        var authorization = Request.Headers.Authorization.ToString();
+        var accessToken = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? authorization[7..].Trim() : null;
+
+        try
+        {
+            await mediator.Send(new LogoutCommand(Request.Cookies[RefreshTokenCookie], accessToken), ct);
+        }
+        finally
+        {
+            // Cookie dihapus juga bila logout gagal (input terlalu besar → 400, Oracle mati → 500).
+            Response.Cookies.Delete(RefreshTokenCookie, CookieOptions(expires: null));
+        }
+
+        return NoContent();
     }
 
     private ActionResult<TokenResponse> Tokens(LoginResult result)

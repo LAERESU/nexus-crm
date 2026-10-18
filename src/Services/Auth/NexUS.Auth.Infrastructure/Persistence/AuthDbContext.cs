@@ -105,6 +105,13 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options, TimeP
         e.HasQueryFilter(x => !x.IsDeleted);
     }
 
+    public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken ct = default)
+    {
+        await using var transaction = await Database.BeginTransactionAsync(ct);
+        await action(ct);
+        await transaction.CommitAsync(ct);
+    }
+
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var now = timeProvider.GetUtcNow();

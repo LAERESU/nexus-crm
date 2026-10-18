@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Common\NexUS.BuildingBlocks.Common.csproj" />
+    <ProjectReference Include="..\Caching\NexUS.BuildingBlocks.Caching.csproj" />
   </ItemGroup>
 
 </Project>

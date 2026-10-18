@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using NexUS.Auth.Application.Abstractions;
 using NexUS.Auth.Domain.Credentials;
+using NexUS.BuildingBlocks.Auth;
 
 namespace NexUS.Auth.Infrastructure.Security;
 
@@ -15,7 +16,7 @@ public sealed class JwtOptions
 
     public string Issuer { get; set; } = "nexus-auth";
     public string Audience { get; set; } = "nexus-api";
-    public TimeSpan AccessTokenLifetime { get; set; } = TimeSpan.FromMinutes(15);
+    public TimeSpan AccessTokenLifetime { get; set; } = NexusJwt.AccessTokenLifetime;
 
     /// <summary>Kunci privat RSA (PEM) dari secret. Wajib di luar Development.</summary>
     public string? SigningKeyPem { get; set; }
@@ -66,7 +67,7 @@ public sealed class JwtAccessTokenIssuer(JwtSigningKey signingKey, IOptions<JwtO
 {
     private static readonly JsonWebTokenHandler Handler = new();
 
-    public AccessToken Issue(Credential credential, IReadOnlyCollection<string> roles)
+    public AccessToken Issue(Credential credential, IReadOnlyCollection<string> roles, Guid sessionId)
     {
         var now = timeProvider.GetUtcNow();
         var expiresAt = now + options.Value.AccessTokenLifetime;
@@ -82,7 +83,8 @@ public sealed class JwtAccessTokenIssuer(JwtSigningKey signingKey, IOptions<JwtO
             Claims = new Dictionary<string, object>
             {
                 [JwtRegisteredClaimNames.Sub] = credential.UserId.ToString(),
-                ["tid"] = credential.TenantId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                [NexusJwt.TenantClaim] = credential.TenantId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                [NexusJwt.SessionClaim] = sessionId.ToString("N"),
                 [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString("N"),
                 ["roles"] = roles.ToArray(),
             },

@@ -14,6 +14,7 @@ namespace NexUS.Auth.UnitTests;
 
 public class JwtAccessTokenIssuerTests
 {
+    private static readonly Guid SessionId = Guid.NewGuid();
     private readonly FakeTimeProvider _time = new(DateTimeOffset.UtcNow);
     private readonly JwtOptions _options = new();
     private readonly JwtSigningKey _key;
@@ -46,7 +47,7 @@ public class JwtAccessTokenIssuerTests
     [Fact]
     public async Task Token_bisa_diverifikasi_dengan_JWKS_dan_memuat_klaim_wajib()
     {
-        var token = Issuer().Issue(_credential, ["admin", "pm"]);
+        var token = Issuer().Issue(_credential, ["admin", "pm"], SessionId);
 
         var result = await ValidateWithJwks(token.Value);
 
@@ -56,6 +57,7 @@ public class JwtAccessTokenIssuerTests
         jwt.Kid.Should().Be(_key.PublicJwk.Kid);
         jwt.Subject.Should().Be(_credential.UserId.ToString());
         jwt.GetClaim("tid").Value.Should().Be("42");
+        jwt.GetClaim("sid").Value.Should().Be(SessionId.ToString("N"));
         jwt.Id.Should().NotBeNullOrEmpty();
         jwt.Claims.Where(c => c.Type == "roles").Select(c => c.Value).Should().BeEquivalentTo("admin", "pm");
     }
@@ -63,7 +65,7 @@ public class JwtAccessTokenIssuerTests
     [Fact]
     public void Token_berlaku_15_menit()
     {
-        var token = Issuer().Issue(_credential, []);
+        var token = Issuer().Issue(_credential, [], SessionId);
 
         token.ExpiresAt.Should().Be(_time.GetUtcNow().AddMinutes(15));
     }
@@ -71,7 +73,7 @@ public class JwtAccessTokenIssuerTests
     [Fact]
     public async Task Token_yang_diubah_gagal_diverifikasi()
     {
-        var token = Issuer().Issue(_credential, ["admin"]).Value;
+        var token = Issuer().Issue(_credential, ["admin"], SessionId).Value;
         var parts = token.Split('.');
         var tampered = $"{parts[0]}.{Base64UrlEncoder.Encode("{\"sub\":\"lain\",\"tid\":\"1\"}")}.{parts[2]}";
 
