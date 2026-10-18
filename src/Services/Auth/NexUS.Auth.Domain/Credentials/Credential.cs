@@ -63,13 +63,12 @@ public sealed class Credential : AggregateRoot
         AddDomainEvent(new CredentialLockedDomainEvent(PublicId, TenantId, UserId, LockedUntil.Value));
     }
 
-    /// <summary>Mencatat indikasi pencurian refresh token (dicatat lewat outbox untuk audit).</summary>
-    public void RecordRefreshTokenReuse(Guid familyId, int revokedTokens, string? ipAddress) =>
-        AddDomainEvent(new RefreshTokenReuseDetectedDomainEvent(PublicId, TenantId, UserId, familyId, revokedTokens, ipAddress));
-
-    /// <summary>Mencatat logout sebuah sesi (dicatat lewat outbox untuk audit).</summary>
-    public void RecordLogout(Guid familyId, int revokedTokens) =>
-        AddDomainEvent(new UserLoggedOutDomainEvent(PublicId, TenantId, UserId, familyId, revokedTokens));
+    /// <summary>
+    /// Mencatat pencabutan sebuah sesi (logout atau indikasi pencurian refresh token) lewat outbox untuk audit.
+    /// Nama event mengikuti kontrak <c>TokenRevoked</c> di ARCHITECTURE.md B.0.
+    /// </summary>
+    public void RecordSessionRevoked(Guid sessionId, RefreshTokenRevocationReason reason, int revokedTokens, string? ipAddress) =>
+        AddDomainEvent(new TokenRevokedDomainEvent(PublicId, TenantId, UserId, sessionId, reason, revokedTokens, ipAddress));
 
     public void RegisterSuccessfulLogin(DateTimeOffset now)
     {
@@ -82,10 +81,9 @@ public sealed class Credential : AggregateRoot
     }
 }
 
-public sealed record RefreshTokenReuseDetectedDomainEvent(
-    Guid CredentialId, long TenantId, Guid UserId, Guid FamilyId, int RevokedTokens, string? IpAddress) : DomainEvent;
-
-public sealed record UserLoggedOutDomainEvent(Guid CredentialId, long TenantId, Guid UserId, Guid FamilyId, int RevokedTokens) : DomainEvent;
+public sealed record TokenRevokedDomainEvent(
+    Guid CredentialId, long TenantId, Guid UserId, Guid SessionId, RefreshTokenRevocationReason Reason, int RevokedTokens, string? IpAddress)
+    : DomainEvent;
 
 public sealed record UserLoggedInDomainEvent(Guid CredentialId, long TenantId, Guid UserId) : DomainEvent;
 

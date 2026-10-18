@@ -18,6 +18,7 @@ public sealed class RefreshTokenCommandHandler(
     ICredentialRepository credentials,
     IAccessTokenIssuer accessTokenIssuer,
     IUserDirectory userDirectory,
+    IAccessTokenBlacklist blacklist,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
     ILogger<RefreshTokenCommandHandler> logger) : IRequestHandler<RefreshTokenCommand, LoginResult>
@@ -51,7 +52,7 @@ public sealed class RefreshTokenCommandHandler(
 
         // Siapkan semua hasil sebelum menyimpan, agar rotasi tidak ter-commit tanpa token baru sampai ke klien.
         var roles = await userDirectory.GetRolesAsync(credential, ct);
-        var accessToken = accessTokenIssuer.Issue(credential, roles);
+        var accessToken = accessTokenIssuer.Issue(credential, roles, current.FamilyId);
         var nextValue = RefreshTokenSecret.Generate(tenantId);
         var next = current.Rotate(RefreshTokenSecret.Hash(nextValue), now, command.UserAgent, command.IpAddress);
         await refreshTokens.AddAsync(next, ct);
@@ -71,16 +72,20 @@ public sealed class RefreshTokenCommandHandler(
 
     private async Task RevokeFamilyAsync(RefreshToken reused, string? ipAddress, DateTimeOffset now, CancellationToken ct)
     {
-        var revoked = await refreshTokens.RevokeFamilyAsync(
-            reused.TenantId, reused.FamilyId, now, RefreshTokenRevocationReason.ReuseDetected, ct);
-
-        // Dicatat lewat outbox agar tersimpan untuk audit (CONTEXT.md bagian 8), bukan hanya di log.
+        var revoked = 0;
         var credential = await credentials.FindByIdAsync(reused.TenantId, reused.CredentialId, ct);
-        if (credential is not null)
+
+        // Pencabutan dan event audit (outbox) dalam satu transaksi (CONTEXT.md bagian 3 poin 2 dan bagian 8).
+        await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            credential.RecordRefreshTokenReuse(reused.FamilyId, revoked, ipAddress);
-            await unitOfWork.SaveChangesAsync(ct);
-        }
+            revoked = await refreshTokens.RevokeFamilyAsync(
+                reused.TenantId, reused.FamilyId, now, RefreshTokenRevocationReason.ReuseDetected, token);
+            credential?.RecordSessionRevoked(reused.FamilyId, RefreshTokenRevocationReason.ReuseDetected, revoked, ipAddress);
+            await unitOfWork.SaveChangesAsync(token);
+        }, ct);
+
+        // Access token sesi yang dicuri juga tidak boleh dipakai lagi.
+        await blacklist.RevokeSessionAsync(reused.TenantId, reused.FamilyId, ct);
 
         logger.LogWarning(
             "Pemakaian ulang refresh token terdeteksi untuk user {UserId} di tenant {TenantId}; {Count} token keluarga {FamilyId} dicabut",

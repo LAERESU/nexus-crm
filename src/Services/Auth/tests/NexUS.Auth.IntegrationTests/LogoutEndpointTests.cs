@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.IdentityModel.JsonWebTokens;
 using NexUS.BuildingBlocks.Auth;
+using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
 
 namespace NexUS.Auth.IntegrationTests;
@@ -53,12 +54,32 @@ public class LogoutEndpointTests(OracleAuthFixture fixture)
 
         var jwt = new JsonWebToken(accessToken);
         await using var redis = await ConnectionMultiplexer.ConnectAsync(fixture.RedisConnectionString);
-        var key = CacheTokenRevocationStore.Key(long.Parse(jwt.GetClaim("tid").Value), jwt.Id);
+        var tenantId = long.Parse(jwt.GetClaim("tid").Value);
+        var key = RedisTokenRevocationStore.TokenKey(tenantId, jwt.Id);
         key.Should().StartWith("tnt:1:auth:revoked:");
-        (await redis.GetDatabase().StringGetAsync(key)).ToString().Should().Be("\"1\"");
+        (await redis.GetDatabase().KeyExistsAsync(key)).Should().BeTrue();
         var ttl = await redis.GetDatabase().KeyTimeToLiveAsync(key);
         ttl.Should().NotBeNull();
-        ttl!.Value.Should().BeGreaterThan(TimeSpan.Zero).And.BeLessThanOrEqualTo(TimeSpan.FromMinutes(15));
+        ttl!.Value.Should().BeGreaterThan(TimeSpan.Zero).And.BeLessThanOrEqualTo(NexusJwt.AccessTokenLifetime + NexusJwt.ClockSkew);
+
+        var sessionKey = RedisTokenRevocationStore.SessionKey(tenantId, jwt.GetClaim("sid").Value);
+        (await redis.GetDatabase().KeyExistsAsync(sessionKey)).Should().BeTrue("seluruh sesi ikut dicabut");
+    }
+
+    [Fact]
+    public async Task Access_token_lama_sebelum_refresh_ikut_dicabut_lewat_sesi()
+    {
+        var (tokenBeforeRefresh, refreshToken) = await LoginAsync();
+        var refreshed = await Client().SendAsync(Post("/api/v1/auth/refresh", refreshToken, null));
+        var latestRefresh = RefreshCookie(refreshed)!;
+        var tokenAfterRefresh = (await refreshed.Content.ReadFromJsonAsync<TokenResponse>())!.AccessToken;
+
+        await Client().SendAsync(Post("/api/v1/auth/logout", latestRefresh, tokenAfterRefresh));
+
+        var store = fixture.Factory.Services.GetRequiredService<ITokenRevocationStore>();
+        var before = new JsonWebToken(tokenBeforeRefresh);
+        (await store.IsRevokedAsync(1, before.Id, before.GetClaim("sid").Value))
+            .Should().BeTrue("token sebelum refresh punya sid yang sama dan ikut dicabut");
     }
 
     [Fact]

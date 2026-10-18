@@ -24,22 +24,30 @@ public sealed class LogoutCommandHandler(
         var now = timeProvider.GetUtcNow();
 
         var accessToken = await accessTokenReader.ReadAsync(command.AccessToken);
-        if (accessToken is not null) await blacklist.RevokeAsync(accessToken, now, ct);
+        if (accessToken is not null) await blacklist.RevokeTokenAsync(accessToken, now, ct);
 
         if (!RefreshTokenSecret.TryGetTenantId(command.RefreshToken, out var tenantId)) return;
 
         var refreshToken = await refreshTokens.FindByHashAsync(tenantId, RefreshTokenSecret.Hash(command.RefreshToken!), ct);
         if (refreshToken is null) return;
 
-        var revoked = await refreshTokens.RevokeFamilyAsync(
-            tenantId, refreshToken.FamilyId, now, RefreshTokenRevocationReason.Logout, ct);
+        // Semua access token sesi ini (juga yang terbit sebelum refresh terakhir) ikut dicabut lewat klaim sid.
+        await blacklist.RevokeSessionAsync(tenantId, refreshToken.FamilyId, ct);
 
+        var revoked = 0;
         var credential = await credentials.FindByIdAsync(tenantId, refreshToken.CredentialId, ct);
-        if (credential is not null)
+        await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            credential.RecordLogout(refreshToken.FamilyId, revoked);
-            await unitOfWork.SaveChangesAsync(ct);
-        }
+            revoked = await refreshTokens.RevokeFamilyAsync(
+                tenantId, refreshToken.FamilyId, now, RefreshTokenRevocationReason.Logout, token);
+
+            // Logout ulang atas sesi yang sudah berakhir tidak dicatat lagi sebagai audit.
+            if (revoked > 0 && credential is not null)
+            {
+                credential.RecordSessionRevoked(refreshToken.FamilyId, RefreshTokenRevocationReason.Logout, revoked, null);
+                await unitOfWork.SaveChangesAsync(token);
+            }
+        }, ct);
 
         logger.LogInformation("Logout user {UserId} di tenant {TenantId}; {Count} refresh token dicabut",
             credential?.UserId, tenantId, revoked);

@@ -50,7 +50,8 @@ public sealed record AccessToken(string Value, DateTimeOffset ExpiresAt);
 
 public interface IAccessTokenIssuer
 {
-    AccessToken Issue(Credential credential, IReadOnlyCollection<string> roles);
+    /// <param name="sessionId">Keluarga refresh token; dimasukkan sebagai klaim <c>sid</c> agar logout bisa mencabut seluruh sesi.</param>
+    AccessToken Issue(Credential credential, IReadOnlyCollection<string> roles, Guid sessionId);
 }
 
 /// <summary>Sumber role user. Sementara dari data Auth sendiri; diganti panggilan ke User Service di NX-020 (ADR-0006).</summary>
@@ -60,7 +61,7 @@ public interface IUserDirectory
 }
 
 /// <summary>Identitas access token yang tanda tangan, issuer, dan audience-nya valid (masa berlaku tidak diperiksa).</summary>
-public sealed record AccessTokenInfo(long TenantId, string Jti, DateTimeOffset ExpiresAt);
+public sealed record AccessTokenInfo(long TenantId, string Jti, string? SessionId, DateTimeOffset ExpiresAt);
 
 public interface IAccessTokenReader
 {
@@ -68,8 +69,10 @@ public interface IAccessTokenReader
     Task<AccessTokenInfo?> ReadAsync(string? token);
 }
 
-/// <summary>Blacklist jti access token yang sudah di-logout.</summary>
+/// <summary>Blacklist access token: satu token (jti) atau seluruh sesi (sid). Lihat ADR-0007.</summary>
 public interface IAccessTokenBlacklist
 {
-    Task RevokeAsync(AccessTokenInfo token, DateTimeOffset now, CancellationToken ct);
+    Task RevokeTokenAsync(AccessTokenInfo token, DateTimeOffset now, CancellationToken ct);
+
+    Task RevokeSessionAsync(long tenantId, Guid sessionId, CancellationToken ct);
 }

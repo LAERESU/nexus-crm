@@ -112,6 +112,7 @@ public class RefreshTokenCommandHandlerTests
     private readonly ICredentialRepository _credentials = Substitute.For<ICredentialRepository>();
     private readonly IAccessTokenIssuer _issuer = Substitute.For<IAccessTokenIssuer>();
     private readonly IUserDirectory _directory = Substitute.For<IUserDirectory>();
+    private readonly IAccessTokenBlacklist _blacklist = Substitute.For<IAccessTokenBlacklist>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 18, 8, 0, 0, TimeSpan.Zero));
     private readonly Credential _credential = Credential.Create(5, Guid.NewGuid(), "budi@demo.local", "hash");
@@ -124,12 +125,14 @@ public class RefreshTokenCommandHandlerTests
         _tokens.FindByHashAsync(5, RefreshTokenSecret.Hash(_tokenValue), Arg.Any<CancellationToken>()).Returns(_current);
         _credentials.FindByIdAsync(5, Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(_credential);
         _directory.GetRolesAsync(Arg.Any<Credential>(), Arg.Any<CancellationToken>()).Returns(["admin"]);
-        _issuer.Issue(Arg.Any<Credential>(), Arg.Any<IReadOnlyCollection<string>>())
+        _issuer.Issue(Arg.Any<Credential>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<Guid>())
             .Returns(new AccessToken("jwt-baru", _time.GetUtcNow().AddMinutes(15)));
+        _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task>>()(CancellationToken.None));
     }
 
     private Task<NexUS.Auth.Application.Login.LoginResult> Refresh(string? token) =>
-        new RefreshTokenCommandHandler(_tokens, _credentials, _issuer, _directory, _unitOfWork, _time,
+        new RefreshTokenCommandHandler(_tokens, _credentials, _issuer, _directory, _blacklist, _unitOfWork, _time,
                 NullLogger<RefreshTokenCommandHandler>.Instance)
             .Handle(new RefreshTokenCommand(token, "ip", "ua"), CancellationToken.None);
 
@@ -160,8 +163,10 @@ public class RefreshTokenCommandHandlerTests
         ex.Which.ClearCookie.Should().BeTrue();
         await _tokens.Received(1).RevokeFamilyAsync(5, _current.FamilyId, Arg.Any<DateTimeOffset>(),
             RefreshTokenRevocationReason.ReuseDetected, Arg.Any<CancellationToken>());
-        _credential.DomainEvents.Should().ContainSingle(e => e is RefreshTokenReuseDetectedDomainEvent);
-        _issuer.DidNotReceiveWithAnyArgs().Issue(default!, default!);
+        _credential.DomainEvents.Should().ContainSingle(e => e is TokenRevokedDomainEvent
+            && ((TokenRevokedDomainEvent)e).Reason == RefreshTokenRevocationReason.ReuseDetected);
+        await _blacklist.Received(1).RevokeSessionAsync(5, _current.FamilyId, Arg.Any<CancellationToken>());
+        _issuer.DidNotReceiveWithAnyArgs().Issue(default!, default!, default);
     }
 
     [Fact]
@@ -215,7 +220,7 @@ public class RefreshTokenCommandHandlerTests
     [Fact]
     public async Task Rotasi_tidak_tersimpan_bila_penerbitan_access_token_gagal()
     {
-        _issuer.Issue(Arg.Any<Credential>(), Arg.Any<IReadOnlyCollection<string>>())
+        _issuer.Issue(Arg.Any<Credential>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<Guid>())
             .Returns(_ => throw new InvalidOperationException("kunci rusak"));
 
         await FluentActions.Awaiting(() => Refresh(_tokenValue)).Should().ThrowAsync<InvalidOperationException>();

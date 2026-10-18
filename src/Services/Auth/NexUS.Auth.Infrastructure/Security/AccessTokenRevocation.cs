@@ -26,15 +26,23 @@ public sealed class JwtAccessTokenReader(JwtSigningKey signingKey, IOptions<JwtO
         });
         if (!result.IsValid || result.SecurityToken is not JsonWebToken jwt) return null;
 
-        return long.TryParse(jwt.GetClaim("tid")?.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var tenantId)
-               && !string.IsNullOrWhiteSpace(jwt.Id)
-            ? new AccessTokenInfo(tenantId, jwt.Id, jwt.ValidTo == DateTime.MinValue ? DateTimeOffset.MinValue : new DateTimeOffset(jwt.ValidTo, TimeSpan.Zero))
-            : null;
+        if (!long.TryParse(Claim(jwt, NexusJwt.TenantClaim), NumberStyles.None, CultureInfo.InvariantCulture, out var tenantId)
+            || string.IsNullOrWhiteSpace(jwt.Id))
+            return null;
+
+        var expiresAt = jwt.ValidTo == DateTime.MinValue ? DateTimeOffset.MinValue : new DateTimeOffset(jwt.ValidTo, TimeSpan.Zero);
+        return new AccessTokenInfo(tenantId, jwt.Id, Claim(jwt, NexusJwt.SessionClaim), expiresAt);
     }
+
+    private static string? Claim(JsonWebToken jwt, string type) =>
+        jwt.TryGetClaim(type, out var claim) ? claim.Value : null;
 }
 
 public sealed class AccessTokenBlacklist(ITokenRevocationStore store) : IAccessTokenBlacklist
 {
-    public Task RevokeAsync(AccessTokenInfo token, DateTimeOffset now, CancellationToken ct) =>
-        store.RevokeAsync(token.TenantId, token.Jti, token.ExpiresAt, now, ct);
+    public Task RevokeTokenAsync(AccessTokenInfo token, DateTimeOffset now, CancellationToken ct) =>
+        store.RevokeTokenAsync(token.TenantId, token.Jti, token.ExpiresAt, now, ct);
+
+    public Task RevokeSessionAsync(long tenantId, Guid sessionId, CancellationToken ct) =>
+        store.RevokeSessionAsync(tenantId, sessionId.ToString("N"), ct);
 }

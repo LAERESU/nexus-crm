@@ -22,6 +22,12 @@ public class LogoutCommandHandlerTests
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 18, 8, 0, 0, TimeSpan.Zero));
     private readonly Credential _credential = Credential.Create(3, Guid.NewGuid(), "budi@demo.local", "hash");
 
+    public LogoutCommandHandlerTests()
+    {
+        _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task>>()(CancellationToken.None));
+    }
+
     private Task Logout(string? refresh, string? access) =>
         new LogoutCommandHandler(_tokens, _credentials, _reader, _blacklist, _unitOfWork, _time,
                 NullLogger<LogoutCommandHandler>.Instance)
@@ -32,17 +38,35 @@ public class LogoutCommandHandlerTests
     {
         var refreshValue = RefreshTokenSecret.Generate(3);
         var refresh = RefreshToken.Issue(_credential, RefreshTokenSecret.Hash(refreshValue), _time.GetUtcNow(), null, null);
-        var access = new AccessTokenInfo(3, "jti-1", _time.GetUtcNow().AddMinutes(10));
+        var access = new AccessTokenInfo(3, "jti-1", "sesi", _time.GetUtcNow().AddMinutes(10));
         _tokens.FindByHashAsync(3, RefreshTokenSecret.Hash(refreshValue), Arg.Any<CancellationToken>()).Returns(refresh);
         _credentials.FindByIdAsync(3, Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(_credential);
         _reader.ReadAsync("akses").Returns(access);
+        _tokens.RevokeFamilyAsync(default, default, default, default, default).ReturnsForAnyArgs(2);
 
         await Logout(refreshValue, "akses");
 
-        await _blacklist.Received(1).RevokeAsync(access, _time.GetUtcNow(), Arg.Any<CancellationToken>());
+        await _blacklist.Received(1).RevokeTokenAsync(access, _time.GetUtcNow(), Arg.Any<CancellationToken>());
+        await _blacklist.Received(1).RevokeSessionAsync(3, refresh.FamilyId, Arg.Any<CancellationToken>());
         await _tokens.Received(1).RevokeFamilyAsync(3, refresh.FamilyId, _time.GetUtcNow(),
             RefreshTokenRevocationReason.Logout, Arg.Any<CancellationToken>());
-        _credential.DomainEvents.Should().ContainSingle(e => e is UserLoggedOutDomainEvent);
+        _credential.DomainEvents.Should().ContainSingle(e => e is TokenRevokedDomainEvent
+            && ((TokenRevokedDomainEvent)e).Reason == RefreshTokenRevocationReason.Logout);
+    }
+
+    [Fact]
+    public async Task Logout_ulang_atas_sesi_yang_sudah_berakhir_tidak_mencatat_audit_lagi()
+    {
+        var refreshValue = RefreshTokenSecret.Generate(3);
+        var refresh = RefreshToken.Issue(_credential, RefreshTokenSecret.Hash(refreshValue), _time.GetUtcNow(), null, null);
+        _tokens.FindByHashAsync(3, RefreshTokenSecret.Hash(refreshValue), Arg.Any<CancellationToken>()).Returns(refresh);
+        _credentials.FindByIdAsync(3, Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(_credential);
+        _tokens.RevokeFamilyAsync(default, default, default, default, default).ReturnsForAnyArgs(0);
+
+        await Logout(refreshValue, null);
+
+        _credential.DomainEvents.Should().BeEmpty();
+        await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -50,7 +74,7 @@ public class LogoutCommandHandlerTests
     {
         await Logout(null, null);
 
-        await _blacklist.DidNotReceiveWithAnyArgs().RevokeAsync(default!, default, default);
+        await _blacklist.DidNotReceiveWithAnyArgs().RevokeTokenAsync(default!, default, default);
         await _tokens.DidNotReceiveWithAnyArgs().FindByHashAsync(default, default!, default);
     }
 
@@ -61,7 +85,7 @@ public class LogoutCommandHandlerTests
 
         await Logout(null, "palsu");
 
-        await _blacklist.DidNotReceiveWithAnyArgs().RevokeAsync(default!, default, default);
+        await _blacklist.DidNotReceiveWithAnyArgs().RevokeTokenAsync(default!, default, default);
     }
 
     [Fact]
@@ -90,7 +114,8 @@ public class JwtAccessTokenReaderTests
     {
         var key = NewKey();
         var credential = Credential.Create(9, Guid.NewGuid(), "a@b.c", "hash");
-        var token = new JwtAccessTokenIssuer(key, Options.Create(_options), _time).Issue(credential, []);
+        var session = Guid.NewGuid();
+        var token = new JwtAccessTokenIssuer(key, Options.Create(_options), _time).Issue(credential, [], session);
         _time.Advance(TimeSpan.FromHours(1));
 
         var info = await new JwtAccessTokenReader(key, Options.Create(_options)).ReadAsync(token.Value);
@@ -98,6 +123,7 @@ public class JwtAccessTokenReaderTests
         info.Should().NotBeNull();
         info!.TenantId.Should().Be(9);
         info.Jti.Should().NotBeNullOrEmpty();
+        info.SessionId.Should().Be(session.ToString("N"));
         info.ExpiresAt.Should().BeCloseTo(token.ExpiresAt, TimeSpan.FromSeconds(1));
     }
 
@@ -105,7 +131,7 @@ public class JwtAccessTokenReaderTests
     public async Task Token_yang_ditandatangani_kunci_lain_ditolak()
     {
         var credential = Credential.Create(9, Guid.NewGuid(), "a@b.c", "hash");
-        var foreign = new JwtAccessTokenIssuer(NewKey(), Options.Create(_options), _time).Issue(credential, []);
+        var foreign = new JwtAccessTokenIssuer(NewKey(), Options.Create(_options), _time).Issue(credential, [], Guid.NewGuid());
 
         (await new JwtAccessTokenReader(NewKey(), Options.Create(_options)).ReadAsync(foreign.Value)).Should().BeNull();
     }

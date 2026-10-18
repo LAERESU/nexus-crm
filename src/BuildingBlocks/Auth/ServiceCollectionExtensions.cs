@@ -15,7 +15,7 @@ public static class ServiceCollectionExtensions
     /// <summary>Blacklist jti di cache (butuh <c>AddNexusCaching</c>).</summary>
     public static IServiceCollection AddNexusTokenRevocation(this IServiceCollection services)
     {
-        services.AddSingleton<ITokenRevocationStore, CacheTokenRevocationStore>();
+        services.AddSingleton<ITokenRevocationStore, RedisTokenRevocationStore>();
         return services;
     }
 }

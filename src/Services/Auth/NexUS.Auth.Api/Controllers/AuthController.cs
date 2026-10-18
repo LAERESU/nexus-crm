@@ -59,7 +59,7 @@ public sealed class AuthController(ISender mediator, TimeProvider timeProvider) 
     /// <summary>Logout sesi saat ini.</summary>
     /// <remarks>
     /// Mencabut refresh token sesi ini (cookie) beserta semua hasil rotasinya, memasukkan access token (header
-    /// Authorization) ke blacklist sampai kedaluwarsa, dan menghapus cookie. Selalu 204, juga bila token tidak valid.
+    /// Authorization) dan seluruh sesinya ke blacklist, lalu menghapus cookie. 204 juga bila token tidak valid.
     /// </remarks>
     [HttpPost("logout")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -68,9 +68,16 @@ public sealed class AuthController(ISender mediator, TimeProvider timeProvider) 
         var authorization = Request.Headers.Authorization.ToString();
         var accessToken = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? authorization[7..].Trim() : null;
 
-        await mediator.Send(new LogoutCommand(Request.Cookies[RefreshTokenCookie], accessToken), ct);
+        try
+        {
+            await mediator.Send(new LogoutCommand(Request.Cookies[RefreshTokenCookie], accessToken), ct);
+        }
+        finally
+        {
+            // Cookie dihapus juga bila logout gagal (input terlalu besar → 400, Oracle mati → 500).
+            Response.Cookies.Delete(RefreshTokenCookie, CookieOptions(expires: null));
+        }
 
-        Response.Cookies.Delete(RefreshTokenCookie, CookieOptions(expires: null));
         return NoContent();
     }
 
