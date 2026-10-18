@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,6 +37,14 @@ public static class DependencyInjection
 
         services.AddNexusCaching(configuration);
         services.AddNexusTokenRevocation();
+
+        // Auth memvalidasi access token miliknya sendiri dengan kunci lokal, bukan JWKS lewat HTTP ke dirinya.
+        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .PostConfigure<JwtSigningKey>((options, signingKey) =>
+            {
+                options.ConfigurationManager = null;
+                options.TokenValidationParameters.IssuerSigningKey = signingKey.Credentials.Key;
+            });
         services.AddSingleton<IAccessTokenBlacklist, AccessTokenBlacklist>();
 
         services.Configure<DevSeedOptions>(configuration.GetSection(DevSeedOptions.SectionName));

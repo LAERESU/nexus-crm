@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using NexUS.BuildingBlocks.Auth;
 using NexUS.BuildingBlocks.Observability;
 using NexUS.Gateway.Api;
 using NexUS.Gateway.Api.Middleware;
@@ -23,6 +24,9 @@ builder.Services.AddOptions<CorsOptions>().Configure<IConfiguration>((options, c
 
 builder.Services.AddProblemDetails();
 builder.Services.AddNexusHealthChecks(builder.Configuration);
+// Setiap route YARP menetapkan AuthorizationPolicy sendiri ("default" = wajib token, "anonymous" = publik).
+// Tanpa fallback policy, path yang tidak terdaftar tetap 404 (NX-011).
+builder.Services.AddNexusJwtAuth(builder.Configuration, requireAuthenticationByDefault: false);
 
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
@@ -40,20 +44,25 @@ builder.Services.AddReverseProxy()
 
 var app = builder.Build();
 
+// Route YARP tanpa AuthorizationPolicy akan publik (Gateway tidak memakai fallback policy): tolak saat start.
+GatewayRoutes.EnsureAuthorizationPolicies(app.Configuration);
+
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseNexusObservability();
 app.UseExceptionHandler(); // exception di pipeline Gateway → 500 ProblemDetails tanpa stack trace
 app.UseMiddleware<RejectDisallowedOriginMiddleware>();
 app.UseCors(GatewayCors.PolicyName);
 app.UseStatusCodePages(); // route tidak terdaftar → 404 ProblemDetails
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapHealthChecks("/health/live", new() { Predicate = _ => false });
-app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains(HealthCheckExtensions.ReadyTag) });
+app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();
+app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains(HealthCheckExtensions.ReadyTag) }).AllowAnonymous();
 
 // Endpoint internal antar service tidak boleh diekspos lewat Gateway (ARCHITECTURE.md: hanya untuk Auth/Gateway).
 // Path literal lebih diprioritaskan daripada route catch-all YARP.
 foreach (var internalPath in GatewayRoutes.InternalPaths)
-    app.Map(internalPath, () => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Not Found"));
+    app.Map(internalPath, () => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Not Found")).AllowAnonymous();
 
 app.MapReverseProxy();
 

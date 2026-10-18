@@ -12,6 +12,7 @@
     <ProjectReference Include="..\NexUS.Project.Application\NexUS.Project.Application.csproj" />
     <ProjectReference Include="..\NexUS.Project.Infrastructure\NexUS.Project.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Observability\NexUS.BuildingBlocks.Observability.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Auth\NexUS.BuildingBlocks.Auth.csproj" />
   </ItemGroup>
 
 </Project>

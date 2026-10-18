@@ -79,7 +79,7 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 - **Langkah:**
   1. `POST /api/v1/auth/logout`: revoke refresh token, hapus cookie, simpan `auth:revoked:{jti}` di Redis dengan TTL sisa umur access token.
 - **Acceptance criteria:**
-  - [ ] Setelah logout, access token lama ditolak (401) oleh Gateway walau belum kedaluwarsa. (sisi Auth ✅: `jti` tersimpan di Redis dengan TTL sisa umur token, diuji dengan Redis sungguhan; penolakan oleh Gateway dibuktikan di NX-015 karena validasi JWT di Gateway baru dibuat di sana)
+  - [x] Setelah logout, access token lama ditolak (401) oleh Gateway walau belum kedaluwarsa. (sisi Auth: `jti`/`sid` tersimpan di Redis, diuji dengan Redis sungguhan; sisi Gateway: dibuktikan di NX-015, tes `Setelah_logout_access_token_lama_ditolak_401_walau_belum_kedaluwarsa`)
 - **Catatan implementasi:**
   - Desain blacklist di ADR-0007. `POST /api/v1/auth/logout` mencabut seluruh keluarga refresh token sesi itu (alasan `Logout`), memasukkan `jti` access token di header **dan** seluruh sesinya (klaim `sid`) ke blacklist, lalu menghapus cookie (juga bila terjadi error). Sesi lain user yang sama tidak terpengaruh. Hasilnya 204, juga tanpa token atau dengan token palsu.
   - Access token kini membawa klaim `sid` (ID keluarga refresh token), sehingga token yang terbit sebelum refresh terakhir ikut dicabut saat logout. Deteksi pemakaian ulang (NX-013) juga mencabut sesi.
@@ -90,7 +90,7 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 
 ---
 
-### NX-015 · Validasi JWT di Gateway & service
+### NX-015 · Validasi JWT di Gateway & service ✅
 - **Sprint:** 2 · **SP:** 3 · **Bergantung pada:** NX-012, NX-014
 - **Langkah:**
   1. Lengkapi `AddNexusJwtAuth()` di BuildingBlocks.Auth (ARCHITECTURE G.1): authority, audience, validasi lifetime, cek blacklist Redis.
@@ -99,8 +99,19 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
   4. Pindahkan `app.UseNexusLogEnrichment()` di setiap `Program.cs` ke setelah `UseAuthentication()`/`UseAuthorization()` (sekarang berada sebelum autentikasi sehingga `TenantId`/`UserId` masih null), dan pastikan `ExceptionHandlingMiddleware` berada di dalam scope enrichment tersebut (temuan review NX-010).
   5. Tolak token yang `jti` atau `sid`-nya ada di `ITokenRevocationStore` (NX-014, ADR-0007) dengan `ClockSkew` dari `NexusJwt`, lalu buktikan dan centang acceptance criteria NX-014: setelah logout, access token lama ditolak 401 oleh Gateway.
 - **Acceptance criteria:**
-  - [ ] Request tanpa token ke `/api/v1/projects` → 401 di Gateway.
-  - [ ] Service menolak token dengan signature atau audience salah, walau dipanggil langsung tanpa Gateway.
+  - [x] Request tanpa token ke `/api/v1/projects` → 401 di Gateway. (tes Gateway; request tidak sampai ke service)
+  - [x] Service menolak token dengan signature atau audience salah, walau dipanggil langsung tanpa Gateway. (tes `JwtValidationTests` atas pipeline `AddNexusJwtAuth` yang dipasang di ketujuh service: signature, audience, issuer, kedaluwarsa, `jti`/`sid` dicabut)
+- **Catatan implementasi:**
+  - `AddNexusJwtAuth` (BuildingBlocks.Auth): RS256, issuer `nexus-auth`, audience `nexus-api`, `ClockSkew` 30 detik dari `NexusJwt`, klaim asli dipertahankan (`MapInboundClaims = false`), blacklist `jti`/`sid` dicek di `OnTokenValidated`. Kunci diambil dari `Auth:Jwt:JwksUrl` lewat retriever JWKS sendiri (tanpa OpenID discovery, yang sengaja dihapus di NX-012) dengan cache dan refresh-kunci bawaan `ConfigurationManager`.
+  - Service: fallback policy mewajibkan user terautentikasi; health, JWKS, dan endpoint auth publik ditandai anonim. Swagger dipasang sebelum autentikasi karena fallback policy juga berlaku untuk request tanpa endpoint.
+  - Gateway: tanpa fallback policy, setiap route YARP memakai `AuthorizationPolicy` eksplisit (`default` wajib token, `anonymous` untuk `/api/v1/auth/**` dan `/api/v1/<resource>/health`), agar path yang tidak terdaftar tetap 404 (NX-011). Gateway gagal start bila ada route tanpa `AuthorizationPolicy`, supaya route baru tidak diam-diam publik.
+  - `Auth:Jwt:JwksUrl` wajib di luar Development (aplikasi gagal start). JWKS diambil lewat `IHttpClientFactory` setiap kali (rotasi DNS tetap berlaku) dan diambil ulang paling cepat 30 detik sekali bila ada `kid` baru. Auth Service memvalidasi tokennya sendiri dengan kunci lokal, tanpa HTTP ke dirinya.
+  - Diterima apa adanya dari review: blacklist dicek di Gateway **dan** di service (dua `EXISTS` Redis per request) sebagai pertahanan berlapis, karena service tetap bisa dipanggil langsung; registrasi cache ganda di Auth aman karena idempoten (`TryAdd`).
+  - Token untuk hub SignalR diterima dari query `access_token` hanya pada path `/hubs/**`.
+  - `TenantId`/`UserId` di log kini diisi `HttpContextUserEnricher` (klaim `tid`/`sub`) saat log ditulis, sehingga tidak bergantung pada posisi middleware dan log error dari penanganan exception ikut memuatnya (temuan review NX-010). Middleware `UseNexusLogEnrichment` dihapus. Urutan pipeline service: Observability → ExceptionHandling → Swagger (dev) → Authentication → Authorization, sehingga error saat autentikasi pun menjadi ProblemDetails.
+  - `ICurrentUser.UserId` kini `Guid` (ID publik dari klaim `sub`), `Roles` dan `SessionId` ditambahkan, `HasPermission` dihapus sampai permission tersedia (NX-020).
+  - **Pertanyaan terbuka untuk E2/E3:** kolom wajib `CREATED_BY`/`UPDATED_BY` bertipe `NUMBER`, sedangkan token hanya membawa ID publik user (`RAW(16)`). Perlu diputuskan sebelum tabel bisnis pertama: simpan ID publik (`RAW(16)`) atau peta ke ID internal User Service.
+  - Compose: service dan Gateway memakai `Auth__Jwt__JwksUrl=http://auth:8080/.well-known/jwks.json` (`RequireHttpsMetadata=false` karena jaringan internal); Gateway kembali diberi `ConnectionStrings__Redis` untuk blacklist.
 
 ---
 
