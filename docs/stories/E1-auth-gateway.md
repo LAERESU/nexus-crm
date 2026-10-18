@@ -90,7 +90,7 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 
 ---
 
-### NX-015 · Validasi JWT di Gateway & service
+### NX-015 · Validasi JWT di Gateway & service ✅
 - **Sprint:** 2 · **SP:** 3 · **Bergantung pada:** NX-012, NX-014
 - **Langkah:**
   1. Lengkapi `AddNexusJwtAuth()` di BuildingBlocks.Auth (ARCHITECTURE G.1): authority, audience, validasi lifetime, cek blacklist Redis.
