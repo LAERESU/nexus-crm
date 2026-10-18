@@ -64,7 +64,7 @@ public sealed class GatewayFixture : IAsyncLifetime
         settings["Auth:Jwt:RequireHttpsMetadata"] = "false";
 
         _gateway = new WebApplicationFactory<Program>().WithWebHostBuilder(web => web
-            .UseEnvironment("Testing")
+            .UseEnvironment("Development") // tanpa Redis: cache, blacklist, dan rate limit lolos (lihat GatewayRateLimitFixture untuk Redis)
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(settings))
             .ConfigureTestServices(services => services.AddSingleton<ITokenRevocationStore>(Revocations)));
     }

@@ -3,6 +3,7 @@ using NexUS.BuildingBlocks.Auth;
 using NexUS.BuildingBlocks.Observability;
 using NexUS.Gateway.Api;
 using NexUS.Gateway.Api.Middleware;
+using NexUS.Gateway.Api.RateLimiting;
 using Yarp.ReverseProxy.Transforms;
 
 if (HealthProbe.IsRequested(args)) return await HealthProbe.RunAsync();
@@ -27,6 +28,9 @@ builder.Services.AddNexusHealthChecks(builder.Configuration);
 // Setiap route YARP menetapkan AuthorizationPolicy sendiri ("default" = wajib token, "anonymous" = publik).
 // Tanpa fallback policy, path yang tidak terdaftar tetap 404 (NX-011).
 builder.Services.AddNexusJwtAuth(builder.Configuration, requireAuthenticationByDefault: false);
+
+builder.Services.Configure<RateLimitingOptions>(builder.Configuration.GetSection(RateLimitingOptions.SectionName));
+builder.Services.AddSingleton<RedisRateLimiter>();
 
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
@@ -54,6 +58,7 @@ app.UseMiddleware<RejectDisallowedOriginMiddleware>();
 app.UseCors(GatewayCors.PolicyName);
 app.UseStatusCodePages(); // route tidak terdaftar → 404 ProblemDetails
 app.UseAuthentication();
+app.UseMiddleware<RateLimitMiddleware>(); // setelah autentikasi: per-user/per-tenant memakai klaim sub/tid
 app.UseAuthorization();
 
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();

@@ -124,6 +124,14 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 - **Acceptance criteria:**
   - [ ] Request ke-301 dalam satu menit oleh user yang sama → 429.
   - [ ] Dua instance Gateway berbagi hitungan yang sama.
+- **Catatan implementasi:**
+  - Limiter Redis ditulis sendiri (skrip Lua atomik, jam Redis `TIME`) alih-alih paket pihak ketiga `RedisRateLimiting` yang disebut ARCHITECTURE.md G.4, agar tidak menambah dependency keamanan pihak ketiga.
+  - Kebijakan: `login` POST `/api/v1/auth/login`, kunci IP + email (email di-hash), 5/15 menit fixed window; `per-user` `sub`, 300/menit sliding window (perkiraan dua window terboboti); `per-tenant` `tid`, 5.000/menit token bucket; `upload` `sub` untuk request `multipart/form-data`, 20/menit fixed window. Batas bisa ditimpa lewat bagian konfigurasi `RateLimiting`.
+  - Key: `rl:login:{hash}` (global, tenant belum diketahui saat login) dan `tnt:{tid}:rl:...` untuk user/tenant.
+  - Respons 429 berupa ProblemDetails dengan header `Retry-After` (detik). Request yang ditolak oleh sliding window tidak ikut dihitung.
+  - Bila Redis tidak terjangkau: request diizinkan (fail open, dicatat), sesuai CONTEXT.md bagian 3 poin 7.
+  - IP klien dibaca dari koneksi. Di belakang ingress, Gateway perlu forwarded headers dari ingress tepercaya (dikonfigurasi bersama Helm di NX-008), agar kunci `login` tidak memakai IP ingress.
+  - Tes dengan Redis sungguhan dan dua instance Gateway (trait `Docker`, berjalan di CI).
 
 ---
 
