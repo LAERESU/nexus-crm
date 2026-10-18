@@ -10,7 +10,7 @@ using Oracle.ManagedDataAccess.Client;
 namespace NexUS.Auth.IntegrationTests;
 
 /// <summary>
-/// Oracle Free sungguhan (Testcontainers) dengan migrasi <c>db/auth</c> yang sama seperti Flyway,
+/// Oracle Free dan Redis sungguhan (Testcontainers) dengan migrasi <c>db/auth</c> yang sama seperti Flyway,
 /// lalu Auth Service berjalan di atasnya dengan seed admin dev.
 /// </summary>
 public sealed class OracleAuthFixture : IAsyncLifetime
@@ -27,12 +27,19 @@ public sealed class OracleAuthFixture : IAsyncLifetime
         .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("DATABASE IS READY TO USE!"))
         .Build();
 
+    private readonly IContainer _redis = new ContainerBuilder("redis:7-alpine")
+        .WithPortBinding(6379, assignRandomHostPort: true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Ready to accept connections"))
+        .Build();
+
     public WebApplicationFactory<Program> Factory { get; private set; } = default!;
     public string ConnectionString { get; private set; } = default!;
+    public string RedisConnectionString { get; private set; } = default!;
 
     public async Task InitializeAsync()
     {
-        await _oracle.StartAsync();
+        await Task.WhenAll(_oracle.StartAsync(), _redis.StartAsync());
+        RedisConnectionString = $"{_redis.Hostname}:{_redis.GetMappedPublicPort(6379)},abortConnect=false";
         ConnectionString =
             $"User Id=AUTH_SCHEMA;Password={SchemaPassword};Data Source={_oracle.Hostname}:{_oracle.GetMappedPublicPort(1521)}/FREEPDB1";
 
@@ -43,6 +50,7 @@ public sealed class OracleAuthFixture : IAsyncLifetime
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Oracle"] = ConnectionString,
+                ["ConnectionStrings:Redis"] = RedisConnectionString,
                 ["Seed:AdminPassword"] = AdminPassword,
             })));
         _ = Factory.Server; // memicu start host (dan seeder) sekarang
@@ -53,6 +61,7 @@ public sealed class OracleAuthFixture : IAsyncLifetime
     {
         if (Factory is not null) await Factory.DisposeAsync();
         await _oracle.DisposeAsync();
+        await _redis.DisposeAsync();
     }
 
     /// <summary>Menjalankan V*.sql di db/auth berurutan, sama seperti Flyway.</summary>

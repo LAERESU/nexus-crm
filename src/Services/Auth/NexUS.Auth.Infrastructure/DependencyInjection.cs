@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NexUS.BuildingBlocks.Auth;
+using NexUS.BuildingBlocks.Caching;
 using NexUS.Auth.Application.Abstractions;
 using NexUS.Auth.Application.Common;
 using NexUS.Auth.Infrastructure.Persistence;
@@ -30,6 +32,11 @@ public static class DependencyInjection
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.AddSingleton<JwtSigningKey>();
         services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
+        services.AddSingleton<IAccessTokenReader, JwtAccessTokenReader>();
+
+        services.AddNexusCaching(configuration);
+        services.AddNexusTokenRevocation();
+        services.AddSingleton<IAccessTokenBlacklist, AccessTokenBlacklist>();
 
         services.Configure<DevSeedOptions>(configuration.GetSection(DevSeedOptions.SectionName));
         services.AddSingleton<DevSeeder>();

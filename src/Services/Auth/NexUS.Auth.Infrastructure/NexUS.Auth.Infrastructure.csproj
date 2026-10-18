@@ -17,6 +17,8 @@
   <ItemGroup>
     <ProjectReference Include="..\NexUS.Auth.Application\NexUS.Auth.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Messaging\NexUS.BuildingBlocks.Messaging.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Auth\NexUS.BuildingBlocks.Auth.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Caching\NexUS.BuildingBlocks.Caching.csproj" />
   </ItemGroup>
 
 </Project>

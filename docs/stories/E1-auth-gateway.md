@@ -79,7 +79,13 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 - **Langkah:**
   1. `POST /api/v1/auth/logout`: revoke refresh token, hapus cookie, simpan `auth:revoked:{jti}` di Redis dengan TTL sisa umur access token.
 - **Acceptance criteria:**
-  - [ ] Setelah logout, access token lama ditolak (401) oleh Gateway walau belum kedaluwarsa.
+  - [ ] Setelah logout, access token lama ditolak (401) oleh Gateway walau belum kedaluwarsa. (sisi Auth ✅: `jti` tersimpan di Redis dengan TTL sisa umur token, diuji dengan Redis sungguhan; penolakan oleh Gateway dibuktikan di NX-015 karena validasi JWT di Gateway baru dibuat di sana)
+- **Catatan implementasi:**
+  - `POST /api/v1/auth/logout` selalu 204 (juga tanpa token atau dengan token palsu): mencabut seluruh keluarga refresh token sesi itu (alasan `Logout`), memasukkan `jti` access token dari header `Authorization` ke blacklist, menghapus cookie, dan mencatat event `UserLoggedOut` di outbox untuk audit. Sesi lain user yang sama tidak terpengaruh.
+  - Access token dibaca dengan memverifikasi tanda tangan, issuer, dan audience memakai kunci Auth sendiri; token yang sudah kedaluwarsa tidak perlu masuk blacklist.
+  - Blacklist `ITokenRevocationStore` ada di `BuildingBlocks.Auth` agar dipakai Gateway dan service di NX-015. Key Redis `tnt:{tenantId}:auth:revoked:{jti}` (awalan tenant wajib menurut CONTEXT.md bagian 3 poin 8, berbeda dari contoh `auth:revoked:{jti}` di ARCHITECTURE.md G.1).
+  - Bila Redis mati, blacklist dianggap kosong (fail open) sesuai aturan "Redis hanya cache" (CONTEXT.md bagian 3 poin 7). Risikonya terbatas pada sisa umur access token (maksimal 15 menit); refresh token tetap dicabut di Oracle.
+  - `AddNexusCaching` kini memakai `NullCacheService` bila `ConnectionStrings:Redis` kosong, sehingga service tetap bisa dijalankan tanpa Redis.
 
 ---
 
@@ -89,6 +95,7 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
   1. Lengkapi `AddNexusJwtAuth()` di BuildingBlocks.Auth (ARCHITECTURE G.1): authority, audience, validasi lifetime, cek blacklist Redis.
   2. Pasang di Gateway (policy `default` untuk route non-auth) dan di setiap service (`[Authorize]` default via fallback policy).
   3. Implementasikan `ICurrentUser` dari klaim (`UserId`, `TenantId`).
+  5. Tolak token yang `jti`-nya ada di `ITokenRevocationStore` (NX-014), lalu buktikan dan centang acceptance criteria NX-014: setelah logout, access token lama ditolak 401 oleh Gateway.
   4. Pindahkan `app.UseNexusLogEnrichment()` di setiap `Program.cs` ke setelah `UseAuthentication()`/`UseAuthorization()` (sekarang berada sebelum autentikasi sehingga `TenantId`/`UserId` masih null), dan pastikan `ExceptionHandlingMiddleware` berada di dalam scope enrichment tersebut (temuan review NX-010).
 - **Acceptance criteria:**
   - [ ] Request tanpa token ke `/api/v1/projects` → 401 di Gateway.

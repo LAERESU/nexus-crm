@@ -58,3 +58,18 @@ public interface IUserDirectory
 {
     Task<IReadOnlyCollection<string>> GetRolesAsync(Credential credential, CancellationToken ct);
 }
+
+/// <summary>Identitas access token yang tanda tangan, issuer, dan audience-nya valid (masa berlaku tidak diperiksa).</summary>
+public sealed record AccessTokenInfo(long TenantId, string Jti, DateTimeOffset ExpiresAt);
+
+public interface IAccessTokenReader
+{
+    /// <summary>Null bila token tidak ada, rusak, atau tanda tangannya tidak valid.</summary>
+    Task<AccessTokenInfo?> ReadAsync(string? token);
+}
+
+/// <summary>Blacklist jti access token yang sudah di-logout.</summary>
+public interface IAccessTokenBlacklist
+{
+    Task RevokeAsync(AccessTokenInfo token, DateTimeOffset now, CancellationToken ct);
+}
