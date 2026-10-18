@@ -12,6 +12,8 @@ public interface ICredentialRepository
 
     Task AddAsync(Credential credential, CancellationToken ct);
 
+    Task<Credential?> FindByIdAsync(long tenantId, long id, CancellationToken ct);
+
     /// <summary>Memuat ulang nilai terbaru dari database setelah konflik konkurensi.</summary>
     Task ReloadAsync(Credential credential, CancellationToken ct);
 }
@@ -19,6 +21,15 @@ public interface ICredentialRepository
 public interface IRefreshTokenRepository
 {
     Task AddAsync(RefreshToken token, CancellationToken ct);
+
+    /// <summary>Mencari token berdasarkan hash di tenant tertentu, termasuk yang sudah dicabut (untuk deteksi reuse).</summary>
+    Task<RefreshToken?> FindByHashAsync(long tenantId, string tokenHash, CancellationToken ct);
+
+    /// <summary>
+    /// Mencabut semua token aktif dalam satu keluarga sesi dengan satu UPDATE atomik (ROW_VERSION ikut naik,
+    /// sehingga rotasi yang berjalan bersamaan gagal). Mengembalikan jumlah token yang dicabut.
+    /// </summary>
+    Task<int> RevokeFamilyAsync(long tenantId, Guid familyId, DateTimeOffset now, RefreshTokenRevocationReason reason, CancellationToken ct);
 }
 
 public interface ILoginAttemptRepository

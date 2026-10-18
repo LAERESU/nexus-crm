@@ -13,6 +13,9 @@ public sealed class CredentialRepository(AuthDbContext db) : ICredentialReposito
     public async Task AddAsync(Credential credential, CancellationToken ct) =>
         await db.Credentials.AddAsync(credential, ct);
 
+    public Task<Credential?> FindByIdAsync(long tenantId, long id, CancellationToken ct) =>
+        db.Credentials.FirstOrDefaultAsync(c => c.TenantId == tenantId && c.Id == id, ct);
+
     public Task ReloadAsync(Credential credential, CancellationToken ct) => db.Entry(credential).ReloadAsync(ct);
 }
 
@@ -20,6 +23,20 @@ public sealed class RefreshTokenRepository(AuthDbContext db) : IRefreshTokenRepo
 {
     public async Task AddAsync(RefreshToken token, CancellationToken ct) =>
         await db.RefreshTokens.AddAsync(token, ct);
+
+    public Task<RefreshToken?> FindByHashAsync(long tenantId, string tokenHash, CancellationToken ct) =>
+        db.RefreshTokens.FirstOrDefaultAsync(t => t.TenantId == tenantId && t.TokenHash == tokenHash, ct);
+
+    public Task<int> RevokeFamilyAsync(
+        long tenantId, Guid familyId, DateTimeOffset now, RefreshTokenRevocationReason reason, CancellationToken ct) =>
+        db.RefreshTokens
+            .Where(t => t.TenantId == tenantId && t.FamilyId == familyId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(set => set
+                .SetProperty(t => t.RevokedAt, now)
+                .SetProperty(t => t.RevokedReason, reason)
+                .SetProperty(t => t.UpdatedAt, now)
+                .SetProperty(t => t.UpdatedBy, AuthDbContext.SystemActor)
+                .SetProperty(t => t.RowVersion, t => t.RowVersion + 1), ct);
 }
 
 public sealed class LoginAttemptRepository(AuthDbContext db) : ILoginAttemptRepository
