@@ -136,7 +136,7 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 
 ---
 
-### NX-017 · Halaman login React + interceptor refresh
+### NX-017 · Halaman login React + interceptor refresh ✅
 - **Sprint:** 2 · **SP:** 5 · **Bergantung pada:** NX-004, NX-013
 - **Langkah:**
   1. `features/auth`: `LoginPage` (React Hook Form + Zod), `authStore` (Zustand, token di memori — ARCHITECTURE E.3).
@@ -144,9 +144,9 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
   3. Saat aplikasi dimuat, panggil `/auth/refresh` untuk memulihkan sesi.
   4. `RequireAuth` di router; tombol logout di header.
 - **Acceptance criteria:**
-  - [ ] Login berhasil membawa user ke Dashboard; refresh halaman tidak mengeluarkan user.
-  - [ ] Token tidak ada di `localStorage` maupun `sessionStorage`.
-  - [ ] Akses route terproteksi tanpa login diarahkan ke `/login`.
+  - [x] Login berhasil membawa user ke Dashboard; refresh halaman tidak mengeluarkan user. (tes `LoginFlow`: login → Dashboard; pemulihan sesi dari cookie saat dimuat)
+  - [x] Token tidak ada di `localStorage` maupun `sessionStorage`. (tes store dan alur login memeriksa kedua storage kosong)
+  - [x] Akses route terproteksi tanpa login diarahkan ke `/login`. (tes `LoginFlow`)
 - **Catatan implementasi:**
   - Access token hanya di memori (Zustand); info user (`sub`, `tid`, `roles`) dibaca dari payload JWT untuk tampilan saja. Status sesi `unknown` → `authenticated`/`anonymous`; `RequireAuth` menunggu pemulihan sesi sebelum memutuskan.
   - Interceptor axios: Bearer token + `X-Correlation-Id`; saat 401, **satu** refresh dipakai bersama semua request yang gagal bersamaan (single-flight), dan antar tab diserialkan dengan Web Locks (`navigator.locks`) karena rotasi NX-013 menolak refresh bersamaan; request diulang sekali. Request yang berangkat dengan token lama padahal token sudah diperbarui diulang dengan token terbaru tanpa refresh kedua. Endpoint auth menandai `skipAuthRefresh`.

@@ -14,7 +14,7 @@
 | Tanggal mulai sprint | — |
 | Tanggal selesai sprint | — |
 | Sprint goal | Menyiapkan repo, keputusan teknis awal, dan backlog siap dikerjakan |
-| Progres keseluruhan | 15 / 64 story selesai (23%) |
+| Progres keseluruhan | 16 / 64 story selesai (25%) |
 | Hambatan aktif | — |
 
 Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 🔍 Review · ✅ Done · 🟥 Blocked
@@ -74,7 +74,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | ID | Epic | Fase | Story | Selesai | Progres |
 | --- | --- | --- | --- | --- | --- |
 | E0 | Fondasi & DevOps | 1 | 10 | 9 | 90% |
-| E1 | Auth & Gateway | 1 | 7 | 6 | 86% |
+| E1 | Auth & Gateway | 1 | 7 | 7 | 100% |
 | E2 | User & RBAC | 2 | 7 | 0 | 0% |
 | E3 | Project Management | 2 | 7 | 0 | 0% |
 | E4 | Task Management | 2 | 9 | 0 | 0% |
@@ -82,7 +82,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | E6 | SOP Builder | 3 | 11 | 0 | 0% |
 | E7 | Notification | 3 | 4 | 0 | 0% |
 | E8 | Audit, Observability & Go-live | 4 | 6 | 0 | 0% |
-| | **Total** | | **64** | **15** | **23%** |
+| | **Total** | | **64** | **16** | **25%** |
 
 ## 5. Product Backlog
 
@@ -111,7 +111,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | NX-014 | Logout + blacklist `jti` di Redis | 3 | 2 | ✅ |
 | NX-015 | Validasi JWT di Gateway & setiap service (JWKS) | 3 | 2 | ✅ |
 | NX-016 | Rate limiting di Gateway (login, per-user, per-tenant) | 5 | 2 | ✅ |
-| NX-017 | Halaman login React + interceptor refresh token | 5 | 2 | 🔍 |
+| NX-017 | Halaman login React + interceptor refresh token | 5 | 2 | ✅ |
 
 ### E2 · User & RBAC
 
@@ -200,8 +200,8 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | Sprint | Fase | Sprint goal | Story | Status |
 | --- | --- | --- | --- | --- |
 | 0 | Persiapan | Repo awal, keputusan D1–D6, tim, backlog siap | NX-001 | 🟨 |
-| 1 | Fondasi | Template service, docker-compose, CI hijau | NX-002–007, NX-009 | ⬜ |
-| 2 | Fondasi | Login end-to-end via Gateway, deploy otomatis ke dev | NX-008, NX-010–017 | ⬜ |
+| 1 | Fondasi | Template service, docker-compose, CI hijau | NX-002–007, NX-009 | ✅ |
+| 2 | Fondasi | Login end-to-end via Gateway, deploy otomatis ke dev | NX-008, NX-010–017 | 🟨 |
 | 3 | Layanan inti | User & RBAC berjalan | NX-018–024 | ⬜ |
 | 4 | Layanan inti | Proyek & anggota berjalan | NX-025–031 | ⬜ |
 | 5 | Layanan inti | Tugas, kanban, dashboard dasar | NX-032–042 | ⬜ |
