@@ -115,15 +115,15 @@ Referensi utama: `ARCHITECTURE.md` A.5, B.1, G.1, G.4. Keputusan D2 (identity pr
 
 ---
 
-### NX-016 · Rate limiting di Gateway
+### NX-016 · Rate limiting di Gateway ✅
 - **Sprint:** 2 · **SP:** 5 · **Bergantung pada:** NX-011, NX-015
 - **Langkah:**
   1. Policy `login`, `per-user`, `per-tenant`, `upload` sesuai tabel ARCHITECTURE G.4.
   2. Gunakan penyimpanan Redis agar batas berlaku untuk semua replika Gateway.
   3. Response 429 menyertakan header `Retry-After`.
 - **Acceptance criteria:**
-  - [ ] Request ke-301 dalam satu menit oleh user yang sama → 429.
-  - [ ] Dua instance Gateway berbagi hitungan yang sama.
+  - [x] Request ke-301 dalam satu menit oleh user yang sama → 429. (tes dengan Redis sungguhan; sliding log eksak menjamin batas per 60 detik bergulir)
+  - [x] Dua instance Gateway berbagi hitungan yang sama. (tes dua `WebApplicationFactory` Gateway dengan satu Redis)
 - **Catatan implementasi:**
   - Desain di ADR-0008: limiter ditulis sendiri sebagai **satu skrip Lua atomik per request** (jam Redis `TIME`), bukan paket pihak ketiga `RedisRateLimiting`. Kuota hanya dipakai bila semua kebijakan lolos, sehingga user yang sudah ditolak tidak menguras kuota tenant.
   - Kebijakan: `login` (POST `/api/v1/auth/login`, dicocokkan per segmen sehingga `/login/` dan beda huruf tetap kena; kunci IP + email yang dibaca seperti Auth: tidak peka huruf besar-kecil, kunci terakhir menang; email di-hash), 5/15 menit fixed window; `per-user` `sub`, 300/menit **sliding log eksak**; `per-ip` untuk request anonim, 300/menit; `per-tenant` `tid`, 5.000/menit token bucket; `upload` untuk `multipart/form-data`, 20/menit fixed window. Batas bisa ditimpa lewat bagian konfigurasi `RateLimiting`.
