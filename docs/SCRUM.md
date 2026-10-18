@@ -109,7 +109,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | NX-012 | Login username/password → access token + refresh token | 8 | 2 | ✅ |
 | NX-013 | Refresh token dengan rotasi & deteksi reuse | 5 | 2 | ✅ |
 | NX-014 | Logout + blacklist `jti` di Redis | 3 | 2 | ✅ |
-| NX-015 | Validasi JWT di Gateway & setiap service (JWKS) | 3 | 2 | ⬜ |
+| NX-015 | Validasi JWT di Gateway & setiap service (JWKS) | 3 | 2 | 🔍 |
 | NX-016 | Rate limiting di Gateway (login, per-user, per-tenant) | 5 | 2 | ⬜ |
 | NX-017 | Halaman login React + interceptor refresh token | 5 | 2 | ⬜ |
 

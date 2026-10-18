@@ -62,7 +62,7 @@ public class GatewayRoutingTests(GatewayFixture fixture) : IClassFixture<Gateway
     [InlineData("/")]
     public async Task Route_tidak_terdaftar_mengembalikan_404_ProblemDetails(string path)
     {
-        var response = await fixture.CreateClient().GetAsync(path);
+        var response = await fixture.CreateClient(authenticated: false).GetAsync(path);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");

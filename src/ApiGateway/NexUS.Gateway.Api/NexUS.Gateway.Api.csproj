@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\BuildingBlocks\Observability\NexUS.BuildingBlocks.Observability.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\Auth\NexUS.BuildingBlocks.Auth.csproj" />
   </ItemGroup>
 
 </Project>

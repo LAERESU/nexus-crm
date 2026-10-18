@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -16,8 +17,8 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddNexusCaching(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<CacheOptions>(configuration.GetSection(CacheOptions.SectionName));
-        services.AddSingleton<IRedisConnection, RedisConnection>();
-        services.AddSingleton<ICacheService>(sp =>
+        services.TryAddSingleton<IRedisConnection, RedisConnection>();
+        services.TryAddSingleton<ICacheService>(sp =>
             sp.GetRequiredService<IRedisConnection>().Multiplexer is { } multiplexer
                 ? new RedisCacheService(multiplexer, sp.GetRequiredService<IOptions<CacheOptions>>(),
                     sp.GetRequiredService<ILogger<RedisCacheService>>())
