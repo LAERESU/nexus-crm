@@ -1,7 +1,7 @@
 # NexUS — Scrum & Pelacak Progres
 
 > File ini dipakai untuk melihat **sudah sampai mana pengembangan**. Langkah rinci setiap story ada di `docs/stories/`. Perbarui status story setiap hari, dan isi bagian Sprint Log di akhir setiap sprint.
-> Terakhir diperbarui: 2026-10-17
+> Terakhir diperbarui: 2026-11-07
 
 ---
 
@@ -9,13 +9,13 @@
 
 | Item | Nilai |
 | --- | --- |
-| Fase | 1 · Fondasi |
-| Sprint aktif | Sprint 0 (persiapan) |
-| Tanggal mulai sprint | — |
-| Tanggal selesai sprint | — |
-| Sprint goal | Menyiapkan repo, keputusan teknis awal, dan backlog siap dikerjakan |
+| Fase | 2 · Layanan inti |
+| Sprint aktif | Sprint 3 |
+| Tanggal mulai sprint | 2026-11-09 |
+| Tanggal selesai sprint | 2026-11-20 |
+| Sprint goal | User & RBAC berjalan: admin tenant bisa mengelola user, departemen, role, dan permission |
 | Progres keseluruhan | 16 / 64 story selesai (25%) |
-| Hambatan aktif | — |
+| Hambatan aktif | NX-008 ditunda: butuh cluster Kubernetes dan keputusan D3 |
 
 Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 🔍 Review · ✅ Done · 🟥 Blocked
 
@@ -97,7 +97,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | NX-005 | `docker-compose` lokal: Oracle Free, Redis, RabbitMQ, semua service | 5 | 1 | ✅ |
 | NX-006 | Pipeline CI: build, test, lint, scan untuk backend & frontend | 5 | 1 | ✅ |
 | NX-007 | Dockerfile multi-stage backend & frontend (non-root) | 3 | 1 | ✅ |
-| NX-008 | Helm chart generik + deploy otomatis ke Kubernetes dev | 8 | 2 | ⬜ |
+| NX-008 | Helm chart generik + deploy otomatis ke Kubernetes dev | 8 | ditunda | 🟥 |
 | NX-009 | Setup Flyway/Liquibase + user & schema Oracle per service | 5 | 1 | ✅ |
 | NX-010 | Logging terstruktur (Serilog) + correlation id + health check | 3 | 2 | ✅ |
 
@@ -199,10 +199,10 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 
 | Sprint | Fase | Sprint goal | Story | Status |
 | --- | --- | --- | --- | --- |
-| 0 | Persiapan | Repo awal, keputusan D1–D6, tim, backlog siap | NX-001 | 🟨 |
+| 0 | Persiapan | Repo awal, keputusan D1–D6, tim, backlog siap | NX-001 | ✅ |
 | 1 | Fondasi | Template service, docker-compose, CI hijau | NX-002–007, NX-009 | ✅ |
-| 2 | Fondasi | Login end-to-end via Gateway, deploy otomatis ke dev | NX-008, NX-010–017 | 🟨 |
-| 3 | Layanan inti | User & RBAC berjalan | NX-018–024 | ⬜ |
+| 2 | Fondasi | Login end-to-end via Gateway, deploy otomatis ke dev | NX-010–017 (NX-008 ditunda) | ✅ |
+| 3 | Layanan inti | User & RBAC berjalan | NX-018–024 | 🟨 |
 | 4 | Layanan inti | Proyek & anggota berjalan | NX-025–031 | ⬜ |
 | 5 | Layanan inti | Tugas, kanban, dashboard dasar | NX-032–042 | ⬜ |
 | 6 | SOP Builder | Editor SOP + notifikasi in-app | NX-044–048, NX-055–056 | ⬜ |
@@ -238,16 +238,48 @@ Salin template di bawah untuk setiap sprint yang selesai, terbaru di atas.
 **Retro — perbaiki (action item + PIC):** ...
 -->
 
-_Belum ada sprint yang selesai._
+### Sprint 2 — selesai 2026-10-18
+
+**Sprint goal:** Login end-to-end via Gateway, deploy otomatis ke dev
+**Tercapai?** Sebagian (login end-to-end tercapai; deploy ke Kubernetes ditunda)
+
+| Metrik | Nilai |
+| --- | --- |
+| SP direncanakan | 43 |
+| SP selesai | 35 |
+| Story selesai | 8 (NX-010–017) |
+| Story dibawa ke sprint berikutnya | 1 (NX-008, ditunda) |
+
+**Selesai:** NX-010, NX-011, NX-012, NX-013, NX-014, NX-015, NX-016, NX-017
+**Belum selesai (alasan):** NX-008 — belum ada cluster Kubernetes dev; menunggu keputusan D3 (lokasi deployment).
+**Hambatan:** —
+**Hasil review (catatan PO):** —
+**Retro — pertahankan:** —
+**Retro — perbaiki (action item + PIC):** isi tanggal mulai/selesai sprint dan Sprint Log di akhir setiap sprint.
+
+### Sprint 1 — selesai 2026-10-18
+
+**Sprint goal:** Template service, docker-compose, CI hijau
+**Tercapai?** Ya
+
+| Metrik | Nilai |
+| --- | --- |
+| SP direncanakan | 31 |
+| SP selesai | 31 |
+| Story selesai | 7 (NX-002–007, NX-009) |
+| Story dibawa ke sprint berikutnya | 0 |
+
+**Selesai:** NX-002, NX-003, NX-004, NX-005, NX-006, NX-007, NX-009
 
 ## 8. Hambatan & Isu
 
 | Tanggal | Isu | Dampak (story) | PIC | Status |
 | --- | --- | --- | --- | --- |
-| | | | | |
+| 2026-11-07 | Belum ada cluster Kubernetes dev; keputusan D3 (lokasi deployment) belum diambil | NX-008 | | Terbuka |
 
 ## 9. Riwayat Velocity
 
 | Sprint | SP direncanakan | SP selesai | Catatan |
 | --- | --- | --- | --- |
-| | | | |
+| 1 | 31 | 31 | Semua story selesai |
+| 2 | 43 | 35 | NX-008 ditunda (butuh cluster) |
