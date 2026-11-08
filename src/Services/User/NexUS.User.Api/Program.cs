@@ -1,5 +1,6 @@
 using NexUS.BuildingBlocks.Auth;
 using NexUS.BuildingBlocks.Observability;
+using NexUS.User.Api;
 using NexUS.User.Api.Middleware;
 using NexUS.User.Application;
 using NexUS.User.Infrastructure;
@@ -12,7 +13,7 @@ builder.Host.AddNexusSerilog();
 
 builder.Services
     .AddUserApplication()
-    .AddUserInfrastructure();
+    .AddUserInfrastructure(builder.Configuration);
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
@@ -20,6 +21,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddNexusHealthChecks(builder.Configuration);
 builder.Services.AddNexusJwtAuth(builder.Configuration);
+builder.Services.AddAuthorization(Policies.Register);
 
 var app = builder.Build();
 

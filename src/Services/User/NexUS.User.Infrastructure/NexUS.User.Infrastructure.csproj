@@ -6,10 +6,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Oracle.EntityFrameworkCore" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NexUS.User.Application\NexUS.User.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Messaging\NexUS.BuildingBlocks.Messaging.csproj" />
   </ItemGroup>
 
 </Project>
