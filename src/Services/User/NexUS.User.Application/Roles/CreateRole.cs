@@ -32,6 +32,8 @@ public sealed class CreateRoleCommandHandler(
     public async Task<RoleDto> Handle(CreateRoleCommand request, CancellationToken ct)
     {
         var code = Role.NormalizeCode(request.Code);
+        if (DefaultRoleCatalog.Roles.Any(r => r.Code == code))
+            throw new DomainException("Kode role dicadangkan untuk role bawaan sistem.");
         if (await roles.CodeExistsAsync(code, ct))
             throw new DomainException("Kode role sudah dipakai di tenant ini.");
 

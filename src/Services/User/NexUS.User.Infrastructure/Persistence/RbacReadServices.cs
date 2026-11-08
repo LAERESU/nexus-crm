@@ -65,7 +65,9 @@ public sealed class UserPermissionReadService(UserDbContext db) : IUserPermissio
                                  where ur.UserId == userId
                                  select new { RoleId = r.PublicId, r.Code, ur.ScopeType, ur.ScopeId }).ToListAsync(ct);
 
+        // Join ke ROLES juga di sini: role yang sudah dihapus tidak boleh lagi memberi permission.
         var granted = await (from ur in db.UserRoles.AsNoTracking()
+                             join r in db.Roles.AsNoTracking() on ur.RoleId equals r.Id
                              join rp in db.RolePermissions.AsNoTracking() on ur.RoleId equals rp.RoleId
                              join p in db.Permissions.AsNoTracking() on rp.PermissionId equals p.Id
                              where ur.UserId == userId

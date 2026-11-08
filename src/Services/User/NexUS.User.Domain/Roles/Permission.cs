@@ -25,4 +25,6 @@ public sealed class Permission : Entity
 
         return new Permission { Code = normalized, Module = normalized[..dot], Description = description };
     }
+
+    public void Describe(string? description) => Description = description;
 }

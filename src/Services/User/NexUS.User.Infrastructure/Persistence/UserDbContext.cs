@@ -163,8 +163,17 @@ public sealed class UserDbContext(DbContextOptions<UserDbContext> options, TimeP
         e.HasIndex(x => x.PublicId).IsUnique();
     }
 
-    public void ExpectRowVersion(object entity, long expectedRowVersion) =>
-        Entry(entity).Property(nameof(Entity.RowVersion)).OriginalValue = expectedRowVersion;
+    public void ExpectRowVersion(object entity, long expectedRowVersion)
+    {
+        var rowVersion = Entry(entity).Property(nameof(Entity.RowVersion));
+
+        // Dicek langsung, bukan hanya lewat klausa UPDATE: bila tidak ada perubahan (PUT yang sama) tidak ada UPDATE,
+        // tetapi klien dengan versi basi tetap berhak mendapat 409 (CONTEXT.md bagian 6).
+        if ((long)rowVersion.CurrentValue! != expectedRowVersion)
+            throw new ConcurrencyException("Data sudah diubah oleh proses lain; muat ulang lalu coba lagi.");
+
+        rowVersion.OriginalValue = expectedRowVersion;
+    }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -196,9 +205,14 @@ public sealed class UserDbContext(DbContextOptions<UserDbContext> options, TimeP
         {
             throw new ConcurrencyException($"Data diubah oleh proses lain: {ex.Entries.Count} entitas bentrok.");
         }
-        catch (DbUpdateException ex) when (ex.InnerException is OracleException { Number: OracleUniqueViolation })
+        catch (DbUpdateException ex) when (ex.InnerException is OracleException { Number: OracleUniqueViolation } oracle)
         {
             // Dua permintaan bersamaan lolos pemeriksaan di handler; index unik di database yang memutuskan.
+            // Bentrok pada baris penghubung berarti ada penulis lain yang menambah baris yang sama (aman diulang).
+            if (oracle.Message.Contains("UX_USER_ROLES_ASSIGNMENT", StringComparison.OrdinalIgnoreCase)
+                || oracle.Message.Contains("UX_ROLE_PERMISSIONS_ROLE_PERM", StringComparison.OrdinalIgnoreCase))
+                throw new ConcurrencyException("Penugasan diubah oleh proses lain; muat ulang lalu coba lagi.");
+
             throw new DomainException("Data dengan email atau kode yang sama sudah ada di tenant ini.");
         }
     }

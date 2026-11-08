@@ -308,4 +308,83 @@ public class RbacEndpointTests(OracleUserFixture fixture)
         var found = await client.GetFromJsonAsync<RolePage>("/api/v1/roles?search=auditor");
         found!.Items.Should().ContainSingle(r => r.Code == "AUDITOR");
     }
+
+    [Fact]
+    public async Task Kode_role_bawaan_dicadangkan_dan_tidak_bisa_dipakai_role_kustom()
+    {
+        var response = await Admin().PostAsJsonAsync("/api/v1/roles", new { code = "auditor", name = "Palsu" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task Put_permission_yang_sama_dengan_versi_basi_tetap_409()
+    {
+        var client = Admin();
+        var role = await CreateRoleAsync(client, ["task.read"]);
+        (await client.SendAsync(WithVersion(HttpMethod.Put, $"/api/v1/roles/{role.Id}/permissions", role.RowVersion, new { permissions = new[] { "task.create" } })))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Isinya sama dengan yang tersimpan sekarang (tidak ada perubahan), tetapi versi klien sudah basi.
+        var stale = await client.SendAsync(WithVersion(HttpMethod.Put, $"/api/v1/roles/{role.Id}/permissions", role.RowVersion, new { permissions = new[] { "task.create" } }));
+
+        stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Role_yang_sudah_dihapus_tidak_lagi_memberi_permission()
+    {
+        var client = Admin();
+        var user = await CreateUserAsync(client);
+        var code = NewCode();
+        var role = await CreateRoleAsync(client, ["task.read"], code);
+        await AssignAsync(client, user.Id, new { roleId = role.Id, scopeType = "global" });
+
+        // Simulasi hapus yang berlomba dengan penugasan: baris USER_ROLES tertinggal menunjuk role yang dihapus.
+        await fixture.ScalarAsync($"UPDATE ROLES SET IS_DELETED = 1 WHERE TENANT_ID = {OracleUserFixture.TenantA} AND CODE = '{code}'");
+
+        var body = await client.GetFromJsonAsync<UserPermissionsBody>($"/api/v1/users/{user.Id}/permissions");
+        body!.Roles.Should().BeEmpty();
+        body.Permissions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Seeder_menonaktifkan_permission_yang_hilang_dari_katalog_dan_memulihkan_deskripsi()
+    {
+        await fixture.ScalarAsync("INSERT INTO PERMISSIONS (CODE, MODULE, DESCRIPTION, CREATED_AT, CREATED_BY) VALUES ('usang.hapus', 'usang', 'dihapus dari katalog', SYSTIMESTAMP, 0)");
+        await fixture.ScalarAsync("UPDATE PERMISSIONS SET DESCRIPTION = 'diubah manual' WHERE CODE = 'task.read'");
+        var client = Admin();
+        (await client.GetFromJsonAsync<List<PermissionBody>>("/api/v1/permissions"))!.Should().Contain(p => p.Code == "usang.hapus");
+
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<DefaultRoleProvisioner>().ProvisionAllAsync(default);
+
+        var catalog = await client.GetFromJsonAsync<List<PermissionBody>>("/api/v1/permissions");
+        catalog!.Should().NotContain(p => p.Code == "usang.hapus");
+        catalog.Single(p => p.Code == "task.read").Description.Should().Be(DefaultRoleCatalog.Permissions.Single(p => p.Code == "task.read").Description);
+        (await client.PostAsJsonAsync("/api/v1/roles", new { code = NewCode(), name = "X", permissions = new[] { "usang.hapus" } }))
+            .StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task Role_kustom_lama_berkode_bawaan_tidak_menggagalkan_seed_tenant_lain()
+    {
+        const long conflictTenant = 3;
+        await fixture.ScalarAsync($"INSERT INTO TENANTS (ID, CODE, NAME, CREATED_AT, CREATED_BY) VALUES ({conflictTenant}, 'tenant-c', 'Tenant C', SYSTIMESTAMP, 0)");
+        await fixture.ScalarAsync(
+            $"INSERT INTO ROLES (TENANT_ID, CODE, NAME, IS_SYSTEM, CREATED_AT, CREATED_BY) VALUES ({conflictTenant}, 'AUDITOR', 'Kustom Lama', 0, SYSTIMESTAMP, 0)");
+
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var provisioner = scope.ServiceProvider.GetRequiredService<DefaultRoleProvisioner>();
+            await FluentActions.Awaiting(() => provisioner.ProvisionAllAsync(default)).Should().NotThrowAsync();
+        }
+
+        // Role kustom tidak ditimpa; role bawaan lain tetap dibuat; tenant lain tidak terpengaruh.
+        Convert.ToInt32(await fixture.ScalarAsync($"SELECT COUNT(*) FROM ROLES WHERE TENANT_ID = {conflictTenant} AND IS_SYSTEM = 1"))
+            .Should().Be(DefaultRoleCatalog.Roles.Count - 1);
+        Convert.ToInt32(await fixture.ScalarAsync($"SELECT IS_SYSTEM FROM ROLES WHERE TENANT_ID = {conflictTenant} AND CODE = 'AUDITOR'")).Should().Be(0);
+        Convert.ToInt32(await fixture.ScalarAsync($"SELECT COUNT(*) FROM ROLES WHERE TENANT_ID = {OracleUserFixture.TenantA} AND IS_SYSTEM = 1"))
+            .Should().Be(DefaultRoleCatalog.Roles.Count);
+    }
 }
