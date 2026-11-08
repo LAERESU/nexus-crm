@@ -13,10 +13,10 @@ Referensi utama: `ARCHITECTURE.md` B.2, C.2 (USR_SCHEMA), G.2.
   3. Endpoint sesuai ARCHITECTURE B.2: list (paging, search, filter departemen), detail, `me`, create, update, `PATCH status`.
   4. Event `UserCreated`, `UserUpdated`, `UserDeactivated` via outbox (pakai implementasi NX-028 bila sudah ada; jika belum, simpan ke outbox dan kirim nanti).
 - **Acceptance criteria:**
-  - [ ] Email unik per tenant (case-insensitive).
-  - [ ] User tenant A tidak bisa melihat user tenant B.
-  - [ ] Paging maksimum 100 per halaman.
-  - [ ] Integration test dengan Oracle Testcontainers lulus.
+  - [x] Email unik per tenant (case-insensitive).
+  - [x] User tenant A tidak bisa melihat user tenant B.
+  - [x] Paging maksimum 100 per halaman.
+  - [x] Integration test dengan Oracle Testcontainers lulus.
 
 ---
 
