@@ -22,6 +22,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddNexusHealthChecks(builder.Configuration);
 builder.Services.AddNexusJwtAuth(builder.Configuration);
 builder.Services.AddAuthorization(Policies.Register);
+builder.Services.AddNexusPermissionAuthorization(builder.Configuration);
 
 var app = builder.Build();
 

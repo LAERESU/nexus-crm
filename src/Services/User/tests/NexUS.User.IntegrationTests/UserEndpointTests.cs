@@ -162,20 +162,19 @@ public class UserEndpointTests(OracleUserFixture fixture)
     [Fact]
     public async Task Admin_tidak_dapat_menonaktifkan_akun_sendiri()
     {
-        var admin = fixture.ClientAs(OracleUserFixture.TenantA);
-        var created = await (await CreateAsync(admin, NewEmail())).Content.ReadFromJsonAsync<UserBody>();
-        var self = fixture.ClientAs(OracleUserFixture.TenantA, userId: created!.Id);
+        var self = fixture.ClientAs(OracleUserFixture.TenantA); // admin tenant itu sendiri
+        var created = await self.GetFromJsonAsync<UserBody>($"/api/v1/users/{OracleUserFixture.AdminId(OracleUserFixture.TenantA)}");
 
-        var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/users/{created.Id}/status") { Content = JsonContent.Create(new { status = "inactive" }) };
+        var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/users/{created!.Id}/status") { Content = JsonContent.Create(new { status = "inactive" }) };
         request.Headers.TryAddWithoutValidation("If-Match", $"\"{created.RowVersion}\"");
 
         (await self.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     [Fact]
-    public async Task Tanpa_role_admin_endpoint_kelola_mengembalikan_403_tetapi_baca_boleh()
+    public async Task Tanpa_permission_user_manage_endpoint_kelola_mengembalikan_403_tetapi_baca_boleh()
     {
-        var member = fixture.ClientAs(OracleUserFixture.TenantA, roles: "member");
+        var member = fixture.MemberClient(OracleUserFixture.TenantA);
 
         (await CreateAsync(member, NewEmail())).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await member.GetAsync("/api/v1/users")).StatusCode.Should().Be(HttpStatusCode.OK);
@@ -194,7 +193,7 @@ public class UserEndpointTests(OracleUserFixture fixture)
     {
         var admin = fixture.ClientAs(OracleUserFixture.TenantA);
         var created = await (await CreateAsync(admin, NewEmail("saya"))).Content.ReadFromJsonAsync<UserBody>();
-        var me = fixture.ClientAs(OracleUserFixture.TenantA, userId: created!.Id, roles: "member");
+        var me = fixture.ClientAs(OracleUserFixture.TenantA, userId: created!.Id);
 
         var profile = await me.GetFromJsonAsync<UserBody>("/api/v1/users/me");
 

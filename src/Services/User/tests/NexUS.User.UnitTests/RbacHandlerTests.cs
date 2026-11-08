@@ -21,6 +21,7 @@ public class RbacHandlerTests
     private readonly IUserPermissionReadService _permissionService = Substitute.For<IUserPermissionReadService>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
+    private readonly ICurrentUserPermissions _currentPermissions = Substitute.For<ICurrentUserPermissions>();
 
     private SetUserRolesCommandHandler SetRolesHandler() => new(_users, _roles, _departments, _permissionService, _unitOfWork);
 
@@ -28,8 +29,8 @@ public class RbacHandlerTests
     public async Task GetPermissions_user_biasa_tidak_boleh_membaca_milik_orang_lain()
     {
         _currentUser.UserId.Returns(Guid.NewGuid());
-        _currentUser.Roles.Returns(["member"]);
-        var handler = new GetUserPermissionsQueryHandler(_permissionService, _currentUser);
+        _currentPermissions.HasAsync("user.manage", Arg.Any<CancellationToken>()).Returns(false);
+        var handler = new GetUserPermissionsQueryHandler(_permissionService, _currentUser, _currentPermissions);
 
         await FluentActions.Awaiting(() => handler.Handle(new GetUserPermissionsQuery(Guid.NewGuid()), default))
             .Should().ThrowAsync<ForbiddenException>();
@@ -38,18 +39,18 @@ public class RbacHandlerTests
     }
 
     [Fact]
-    public async Task GetPermissions_user_boleh_membaca_miliknya_sendiri_dan_admin_boleh_semua()
+    public async Task GetPermissions_user_boleh_membaca_miliknya_sendiri_dan_pemegang_user_manage_boleh_semua()
     {
         var self = Guid.NewGuid();
         _permissionService.GetAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(ci => new UserPermissionsDto(ci.Arg<Guid>(), [], []));
 
         _currentUser.UserId.Returns(self);
-        _currentUser.Roles.Returns(["member"]);
-        var asSelf = new GetUserPermissionsQueryHandler(_permissionService, _currentUser);
+        _currentPermissions.HasAsync("user.manage", Arg.Any<CancellationToken>()).Returns(false);
+        var asSelf = new GetUserPermissionsQueryHandler(_permissionService, _currentUser, _currentPermissions);
         (await asSelf.Handle(new GetUserPermissionsQuery(self), default)).UserId.Should().Be(self);
 
-        _currentUser.Roles.Returns(["admin"]);
+        _currentPermissions.HasAsync("user.manage", Arg.Any<CancellationToken>()).Returns(true);
         var other = Guid.NewGuid();
         (await asSelf.Handle(new GetUserPermissionsQuery(other), default)).UserId.Should().Be(other);
     }

@@ -4,15 +4,22 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using NexUS.User.Domain.Users;
+using NexUS.User.Infrastructure.Persistence;
 using NexUS.User.Infrastructure.Seeding;
+using StackExchange.Redis;
+using UserEntity = NexUS.User.Domain.Users.User;
 using Oracle.ManagedDataAccess.Client;
 
 namespace NexUS.User.IntegrationTests;
 
 /// <summary>
 /// Oracle Free sungguhan (Testcontainers) dengan migrasi <c>db/usr</c> yang sama seperti Flyway, lalu User Service
-/// berjalan di atasnya dengan dua tenant. Autentikasi memakai <see cref="TestAuthHandler"/>.
+/// berjalan di atasnya dengan dua tenant, masing-masing punya user admin (TENANT_ADMIN) dan anggota (MEMBER) sungguhan,
+/// plus Redis sungguhan untuk cache permission. Autentikasi memakai <see cref="TestAuthHandler"/>; hak akses tetap
+/// ditentukan permission di database, bukan header.
 /// </summary>
 public sealed class OracleUserFixture : IAsyncLifetime
 {
@@ -28,12 +35,21 @@ public sealed class OracleUserFixture : IAsyncLifetime
         .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("DATABASE IS READY TO USE!"))
         .Build();
 
+    private readonly IContainer _redis = new ContainerBuilder("redis:7-alpine")
+        .WithPortBinding(6379, assignRandomHostPort: true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Ready to accept connections"))
+        .Build();
+
     public WebApplicationFactory<Program> Factory { get; private set; } = default!;
+    public string RedisConnectionString { get; private set; } = default!;
+    public IConnectionMultiplexer Redis { get; private set; } = default!;
     public string ConnectionString { get; private set; } = default!;
 
     public async Task InitializeAsync()
     {
-        await _oracle.StartAsync();
+        await Task.WhenAll(_oracle.StartAsync(), _redis.StartAsync());
+        RedisConnectionString = $"{_redis.Hostname}:{_redis.GetMappedPublicPort(6379)},abortConnect=false";
+        Redis = await ConnectionMultiplexer.ConnectAsync(RedisConnectionString);
         ConnectionString =
             $"User Id=USR_SCHEMA;Password={SchemaPassword};Data Source={_oracle.Hostname}:{_oracle.GetMappedPublicPort(1521)}/FREEPDB1";
 
@@ -47,7 +63,7 @@ public sealed class OracleUserFixture : IAsyncLifetime
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Oracle"] = ConnectionString,
-                ["ConnectionStrings:Redis"] = "localhost:6379,abortConnect=false,connectTimeout=100", // tidak dipakai endpoint User
+                ["ConnectionStrings:Redis"] = RedisConnectionString,
             }))
             .ConfigureServices(services =>
             {
@@ -60,23 +76,55 @@ public sealed class OracleUserFixture : IAsyncLifetime
             }));
         _ = Factory.Server; // memicu start host (dan seeder role bawaan) sekarang
         await Factory.Services.GetRequiredService<DefaultRoleSeeder>().Completion.WaitAsync(TimeSpan.FromMinutes(2));
+        await Factory.Services.GetRequiredService<DevSeeder>().Completion.WaitAsync(TimeSpan.FromMinutes(2));
+
+        foreach (var tenant in new[] { TenantA, TenantB })
+        {
+            await SeedUserAsync(tenant, AdminId(tenant), "TENANT_ADMIN");
+            await SeedUserAsync(tenant, MemberId(tenant), "MEMBER");
+        }
+    }
+
+    /// <summary>User admin tetap per tenant; memegang role TENANT_ADMIN secara global.</summary>
+    public static Guid AdminId(long tenantId) => Guid.Parse($"a0000000-0000-0000-0000-{tenantId:D12}");
+
+    /// <summary>User anggota tetap per tenant; hanya memegang role MEMBER secara global.</summary>
+    public static Guid MemberId(long tenantId) => Guid.Parse($"b0000000-0000-0000-0000-{tenantId:D12}");
+
+    private async Task SeedUserAsync(long tenantId, Guid publicId, string roleCode)
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<UserDbContext>();
+        var roleId = await db.Roles.IgnoreQueryFilters().Where(r => r.TenantId == tenantId && r.Code == roleCode).Select(r => r.Id).SingleAsync();
+
+        var user = UserEntity.Create(tenantId, $"{roleCode.ToLowerInvariant()}-{tenantId}@uji.local", $"{roleCode} {tenantId}", null, null, publicId);
+        user.SetRoles([new RoleAssignment(roleId, RoleScopeType.Global, null)]);
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
     }
 
     public async Task DisposeAsync()
     {
         if (Factory is not null) await Factory.DisposeAsync();
+        Redis?.Dispose();
         await _oracle.DisposeAsync();
+        await _redis.DisposeAsync();
     }
 
-    /// <summary>Klien yang berperan sebagai user tertentu; role <c>admin</c> diperlukan untuk endpoint kelola.</summary>
-    public HttpClient ClientAs(long tenantId, Guid? userId = null, string roles = "admin")
+    /// <summary>
+    /// Klien yang berperan sebagai user tertentu. Tanpa <paramref name="userId"/> berarti admin tenant itu
+    /// (<see cref="AdminId"/>); user lain hanya punya akses sebanyak role yang ditugaskan kepadanya.
+    /// </summary>
+    public HttpClient ClientAs(long tenantId, Guid? userId = null)
     {
         var client = Factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, tenantId.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, (userId ?? Guid.NewGuid()).ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.RolesHeader, roles);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, (userId ?? AdminId(tenantId)).ToString());
         return client;
     }
+
+    /// <summary>Klien sebagai anggota biasa (role MEMBER) di tenant itu.</summary>
+    public HttpClient MemberClient(long tenantId) => ClientAs(tenantId, MemberId(tenantId));
 
     public async Task<object?> ScalarAsync(string sql)
     {
