@@ -1,5 +1,6 @@
 using NexUS.BuildingBlocks.Common.Domain;
 using NexUS.BuildingBlocks.Common.Exceptions;
+using NexUS.User.Domain.Roles;
 
 namespace NexUS.User.Domain.Users;
 
@@ -15,6 +16,9 @@ public sealed class User : AggregateRoot
     public const int EmailMaxLength = 320;
     public const int FullNameMaxLength = 200;
     public const int JobTitleMaxLength = 200;
+    public const int MaxRoleAssignments = 100;
+
+    private readonly List<UserRole> _roles = [];
 
     public string Email { get; private set; } = default!;
     public string FullName { get; private set; } = default!;
@@ -23,6 +27,8 @@ public sealed class User : AggregateRoot
 
     /// <summary>ID internal departemen; null bila belum ditempatkan.</summary>
     public long? DepartmentId { get; private set; }
+
+    public IReadOnlyCollection<UserRole> Roles => _roles;
 
     private User() { } // untuk EF Core
 
@@ -61,6 +67,26 @@ public sealed class User : AggregateRoot
         if (Status == UserStatus.Inactive) return;
         Status = UserStatus.Inactive;
         AddDomainEvent(new UserDeactivatedDomainEvent(PublicId, TenantId));
+    }
+
+    /// <summary>
+    /// Mengganti seluruh penugasan role user. Penugasan ganda diabaikan; event <see cref="RoleChangedDomainEvent"/>
+    /// hanya bila himpunan penugasan benar-benar berubah. Keberadaan role dan scope diperiksa di Application layer.
+    /// </summary>
+    public void SetRoles(IReadOnlyCollection<RoleAssignment> desired)
+    {
+        var assignments = desired.Select(a => a.Validated()).Distinct().ToList();
+        if (assignments.Count > MaxRoleAssignments)
+            throw new DomainException($"Satu user maksimal memiliki {MaxRoleAssignments} penugasan role.");
+
+        var removed = _roles.Where(existing => !assignments.Any(existing.Matches)).ToList();
+        var added = assignments.Where(a => !_roles.Any(existing => existing.Matches(a))).ToList();
+        if (removed.Count == 0 && added.Count == 0) return;
+
+        foreach (var role in removed) _roles.Remove(role);
+        foreach (var assignment in added) _roles.Add(UserRole.Create(TenantId, assignment));
+
+        AddDomainEvent(new RoleChangedDomainEvent(TenantId, RoleId: null, PublicId, RoleChangeReason.UserRolesChanged));
     }
 
     public static string NormalizeEmail(string email)

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NexUS.User.Application.Abstractions;
 using NexUS.User.Application.Common;
 using NexUS.User.Infrastructure.Persistence;
+using NexUS.User.Infrastructure.Seeding;
 using Oracle.EntityFrameworkCore.Infrastructure;
 
 namespace NexUS.User.Infrastructure;
@@ -24,6 +25,14 @@ public static class DependencyInjection
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<IDepartmentReadService, DepartmentReadService>();
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<IPermissionRepository, PermissionRepository>();
+        services.AddScoped<IRoleReadService, RoleReadService>();
+        services.AddScoped<IUserPermissionReadService, UserPermissionReadService>();
+
+        services.AddScoped<DefaultRoleProvisioner>();
+        services.AddSingleton<DefaultRoleSeeder>();
+        services.AddHostedService(sp => sp.GetRequiredService<DefaultRoleSeeder>());
 
         return services;
     }

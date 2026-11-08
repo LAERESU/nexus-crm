@@ -5,6 +5,7 @@ using NexUS.BuildingBlocks.Common.Exceptions;
 using NexUS.BuildingBlocks.Messaging;
 using NexUS.User.Application.Common;
 using NexUS.User.Domain.Departments;
+using NexUS.User.Domain.Roles;
 using NexUS.User.Domain.Tenants;
 using NexUS.User.Domain.Users;
 using Oracle.ManagedDataAccess.Client;
@@ -26,6 +27,10 @@ public sealed class UserDbContext(DbContextOptions<UserDbContext> options, TimeP
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<UserEntity> Users => Set<UserEntity>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder model)
@@ -72,6 +77,58 @@ public sealed class UserDbContext(DbContextOptions<UserDbContext> options, TimeP
             e.Property(x => x.DepartmentId).HasColumnName("DEPARTMENT_ID");
             e.HasOne<Department>().WithMany().HasForeignKey(x => x.DepartmentId);
             e.HasIndex(x => new { x.TenantId, x.Email }).IsUnique();
+            e.HasMany(x => x.Roles).WithOne().HasForeignKey(r => r.UserId);
+            e.Navigation(x => x.Roles).UsePropertyAccessMode(PropertyAccessMode.Field);
+            e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
+        });
+
+        // Katalog permission bersifat global: tanpa filter tenant.
+        model.Entity<Permission>(e =>
+        {
+            e.ToTable("PERMISSIONS");
+            MapEntity(e);
+            e.Property(x => x.Code).HasColumnName("CODE").HasMaxLength(Permission.CodeMaxLength);
+            e.Property(x => x.Module).HasColumnName("MODULE").HasMaxLength(50);
+            e.Property(x => x.Description).HasColumnName("DESCRIPTION").HasMaxLength(Permission.DescriptionMaxLength);
+            e.HasQueryFilter(x => !x.IsDeleted);
+        });
+
+        model.Entity<Role>(e =>
+        {
+            e.ToTable("ROLES");
+            MapEntity(e);
+            e.Ignore(x => x.DomainEvents);
+            e.Property(x => x.Code).HasColumnName("CODE").HasMaxLength(Role.CodeMaxLength);
+            e.Property(x => x.Name).HasColumnName("NAME").HasMaxLength(Role.NameMaxLength);
+            e.Property(x => x.Description).HasColumnName("DESCRIPTION").HasMaxLength(Role.DescriptionMaxLength);
+            e.Property(x => x.IsSystem).HasColumnName("IS_SYSTEM").HasColumnType("NUMBER(1)");
+            e.HasMany(x => x.Permissions).WithOne().HasForeignKey(p => p.RoleId);
+            e.Navigation(x => x.Permissions).UsePropertyAccessMode(PropertyAccessMode.Field);
+            e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
+        });
+
+        model.Entity<RolePermission>(e =>
+        {
+            e.ToTable("ROLE_PERMISSIONS");
+            MapEntity(e);
+            e.Property(x => x.RoleId).HasColumnName("ROLE_ID");
+            e.Property(x => x.PermissionId).HasColumnName("PERMISSION_ID");
+            e.HasOne<Permission>().WithMany().HasForeignKey(x => x.PermissionId);
+            e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
+        });
+
+        model.Entity<UserRole>(e =>
+        {
+            e.ToTable("USER_ROLES");
+            MapEntity(e);
+            e.Property(x => x.UserId).HasColumnName("USER_ID");
+            e.Property(x => x.RoleId).HasColumnName("ROLE_ID");
+            // Nilai kolom huruf besar (GLOBAL/DEPARTMENT/PROJECT) sesuai CHECK constraint di V3.
+            e.Property(x => x.ScopeType).HasColumnName("SCOPE_TYPE").HasMaxLength(20).HasConversion(
+                scope => scope.ToString().ToUpperInvariant(),
+                value => Enum.Parse<RoleScopeType>(value, true));
+            e.Property(x => x.ScopeId).HasColumnName("SCOPE_ID");
+            e.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId);
             e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
         });
 
@@ -106,8 +163,17 @@ public sealed class UserDbContext(DbContextOptions<UserDbContext> options, TimeP
         e.HasIndex(x => x.PublicId).IsUnique();
     }
 
-    public void ExpectRowVersion(object entity, long expectedRowVersion) =>
-        Entry(entity).Property(nameof(Entity.RowVersion)).OriginalValue = expectedRowVersion;
+    public void ExpectRowVersion(object entity, long expectedRowVersion)
+    {
+        var rowVersion = Entry(entity).Property(nameof(Entity.RowVersion));
+
+        // Dicek langsung, bukan hanya lewat klausa UPDATE: bila tidak ada perubahan (PUT yang sama) tidak ada UPDATE,
+        // tetapi klien dengan versi basi tetap berhak mendapat 409 (CONTEXT.md bagian 6).
+        if ((long)rowVersion.CurrentValue! != expectedRowVersion)
+            throw new ConcurrencyException("Data sudah diubah oleh proses lain; muat ulang lalu coba lagi.");
+
+        rowVersion.OriginalValue = expectedRowVersion;
+    }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -139,9 +205,14 @@ public sealed class UserDbContext(DbContextOptions<UserDbContext> options, TimeP
         {
             throw new ConcurrencyException($"Data diubah oleh proses lain: {ex.Entries.Count} entitas bentrok.");
         }
-        catch (DbUpdateException ex) when (ex.InnerException is OracleException { Number: OracleUniqueViolation })
+        catch (DbUpdateException ex) when (ex.InnerException is OracleException { Number: OracleUniqueViolation } oracle)
         {
             // Dua permintaan bersamaan lolos pemeriksaan di handler; index unik di database yang memutuskan.
+            // Bentrok pada baris penghubung berarti ada penulis lain yang menambah baris yang sama (aman diulang).
+            if (oracle.Message.Contains("UX_USER_ROLES_ASSIGNMENT", StringComparison.OrdinalIgnoreCase)
+                || oracle.Message.Contains("UX_ROLE_PERMISSIONS_ROLE_PERM", StringComparison.OrdinalIgnoreCase))
+                throw new ConcurrencyException("Penugasan diubah oleh proses lain; muat ulang lalu coba lagi.");
+
             throw new DomainException("Data dengan email atau kode yang sama sudah ada di tenant ini.");
         }
     }

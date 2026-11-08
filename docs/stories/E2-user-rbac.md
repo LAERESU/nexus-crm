@@ -28,8 +28,8 @@ Referensi utama: `ARCHITECTURE.md` B.2, C.2 (USR_SCHEMA), G.2.
   3. Endpoint: CRUD role, atur permission role, `PUT /users/{id}/roles`, `GET /users/{id}/permissions` (internal).
   4. Event `RoleChanged`.
 - **Acceptance criteria:**
-  - [ ] Role sistem (`IS_SYSTEM=1`) tidak bisa dihapus.
-  - [ ] Perubahan role langsung tercermin pada endpoint permissions.
+  - [x] Role sistem (`IS_SYSTEM=1`) tidak bisa dihapus.
+  - [x] Perubahan role langsung tercermin pada endpoint permissions.
 
 ---
 
