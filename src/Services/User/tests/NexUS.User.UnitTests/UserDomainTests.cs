@@ -80,4 +80,15 @@ public class UserDomainTests
         user.DepartmentId.Should().Be(7);
         user.PopDomainEvents().Should().ContainSingle().Which.Should().BeOfType<UserUpdatedDomainEvent>();
     }
+
+    [Fact]
+    public void UpdateProfile_tanpa_perubahan_tidak_mencatat_event()
+    {
+        var user = NewUser();
+        user.PopDomainEvents();
+
+        user.UpdateProfile("Budi Santoso", "Staf", departmentId: null);
+
+        user.PopDomainEvents().Should().BeEmpty();
+    }
 }

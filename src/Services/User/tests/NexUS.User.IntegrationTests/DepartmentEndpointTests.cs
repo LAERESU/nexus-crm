@@ -96,4 +96,27 @@ public class DepartmentEndpointTests(OracleUserFixture fixture)
         var flag = await fixture.ScalarAsync($"SELECT IS_DELETED FROM DEPARTMENTS WHERE CODE = '{department.Code}' AND TENANT_ID = {OracleUserFixture.TenantA}");
         Convert.ToInt32(flag).Should().Be(1);
     }
+
+    [Fact]
+    public async Task Kode_departemen_yang_dihapus_dapat_dipakai_lagi()
+    {
+        var client = fixture.ClientAs(OracleUserFixture.TenantA);
+        var code = NewCode();
+        var first = await CreateAsync(client, code);
+        (await client.SendAsync(WithVersion(HttpMethod.Delete, $"/api/v1/departments/{first.Id}", first.RowVersion)))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var again = await client.PostAsJsonAsync("/api/v1/departments", new { code, name = "Baru" });
+
+        again.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task List_menolak_page_yang_membuat_offset_overflow()
+    {
+        var client = fixture.ClientAs(OracleUserFixture.TenantA);
+
+        (await client.GetAsync($"/api/v1/departments?page={int.MaxValue}&size=100")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await client.GetAsync($"/api/v1/users?page={int.MaxValue}&size=100")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
 }

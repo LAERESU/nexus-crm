@@ -94,6 +94,7 @@ public class UserHandlerTests
 
         (await validator.ValidateAsync(new ListUsersQuery(null, null, null, 1, 101))).IsValid.Should().BeFalse();
         (await validator.ValidateAsync(new ListUsersQuery(null, null, "banned", 1, 20))).IsValid.Should().BeFalse();
+        (await validator.ValidateAsync(new ListUsersQuery(null, null, null, int.MaxValue, 100))).IsValid.Should().BeFalse(); // overflow offset
         (await validator.ValidateAsync(new ListUsersQuery("budi", null, "Active", 1, PagedResult<UserDto>.MaxSize))).IsValid.Should().BeTrue();
     }
 }

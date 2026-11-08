@@ -14,7 +14,7 @@ public sealed class ListDepartmentsQueryValidator : AbstractValidator<ListDepart
     public ListDepartmentsQueryValidator()
     {
         RuleFor(x => x.Search).MaximumLength(200);
-        RuleFor(x => x.Page).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.Page).InclusiveBetween(1, 100_000); // batas atas mencegah overflow offset
         RuleFor(x => x.Size).InclusiveBetween(1, PagedResult<DepartmentDto>.MaxSize);
     }
 }

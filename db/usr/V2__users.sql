@@ -40,8 +40,11 @@ CREATE TABLE DEPARTMENTS (
     CONSTRAINT CK_DEPARTMENTS_IS_DELETED CHECK (IS_DELETED IN (0, 1))
 );
 
--- Kode departemen unik per tenant; index FK diawali kolom FK agar tidak terjadi lock tabel anak.
-CREATE UNIQUE INDEX UX_DEPARTMENTS_TNT_CODE ON DEPARTMENTS (TENANT_ID, CODE);
+-- Kode departemen unik per tenant, hanya untuk baris yang belum dihapus: baris soft delete bernilai NULL di kedua
+-- kolom sehingga tidak masuk index dan kodenya bisa dipakai lagi. Index FK diawali kolom FK agar tidak lock tabel anak.
+CREATE UNIQUE INDEX UX_DEPARTMENTS_TNT_CODE ON DEPARTMENTS (
+    CASE WHEN IS_DELETED = 0 THEN TENANT_ID END,
+    CASE WHEN IS_DELETED = 0 THEN CODE END);
 CREATE INDEX IX_DEPARTMENTS_PARENT_ID ON DEPARTMENTS (PARENT_ID);
 
 CREATE TABLE USERS (
@@ -67,7 +70,10 @@ CREATE TABLE USERS (
     CONSTRAINT CK_USERS_IS_DELETED CHECK (IS_DELETED IN (0, 1))
 );
 
--- Email unik per tenant. EMAIL sudah huruf kecil, jadi index biasa cukup untuk case-insensitive.
-CREATE UNIQUE INDEX UX_USERS_TNT_EMAIL ON USERS (TENANT_ID, EMAIL);
+-- Email unik per tenant untuk baris yang belum dihapus (lihat catatan UX_DEPARTMENTS_TNT_CODE).
+-- EMAIL sudah huruf kecil, jadi index biasa cukup untuk case-insensitive.
+CREATE UNIQUE INDEX UX_USERS_TNT_EMAIL ON USERS (
+    CASE WHEN IS_DELETED = 0 THEN TENANT_ID END,
+    CASE WHEN IS_DELETED = 0 THEN EMAIL END);
 CREATE INDEX IX_USERS_TNT_DEPARTMENT ON USERS (TENANT_ID, DEPARTMENT_ID);
 CREATE INDEX IX_USERS_DEPARTMENT_ID ON USERS (DEPARTMENT_ID);

@@ -13,7 +13,7 @@ public sealed class ListUsersQueryValidator : AbstractValidator<ListUsersQuery>
     public ListUsersQueryValidator()
     {
         RuleFor(x => x.Search).MaximumLength(200);
-        RuleFor(x => x.Page).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.Page).InclusiveBetween(1, 100_000); // batas atas mencegah overflow offset
         RuleFor(x => x.Size).InclusiveBetween(1, PagedResult<UserDto>.MaxSize);
         RuleFor(x => x.Status)
             .Must(s => s is null || UserStatusNames.TryParse(s, out _))

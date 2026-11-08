@@ -39,9 +39,14 @@ public sealed class User : AggregateRoot
 
     public void UpdateProfile(string fullName, string? jobTitle, long? departmentId)
     {
+        var (oldName, oldTitle, oldDepartment) = (FullName, JobTitle, DepartmentId);
+
         ApplyProfile(fullName, jobTitle);
         DepartmentId = departmentId;
-        AddDomainEvent(new UserUpdatedDomainEvent(PublicId, TenantId, Email, FullName));
+
+        // Tanpa perubahan tidak ada UPDATE di database, jadi tidak boleh ada event ke consumer.
+        if (FullName != oldName || JobTitle != oldTitle || DepartmentId != oldDepartment)
+            AddDomainEvent(new UserUpdatedDomainEvent(PublicId, TenantId, Email, FullName));
     }
 
     public void Activate()
