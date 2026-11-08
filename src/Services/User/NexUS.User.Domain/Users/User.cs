@@ -62,6 +62,8 @@ public sealed class User : AggregateRoot
     {
         if (Status == UserStatus.Active) return;
         Status = UserStatus.Active;
+        // User nonaktif tidak punya permission, jadi cache permission-nya harus dihapus saat status berubah.
+        AddDomainEvent(new NexUS.User.Domain.Roles.RoleChangedDomainEvent(TenantId, null, PublicId, NexUS.User.Domain.Roles.RoleChangeReason.UserStatusChanged));
         AddDomainEvent(new UserUpdatedDomainEvent(PublicId, TenantId, Email, FullName));
     }
 
@@ -69,6 +71,7 @@ public sealed class User : AggregateRoot
     {
         if (Status == UserStatus.Inactive) return;
         Status = UserStatus.Inactive;
+        AddDomainEvent(new NexUS.User.Domain.Roles.RoleChangedDomainEvent(TenantId, null, PublicId, NexUS.User.Domain.Roles.RoleChangeReason.UserStatusChanged));
         AddDomainEvent(new UserDeactivatedDomainEvent(PublicId, TenantId));
     }
 

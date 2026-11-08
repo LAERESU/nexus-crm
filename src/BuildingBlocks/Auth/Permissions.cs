@@ -95,9 +95,10 @@ public sealed class RedisPermissionCache(IRedisConnection redis, ILogger<RedisPe
 
         try
         {
+            // Per key (bukan DEL multi-key) agar tetap jalan di Redis cluster/proxy yang membagi key ke slot berbeda.
             var database = multiplexer.GetDatabase();
             foreach (var batch in userIds.Distinct().Chunk(DeleteBatchSize))
-                await database.KeyDeleteAsync(batch.Select(id => (RedisKey)PermissionCacheKeys.For(tenantId, id)).ToArray());
+                await Task.WhenAll(batch.Select(id => database.KeyDeleteAsync(PermissionCacheKeys.For(tenantId, id))));
         }
         catch (Exception ex) when (ex is RedisException or TimeoutException)
         {

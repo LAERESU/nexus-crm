@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Globalization;
-using System.Net;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
@@ -15,9 +14,12 @@ using NexUS.BuildingBlocks.Caching;
 
 namespace NexUS.BuildingBlocks.Auth;
 
-public sealed class PermissionRequirement(string permission) : IAuthorizationRequirement
+public sealed class PermissionRequirement(string permission, bool globalOnly = false) : IAuthorizationRequirement
 {
     public string Permission { get; } = permission;
+
+    /// <summary>True untuk endpoint yang berlaku di seluruh tenant: hanya penugasan role global yang dihitung.</summary>
+    public bool GlobalOnly { get; } = globalOnly;
 }
 
 /// <summary>
@@ -42,11 +44,13 @@ public sealed class PermissionHandler(IServiceProvider services, ILogger<Permiss
         {
             var ct = (context.Resource as HttpContext)?.RequestAborted ?? CancellationToken.None;
             var granted = await services.GetRequiredService<IPermissionService>().GetAsync(tenantId, userId, ct);
-            if (granted.Any(p => string.Equals(p.Code, requirement.Permission, StringComparison.Ordinal)))
+            if (granted.Any(p => string.Equals(p.Code, requirement.Permission, StringComparison.Ordinal)
+                    && (!requirement.GlobalOnly || p.ScopeType == "global")))
                 context.Succeed(requirement);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (!(context.Resource as HttpContext)?.RequestAborted.IsCancellationRequested ?? true)
         {
+            // Termasuk timeout HttpClient (TaskCanceledException); hanya pembatalan oleh klien yang diteruskan.
             logger.LogError(ex, "Permission {Permission} tidak dapat diperiksa; akses ditolak", requirement.Permission);
         }
     }
@@ -105,8 +109,7 @@ public sealed class UserServicePermissionSource(IHttpClientFactory httpClients, 
         request.Headers.TryAddWithoutValidation("Authorization", authorization);
 
         using var response = await httpClients.CreateClient(HttpClientName).SendAsync(request, ct);
-        if (response.StatusCode == HttpStatusCode.NotFound) return []; // user belum punya record: tidak punya permission
-
+        // 404 juga dianggap gagal (fail closed, tidak di-cache): bisa berarti BaseUrl/route salah atau user belum diprovisi.
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<Response>(ct))?.Permissions ?? [];
     }

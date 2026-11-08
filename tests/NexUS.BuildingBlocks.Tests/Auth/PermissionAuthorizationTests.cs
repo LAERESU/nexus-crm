@@ -12,7 +12,7 @@ namespace NexUS.BuildingBlocks.Tests.Auth;
 public class PermissionHandlerTests
 {
     private readonly IPermissionService _permissions = Substitute.For<IPermissionService>();
-    private readonly PermissionRequirement _requirement = new("task.update");
+    private PermissionRequirement _requirement = new("task.update");
 
     private static ClaimsPrincipal Principal(Guid? user, string? tenant = "7") =>
         new(new ClaimsIdentity(
@@ -57,6 +57,27 @@ public class PermissionHandlerTests
         (await EvaluateAsync(new ClaimsPrincipal(new ClaimsIdentity()))).Should().BeFalse();
 
         await _permissions.DidNotReceiveWithAnyArgs().GetAsync(default, default, default);
+    }
+
+    [Fact]
+    public async Task Requirement_global_mengabaikan_permission_bersope_departemen_atau_proyek()
+    {
+        _requirement = new PermissionRequirement("user.manage", globalOnly: true);
+        var user = Guid.NewGuid();
+        _permissions.GetAsync(7, user, Arg.Any<CancellationToken>()).Returns([new GrantedPermission("user.manage", "department", Guid.NewGuid())]);
+        (await EvaluateAsync(Principal(user))).Should().BeFalse();
+
+        _permissions.GetAsync(7, user, Arg.Any<CancellationToken>()).Returns([new GrantedPermission("user.manage", "global", null)]);
+        (await EvaluateAsync(Principal(user))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Fail_closed_juga_bila_sumber_timeout()
+    {
+        _permissions.GetAsync(Arg.Any<long>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<GrantedPermission>>(_ => throw new TaskCanceledException("timeout HttpClient"));
+
+        (await EvaluateAsync(Principal(Guid.NewGuid()))).Should().BeFalse();
     }
 
     [Fact]

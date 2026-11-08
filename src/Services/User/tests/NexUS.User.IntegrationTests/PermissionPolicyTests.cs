@@ -116,6 +116,43 @@ public class PermissionPolicyTests(OracleUserFixture fixture)
     }
 
     [Fact]
+    public async Task Menonaktifkan_user_langsung_mencabut_akses_dan_mengaktifkan_memulihkannya()
+    {
+        var user = await CreateUserAsync();
+        var tenantAdmin = await RoleAsync("TENANT_ADMIN");
+        (await SetRolesAsync(user.Id, tenantAdmin.Id)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var client = fixture.ClientAs(Tenant, user.Id);
+        (await TryManageAsync(client)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var current = await Admin.GetFromJsonAsync<UserBody>($"/api/v1/users/{user.Id}");
+        var deactivate = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/users/{user.Id}/status") { Content = JsonContent.Create(new { status = "inactive" }) };
+        deactivate.Headers.TryAddWithoutValidation("If-Match", $"\"{current!.RowVersion}\"");
+        var deactivated = await Admin.SendAsync(deactivate);
+        deactivated.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await TryManageAsync(client)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var version = (await deactivated.Content.ReadFromJsonAsync<UserBody>())!.RowVersion;
+        var activate = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/users/{user.Id}/status") { Content = JsonContent.Create(new { status = "active" }) };
+        activate.Headers.TryAddWithoutValidation("If-Match", $"\"{version}\"");
+        (await Admin.SendAsync(activate)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await TryManageAsync(client)).StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Role_bersope_departemen_tidak_cukup_untuk_endpoint_kelola_tenant()
+    {
+        var user = await CreateUserAsync();
+        var department = await (await Admin.PostAsJsonAsync("/api/v1/departments", new { code = $"D{Guid.NewGuid():N}"[..12], name = "Dept Uji" }))
+            .Content.ReadFromJsonAsync<UserBody>();
+        var tenantAdmin = await RoleAsync("TENANT_ADMIN");
+        var assign = await Admin.PutAsJsonAsync($"/api/v1/users/{user.Id}/roles",
+            new { roles = new[] { new { roleId = tenantAdmin.Id, scopeType = "department", scopeId = department!.Id } } });
+        assign.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await TryManageAsync(fixture.ClientAs(Tenant, user.Id))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task Admin_tenant_lain_tidak_membawa_permission_ke_tenant_ini()
     {
         // ID admin tenant A dipakai dengan klaim tenant B: key cache dan query dipisah per tenant, jadi tidak punya permission.

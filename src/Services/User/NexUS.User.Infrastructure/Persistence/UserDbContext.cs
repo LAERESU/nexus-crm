@@ -254,7 +254,7 @@ public sealed class UserDbContext(
                 await permissionCache.InvalidateAsync(tenant.Key, userIds);
             }
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
             logger.LogError(ex, "Cache permission tidak dapat dihapus setelah RoleChanged; perubahan role baru berlaku setelah TTL");
         }

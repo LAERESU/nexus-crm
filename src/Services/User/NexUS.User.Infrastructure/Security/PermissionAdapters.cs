@@ -24,6 +24,6 @@ public sealed class CurrentUserPermissions(IPermissionService permissions, ICurr
         if (!currentUser.IsAuthenticated || currentUser.UserId == Guid.Empty) return false;
 
         var granted = await permissions.GetAsync(currentUser.TenantId, currentUser.UserId, ct);
-        return granted.Any(p => p.Code == permission);
+        return granted.Any(p => p.Code == permission && p.ScopeType == "global"); // dipakai untuk akses tenant-wide
     }
 }

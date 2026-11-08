@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using NexUS.BuildingBlocks.Auth;
 
 namespace NexUS.User.Api;
 
@@ -18,5 +19,9 @@ public static class Policies
     public static void Register(AuthorizationOptions options)
     {
         options.AddPolicy(Authenticated, policy => policy.RequireAuthenticatedUser());
+
+        // Endpoint kelola berlaku di seluruh tenant: penugasan role bersope departemen/proyek tidak cukup.
+        foreach (var permission in new[] { UserManage, RoleManage })
+            options.AddPolicy(permission, policy => policy.RequireAuthenticatedUser().AddRequirements(new PermissionRequirement(permission, globalOnly: true)));
     }
 }
