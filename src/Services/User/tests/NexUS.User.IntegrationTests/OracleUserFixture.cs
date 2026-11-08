@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NexUS.User.Infrastructure.Seeding;
 using Oracle.ManagedDataAccess.Client;
 
 namespace NexUS.User.IntegrationTests;
@@ -57,7 +58,8 @@ public sealed class OracleUserFixture : IAsyncLifetime
                     options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
                 });
             }));
-        _ = Factory.Server;
+        _ = Factory.Server; // memicu start host (dan seeder role bawaan) sekarang
+        await Factory.Services.GetRequiredService<DefaultRoleSeeder>().Completion.WaitAsync(TimeSpan.FromMinutes(2));
     }
 
     public async Task DisposeAsync()

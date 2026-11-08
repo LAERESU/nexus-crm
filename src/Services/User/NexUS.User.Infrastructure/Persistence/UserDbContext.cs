@@ -5,6 +5,7 @@ using NexUS.BuildingBlocks.Common.Exceptions;
 using NexUS.BuildingBlocks.Messaging;
 using NexUS.User.Application.Common;
 using NexUS.User.Domain.Departments;
+using NexUS.User.Domain.Roles;
 using NexUS.User.Domain.Tenants;
 using NexUS.User.Domain.Users;
 using Oracle.ManagedDataAccess.Client;
@@ -26,6 +27,10 @@ public sealed class UserDbContext(DbContextOptions<UserDbContext> options, TimeP
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<UserEntity> Users => Set<UserEntity>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder model)
@@ -72,6 +77,58 @@ public sealed class UserDbContext(DbContextOptions<UserDbContext> options, TimeP
             e.Property(x => x.DepartmentId).HasColumnName("DEPARTMENT_ID");
             e.HasOne<Department>().WithMany().HasForeignKey(x => x.DepartmentId);
             e.HasIndex(x => new { x.TenantId, x.Email }).IsUnique();
+            e.HasMany(x => x.Roles).WithOne().HasForeignKey(r => r.UserId);
+            e.Navigation(x => x.Roles).UsePropertyAccessMode(PropertyAccessMode.Field);
+            e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
+        });
+
+        // Katalog permission bersifat global: tanpa filter tenant.
+        model.Entity<Permission>(e =>
+        {
+            e.ToTable("PERMISSIONS");
+            MapEntity(e);
+            e.Property(x => x.Code).HasColumnName("CODE").HasMaxLength(Permission.CodeMaxLength);
+            e.Property(x => x.Module).HasColumnName("MODULE").HasMaxLength(50);
+            e.Property(x => x.Description).HasColumnName("DESCRIPTION").HasMaxLength(Permission.DescriptionMaxLength);
+            e.HasQueryFilter(x => !x.IsDeleted);
+        });
+
+        model.Entity<Role>(e =>
+        {
+            e.ToTable("ROLES");
+            MapEntity(e);
+            e.Ignore(x => x.DomainEvents);
+            e.Property(x => x.Code).HasColumnName("CODE").HasMaxLength(Role.CodeMaxLength);
+            e.Property(x => x.Name).HasColumnName("NAME").HasMaxLength(Role.NameMaxLength);
+            e.Property(x => x.Description).HasColumnName("DESCRIPTION").HasMaxLength(Role.DescriptionMaxLength);
+            e.Property(x => x.IsSystem).HasColumnName("IS_SYSTEM").HasColumnType("NUMBER(1)");
+            e.HasMany(x => x.Permissions).WithOne().HasForeignKey(p => p.RoleId);
+            e.Navigation(x => x.Permissions).UsePropertyAccessMode(PropertyAccessMode.Field);
+            e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
+        });
+
+        model.Entity<RolePermission>(e =>
+        {
+            e.ToTable("ROLE_PERMISSIONS");
+            MapEntity(e);
+            e.Property(x => x.RoleId).HasColumnName("ROLE_ID");
+            e.Property(x => x.PermissionId).HasColumnName("PERMISSION_ID");
+            e.HasOne<Permission>().WithMany().HasForeignKey(x => x.PermissionId);
+            e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
+        });
+
+        model.Entity<UserRole>(e =>
+        {
+            e.ToTable("USER_ROLES");
+            MapEntity(e);
+            e.Property(x => x.UserId).HasColumnName("USER_ID");
+            e.Property(x => x.RoleId).HasColumnName("ROLE_ID");
+            // Nilai kolom huruf besar (GLOBAL/DEPARTMENT/PROJECT) sesuai CHECK constraint di V3.
+            e.Property(x => x.ScopeType).HasColumnName("SCOPE_TYPE").HasMaxLength(20).HasConversion(
+                scope => scope.ToString().ToUpperInvariant(),
+                value => Enum.Parse<RoleScopeType>(value, true));
+            e.Property(x => x.ScopeId).HasColumnName("SCOPE_ID");
+            e.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId);
             e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
         });
 
