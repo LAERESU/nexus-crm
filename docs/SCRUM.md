@@ -14,7 +14,7 @@
 | Tanggal mulai sprint | 2026-11-09 |
 | Tanggal selesai sprint | 2026-11-20 |
 | Sprint goal | User & RBAC berjalan: admin tenant bisa mengelola user, departemen, role, dan permission |
-| Progres keseluruhan | 18 / 64 story selesai (28%) |
+| Progres keseluruhan | 19 / 64 story selesai (30%) |
 | Hambatan aktif | NX-008 ditunda: butuh cluster Kubernetes dan keputusan D3 |
 
 Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 🔍 Review · ✅ Done · 🟥 Blocked
@@ -75,7 +75,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | --- | --- | --- | --- | --- | --- |
 | E0 | Fondasi & DevOps | 1 | 10 | 9 | 90% |
 | E1 | Auth & Gateway | 1 | 7 | 7 | 100% |
-| E2 | User & RBAC | 2 | 7 | 2 | 29% |
+| E2 | User & RBAC | 2 | 7 | 3 | 43% |
 | E3 | Project Management | 2 | 7 | 0 | 0% |
 | E4 | Task Management | 2 | 9 | 0 | 0% |
 | E5 | Dashboard | 2 | 3 | 0 | 0% |
@@ -119,7 +119,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | --- | --- | --- | --- | --- |
 | NX-018 | Schema & CRUD tenant, user, departemen | 8 | 3 | ✅ |
 | NX-019 | Role & permission + assign role ke user (dengan scope) | 8 | 3 | ✅ |
-| NX-020 | Permission policy dinamis + cache permission di Redis | 5 | 3 | 🔍 |
+| NX-020 | Permission policy dinamis + cache permission di Redis | 5 | 3 | ✅ |
 | NX-021 | Undang user via email (event `UserCreated`) | 3 | 3 | ⬜ |
 | NX-022 | Halaman user list + form user | 5 | 3 | ⬜ |
 | NX-023 | Halaman role + matriks permission | 5 | 3 | ⬜ |
