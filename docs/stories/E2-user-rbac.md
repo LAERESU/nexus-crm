@@ -54,8 +54,9 @@ Referensi utama: `ARCHITECTURE.md` B.2, C.2 (USR_SCHEMA), G.2.
   2. Endpoint `POST /api/v1/auth/activate` untuk set password pertama.
   3. Email undangan dikirim (sementara langsung via SMTP Mailpit; dipindah ke Notification di NX-057).
 - **Acceptance criteria:**
-  - [ ] User baru menerima email dan bisa login setelah set password.
-  - [ ] Token aktivasi kedaluwarsa tidak bisa dipakai.
+  - [x] User baru menerima email dan bisa login setelah set password.
+  - [x] Token aktivasi kedaluwarsa tidak bisa dipakai.
+- **Catatan:** relay outbox ke RabbitMQ dan consumer idempotent (bagian NX-028) dikerjakan di sini, memakai `RabbitMQ.Client` langsung karena MassTransit 9 berlisensi komersial. Halaman web `/activate` dan kirim ulang undangan belum ada. Lihat ADR-0010.
 
 ---
 

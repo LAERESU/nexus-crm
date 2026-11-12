@@ -40,14 +40,23 @@ public sealed class OracleUserFixture : IAsyncLifetime
         .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Ready to accept connections"))
         .Build();
 
+    private readonly IContainer _rabbit = new ContainerBuilder("rabbitmq:3.13-management-alpine")
+        .WithEnvironment("RABBITMQ_DEFAULT_USER", "nexus")
+        .WithEnvironment("RABBITMQ_DEFAULT_PASS", "nexus_test")
+        .WithPortBinding(5672, assignRandomHostPort: true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"))
+        .Build();
+
     public WebApplicationFactory<Program> Factory { get; private set; } = default!;
+    public string RabbitConnectionString { get; private set; } = default!;
     public string RedisConnectionString { get; private set; } = default!;
     public IConnectionMultiplexer Redis { get; private set; } = default!;
     public string ConnectionString { get; private set; } = default!;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_oracle.StartAsync(), _redis.StartAsync());
+        await Task.WhenAll(_oracle.StartAsync(), _redis.StartAsync(), _rabbit.StartAsync());
+        RabbitConnectionString = $"amqp://nexus:nexus_test@{_rabbit.Hostname}:{_rabbit.GetMappedPublicPort(5672)}";
         RedisConnectionString = $"{_redis.Hostname}:{_redis.GetMappedPublicPort(6379)},abortConnect=false";
         Redis = await ConnectionMultiplexer.ConnectAsync(RedisConnectionString);
         ConnectionString =
@@ -64,6 +73,7 @@ public sealed class OracleUserFixture : IAsyncLifetime
             {
                 ["ConnectionStrings:Oracle"] = ConnectionString,
                 ["ConnectionStrings:Redis"] = RedisConnectionString,
+                ["ConnectionStrings:RabbitMq"] = RabbitConnectionString,
             }))
             .ConfigureServices(services =>
             {
@@ -109,6 +119,7 @@ public sealed class OracleUserFixture : IAsyncLifetime
         Redis?.Dispose();
         await _oracle.DisposeAsync();
         await _redis.DisposeAsync();
+        await _rabbit.DisposeAsync();
     }
 
     /// <summary>

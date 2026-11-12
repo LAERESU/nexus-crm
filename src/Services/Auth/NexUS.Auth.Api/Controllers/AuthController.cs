@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NexUS.Auth.Application.Invitations;
 using NexUS.Auth.Application.Login;
 using NexUS.Auth.Application.Logout;
 using NexUS.Auth.Application.Refresh;
@@ -8,6 +9,8 @@ using NexUS.Auth.Application.Refresh;
 namespace NexUS.Auth.Api.Controllers;
 
 public sealed record LoginRequest(string Email, string Password);
+
+public sealed record ActivateRequest(string Token, string Password);
 
 public sealed record TokenResponse(string AccessToken, string TokenType, int ExpiresIn);
 
@@ -78,6 +81,21 @@ public sealed class AuthController(ISender mediator, TimeProvider timeProvider) 
             Response.Cookies.Delete(RefreshTokenCookie, CookieOptions(expires: null));
         }
 
+        return NoContent();
+    }
+
+    /// <summary>Mengaktifkan akun undangan dengan mengisi password pertama.</summary>
+    /// <remarks>
+    /// Token berasal dari email undangan, berlaku 72 jam dan hanya sekali pakai. Token salah, kedaluwarsa, atau sudah
+    /// dipakai menghasilkan 422 dengan pesan yang sama. Setelah berhasil, user login seperti biasa.
+    /// </remarks>
+    [HttpPost("activate")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> Activate(ActivateRequest request, CancellationToken ct)
+    {
+        await mediator.Send(new ActivateAccountCommand(request.Token, request.Password), ct);
         return NoContent();
     }
 

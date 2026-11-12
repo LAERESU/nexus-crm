@@ -13,6 +13,12 @@ public sealed class CredentialRepository(AuthDbContext db) : ICredentialReposito
     public async Task AddAsync(Credential credential, CancellationToken ct) =>
         await db.Credentials.AddAsync(credential, ct);
 
+    public Task<Credential?> FindByUserAsync(long tenantId, Guid userId, CancellationToken ct) =>
+        db.Credentials.FirstOrDefaultAsync(c => c.TenantId == tenantId && c.UserId == userId, ct);
+
+    public Task<Credential?> FindByActivationHashAsync(long tenantId, string activationTokenHash, CancellationToken ct) =>
+        db.Credentials.FirstOrDefaultAsync(c => c.TenantId == tenantId && c.ActivationTokenHash == activationTokenHash, ct);
+
     public Task<Credential?> FindByIdAsync(long tenantId, long id, CancellationToken ct) =>
         db.Credentials.FirstOrDefaultAsync(c => c.TenantId == tenantId && c.Id == id, ct);
 

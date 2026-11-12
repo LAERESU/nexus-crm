@@ -4,8 +4,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NexUS.BuildingBlocks.Auth;
 using NexUS.BuildingBlocks.Caching;
+using NexUS.BuildingBlocks.Messaging;
 using NexUS.User.Application.Abstractions;
 using NexUS.User.Application.Common;
+using NexUS.User.Infrastructure.Messaging;
 using NexUS.User.Infrastructure.Persistence;
 using NexUS.User.Infrastructure.Security;
 using NexUS.User.Infrastructure.Seeding;
@@ -44,6 +46,9 @@ public static class DependencyInjection
         services.Configure<DevSeedOptions>(configuration.GetSection(DevSeedOptions.SectionName));
         services.AddSingleton<DevSeeder>();
         services.AddHostedService(sp => sp.GetRequiredService<DevSeeder>());
+
+        // Relay outbox -> RabbitMQ (NX-021; berhenti sendiri bila ConnectionStrings:RabbitMq kosong).
+        services.AddNexusOutboxPublisher<UserDbContext, UserOutboxMapper>("user");
 
         services.AddScoped<DefaultRoleProvisioner>();
         services.AddSingleton<DefaultRoleSeeder>();

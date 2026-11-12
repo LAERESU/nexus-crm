@@ -4,8 +4,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NexUS.BuildingBlocks.Auth;
 using NexUS.BuildingBlocks.Caching;
+using NexUS.BuildingBlocks.Messaging;
+using NexUS.BuildingBlocks.Messaging.Contracts;
 using NexUS.Auth.Application.Abstractions;
 using NexUS.Auth.Application.Common;
+using NexUS.Auth.Infrastructure.Messaging;
 using NexUS.Auth.Infrastructure.Persistence;
 using NexUS.Auth.Infrastructure.Security;
 using NexUS.Auth.Infrastructure.Seeding;
@@ -46,6 +49,12 @@ public static class DependencyInjection
                 options.TokenValidationParameters.IssuerSigningKey = signingKey.Credentials.Key;
             });
         services.AddSingleton<IAccessTokenBlacklist, AccessTokenBlacklist>();
+
+        // Undangan user (NX-021): UserCreated dari User Service -> kredensial tanpa password + email aktivasi.
+        services.AddScoped<IProcessedEventStore, ProcessedEventStore>();
+        services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+        services.AddSingleton<IInvitationEmailSender, SmtpInvitationEmailSender>();
+        services.AddNexusEventConsumer<UserCreated, UserCreatedHandler>("auth");
 
         services.Configure<DevSeedOptions>(configuration.GetSection(DevSeedOptions.SectionName));
         services.AddSingleton<DevSeeder>();

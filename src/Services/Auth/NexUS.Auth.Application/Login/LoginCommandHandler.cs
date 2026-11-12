@@ -37,8 +37,17 @@ public sealed class LoginCommandHandler(
             throw Failure(null, LoginFailureReason.UserNotFound);
         }
 
+        if (credential.PasswordHash is not { } passwordHash)
+        {
+            // Undangan belum dipakai: belum ada password. Respons dan biayanya sama dengan email tidak terdaftar.
+            passwordHasher.VerifyDummy(command.Password);
+            await RecordFailureAsync(credential, LoginFailureReason.NotActivated, command, now, ct);
+            await unitOfWork.SaveChangesAsync(ct);
+            throw Failure(credential, LoginFailureReason.NotActivated);
+        }
+
         // Selalu verifikasi sebelum cek kunci agar akun terkunci tidak merespons lebih cepat (timing leak).
-        var passwordValid = passwordHasher.Verify(command.Password, credential.PasswordHash);
+        var passwordValid = passwordHasher.Verify(command.Password, passwordHash);
 
         if (credential.IsLocked(now))
         {
