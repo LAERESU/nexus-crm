@@ -57,6 +57,7 @@ public sealed class OracleUserFixture : IAsyncLifetime
     {
         await Task.WhenAll(_oracle.StartAsync(), _redis.StartAsync(), _rabbit.StartAsync());
         RabbitConnectionString = $"amqp://nexus:nexus_test@{_rabbit.Hostname}:{_rabbit.GetMappedPublicPort(5672)}";
+        await DeclareConsumerQueueAsync();
         RedisConnectionString = $"{_redis.Hostname}:{_redis.GetMappedPublicPort(6379)},abortConnect=false";
         Redis = await ConnectionMultiplexer.ConnectAsync(RedisConnectionString);
         ConnectionString =
@@ -93,6 +94,19 @@ public sealed class OracleUserFixture : IAsyncLifetime
             await SeedUserAsync(tenant, AdminId(tenant), "TENANT_ADMIN");
             await SeedUserAsync(tenant, MemberId(tenant), "MEMBER");
         }
+    }
+
+    /// <summary>Antrean penerima <c>UserCreated</c> (peran consumer Auth); tanpa antrean, publish mandatory gagal.</summary>
+    public const string UserCreatedQueue = "test.UserCreated";
+
+    private async Task DeclareConsumerQueueAsync()
+    {
+        var factory = new RabbitMQ.Client.ConnectionFactory { Uri = new Uri(RabbitConnectionString) };
+        await using var connection = await factory.CreateConnectionAsync();
+        await using var channel = await connection.CreateChannelAsync();
+        await NexUS.BuildingBlocks.Messaging.EventBusTopology.DeclareExchangeAsync(channel, default);
+        await channel.QueueDeclareAsync(UserCreatedQueue, durable: true, exclusive: false, autoDelete: false);
+        await channel.QueueBindAsync(UserCreatedQueue, NexUS.BuildingBlocks.Messaging.EventBusTopology.Exchange, "UserCreated");
     }
 
     /// <summary>User admin tetap per tenant; memegang role TENANT_ADMIN secara global.</summary>

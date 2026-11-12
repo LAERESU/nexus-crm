@@ -120,6 +120,7 @@ services:
       Seed__AdminPassword: "${SEED_ADMIN_PASSWORD:-}"
       Email__SmtpHost: mailpit
       Email__SmtpPort: "1025"
+      Email__ActivationUrlTemplate: "http://localhost:5173/activate?token={token}"
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
       Auth__Jwt__JwksUrl: http://auth:8080/.well-known/jwks.json
       Auth__Jwt__RequireHttpsMetadata: "false"

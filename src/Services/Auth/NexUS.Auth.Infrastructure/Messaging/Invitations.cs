@@ -42,7 +42,7 @@ public sealed class EmailOptions
     public string From { get; set; } = "no-reply@nexus.local";
 
     /// <summary>Alamat halaman aktivasi di aplikasi web; <c>{token}</c> diganti token aktivasi.</summary>
-    public string ActivationUrlTemplate { get; set; } = "http://localhost:5173/activate?token={token}";
+    public string? ActivationUrlTemplate { get; set; }
 }
 
 /// <summary>Email undangan langsung lewat SMTP (sementara sampai Notification Service ada, NX-057).</summary>
@@ -53,6 +53,8 @@ public sealed class SmtpInvitationEmailSender(IOptions<EmailOptions> options) : 
         var email = options.Value;
         if (string.IsNullOrWhiteSpace(email.SmtpHost))
             throw new InvalidOperationException("Email:SmtpHost belum dikonfigurasi; undangan tidak dapat dikirim.");
+        if (email.ActivationUrlTemplate?.Contains("{token}", StringComparison.Ordinal) != true)
+            throw new InvalidOperationException("Email:ActivationUrlTemplate belum dikonfigurasi atau tidak memuat {token}.");
 
         var url = email.ActivationUrlTemplate.Replace("{token}", Uri.EscapeDataString(invitation.ActivationToken), StringComparison.Ordinal);
         using var message = new MailMessage(email.From, invitation.Email)

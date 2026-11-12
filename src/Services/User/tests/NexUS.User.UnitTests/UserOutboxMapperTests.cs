@@ -24,6 +24,14 @@ public class UserOutboxMapperTests
     }
 
     [Fact]
+    public void Hanya_UserCreated_yang_diambil_relay_event_lain_tetap_tertunda_di_outbox()
+    {
+        _mapper.PublishedTypes.Should().Equal(typeof(UserCreatedDomainEvent).FullName);
+        OutboxMessage.From(new UserCreatedDomainEvent(Guid.NewGuid(), 7, "a@b.c", "A")).Type
+            .Should().StartWith(_mapper.PublishedTypes.Single() + ",");
+    }
+
+    [Fact]
     public void Event_lain_tidak_dipublikasikan()
     {
         var message = OutboxMessage.From(new RoleChangedDomainEvent(7, Guid.NewGuid(), null, RoleChangeReason.RolePermissionsChanged));

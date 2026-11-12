@@ -72,6 +72,7 @@ public sealed class OracleAuthFixture : IAsyncLifetime
                 ["ConnectionStrings:RabbitMq"] = $"amqp://nexus:nexus_test@{_rabbit.Hostname}:{_rabbit.GetMappedPublicPort(5672)}",
                 ["Email:SmtpHost"] = _mailpit.Hostname,
                 ["Email:SmtpPort"] = _mailpit.GetMappedPublicPort(1025).ToString(),
+                ["Email:ActivationUrlTemplate"] = "http://localhost:5173/activate?token={token}",
             })));
         _ = Factory.Server; // memicu start host (dan seeder) sekarang
         await Factory.Services.GetRequiredService<DevSeeder>().Completion.WaitAsync(TimeSpan.FromMinutes(2));

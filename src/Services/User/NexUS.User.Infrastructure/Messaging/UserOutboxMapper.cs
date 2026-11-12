@@ -8,11 +8,13 @@ namespace NexUS.User.Infrastructure.Messaging;
 /// <summary>
 /// Kontrak event User Service yang dipublikasikan ke service lain. Baru <c>UserCreated</c> (NX-021); event lain
 /// (<c>UserDeactivated</c>, <c>RoleChanged</c>, ...) ditambahkan saat ada consumer-nya (NX-028) dan sampai saat itu
-/// hanya ditandai selesai di outbox.
+/// tetap tertunda di outbox.
 /// </summary>
 public sealed class UserOutboxMapper : IOutboxEventMapper
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    public IReadOnlyCollection<string> PublishedTypes { get; } = [typeof(UserCreatedDomainEvent).FullName!];
 
     public IIntegrationEvent? Map(OutboxMessage message)
     {

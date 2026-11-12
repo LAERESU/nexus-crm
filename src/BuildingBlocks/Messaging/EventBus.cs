@@ -73,8 +73,9 @@ public sealed class RabbitMqEventPublisher(RabbitMqConnection connection, ILogge
 {
     public async Task PublishAsync(IIntegrationEvent integrationEvent, CancellationToken ct = default)
     {
-        // Publisher confirm: BasicPublishAsync baru selesai setelah broker menerima pesan, sehingga outbox hanya
-        // ditandai terkirim bila pesan benar-benar sampai.
+        // Publisher confirm + mandatory: BasicPublishAsync baru selesai setelah broker menerima pesan dan melempar
+        // exception bila tidak ada antrean yang menerimanya (consumer belum pernah berjalan), sehingga outbox hanya
+        // ditandai terkirim bila pesan benar-benar sampai ke sebuah antrean.
         var options = new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: true);
         await using var channel = await (await connection.GetAsync(ct)).CreateChannelAsync(options, ct);
         await EventBusTopology.DeclareExchangeAsync(channel, ct);
@@ -90,7 +91,7 @@ public sealed class RabbitMqEventPublisher(RabbitMqConnection connection, ILogge
         };
         var body = JsonSerializer.SerializeToUtf8Bytes(integrationEvent, type, EventBusTopology.Json);
 
-        await channel.BasicPublishAsync(EventBusTopology.Exchange, EventBusTopology.RoutingKey(type), mandatory: false, properties, body, ct);
+        await channel.BasicPublishAsync(EventBusTopology.Exchange, EventBusTopology.RoutingKey(type), mandatory: true, properties, body, ct);
         logger.LogDebug("Event {EventType} {EventId} terkirim", type.Name, integrationEvent.EventId);
     }
 }

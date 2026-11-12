@@ -6,11 +6,16 @@ using Microsoft.Extensions.Logging;
 namespace NexUS.BuildingBlocks.Messaging;
 
 /// <summary>
-/// Menerjemahkan baris outbox (domain event internal service) menjadi kontrak event antar service. Null berarti event
-/// itu tidak dipublikasikan (hanya untuk keperluan internal service).
+/// Menerjemahkan baris outbox (domain event internal service) menjadi kontrak event antar service.
 /// </summary>
 public interface IOutboxEventMapper
 {
+    /// <summary>
+    /// Nama lengkap tipe domain event yang sudah punya kontrak. Relay hanya mengambil baris bertipe ini; event lain
+    /// tetap tertunda di outbox sampai kontrak dan consumer-nya ada, bukan dibuang.
+    /// </summary>
+    IReadOnlyCollection<string> PublishedTypes { get; }
+
     IIntegrationEvent? Map(OutboxMessage message);
 }
 
@@ -28,11 +33,26 @@ public sealed class OutboxPublisherWorker<TContext>(
     public static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
     public static readonly TimeSpan FailureDelay = TimeSpan.FromSeconds(10);
 
-    // ROWNUM (bukan FETCH FIRST) karena Oracle menolak FETCH FIRST bersama FOR UPDATE (ORA-02014).
-    // Hanya konstanta yang dirangkai di sini; tidak ada input luar.
-    private const string PendingSql =
-        "SELECT * FROM OUTBOX_MESSAGES WHERE PROCESSED_AT IS NULL AND RETRY_COUNT < 5 AND ROWNUM <= 50 " +
-        "ORDER BY OCCURRED_AT FOR UPDATE SKIP LOCKED";
+    /// <summary>
+    /// Mengambil <see cref="BatchSize"/> baris tertua. Pengurutan di subquery dan ROWNUM di luarnya, karena ROWNUM
+    /// dievaluasi sebelum ORDER BY; FETCH FIRST tidak dipakai karena Oracle menolaknya bersama FOR UPDATE (ORA-02014).
+    /// Semua nilai dikirim sebagai bind variable; yang dirangkai hanya jumlah placeholder tipe.
+    /// </summary>
+    private static (string Sql, object[] Parameters) PendingQuery(IReadOnlyCollection<string> publishedTypes)
+    {
+        var parameters = new List<object> { MaxMappingRetries, BatchSize };
+        var typeFilter = string.Join(" OR ", publishedTypes.Select(type =>
+        {
+            parameters.Add(type + ",%"); // TYPE berisi nama tipe lengkap diikuti nama assembly
+            return $"TYPE LIKE {{{parameters.Count - 1}}}";
+        }));
+
+        var sql =
+            "SELECT * FROM OUTBOX_MESSAGES WHERE ID IN (" +
+            "SELECT ID FROM (SELECT ID FROM OUTBOX_MESSAGES WHERE PROCESSED_AT IS NULL AND RETRY_COUNT < {0} " +
+            $"AND ({typeFilter}) ORDER BY OCCURRED_AT) WHERE ROWNUM <= {{1}}) FOR UPDATE SKIP LOCKED";
+        return (sql, parameters.ToArray());
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -74,8 +94,11 @@ public sealed class OutboxPublisherWorker<TContext>(
         var mapper = scope.ServiceProvider.GetRequiredService<IOutboxEventMapper>();
         var publisher = scope.ServiceProvider.GetRequiredService<IEventPublisher>();
 
+        if (mapper.PublishedTypes.Count == 0) return 0;
+
+        var (sql, parameters) = PendingQuery(mapper.PublishedTypes);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var pending = await db.Set<OutboxMessage>().FromSqlRaw(PendingSql).ToListAsync(ct);
+        var pending = await db.Set<OutboxMessage>().FromSqlRaw(sql, parameters).ToListAsync(ct);
 
         Exception? publishFailure = null;
         foreach (var message in pending.OrderBy(m => m.OccurredAt))

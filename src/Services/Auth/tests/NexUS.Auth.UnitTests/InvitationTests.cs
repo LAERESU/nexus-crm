@@ -132,6 +132,21 @@ public class InviteUserCommandHandlerTests
         await _processed.Received(2).MarkAsync(_command.EventId, InviteUserCommandHandler.Consumer, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData("bukan-email")]
+    [InlineData("")]
+    public async Task Alamat_email_tidak_valid_dianggap_selesai_tanpa_kredensial(string email)
+    {
+        var handler = new InviteUserCommandHandler(
+            _credentials, _processed, _email, _unitOfWork, _time, NullLogger<InviteUserCommandHandler>.Instance);
+
+        await handler.Handle(_command with { Email = email }, default);
+
+        await _credentials.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        await _email.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+        await _processed.Received(1).MarkAsync(_command.EventId, InviteUserCommandHandler.Consumer, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task Kegagalan_kirim_email_diteruskan_agar_transaksi_dibatalkan_dan_event_diulang()
     {

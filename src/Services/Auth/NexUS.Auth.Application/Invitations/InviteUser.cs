@@ -29,7 +29,16 @@ public sealed class InviteUserCommandHandler(
             var now = timeProvider.GetUtcNow();
             await processedEvents.MarkAsync(command.EventId, Consumer, now, token);
 
-            var email = Credential.NormalizeEmail(command.Email);
+            if (!System.Net.Mail.MailAddress.TryCreate(command.Email?.Trim(), out _))
+            {
+                // Mengulang tidak akan membantu (alamat tidak bisa dikirimi email), jadi event dianggap selesai.
+                logger.LogError("Undangan user {UserId} di tenant {TenantId} dilewati: alamat email tidak valid",
+                    command.UserId, command.TenantId);
+                await unitOfWork.SaveChangesAsync(token);
+                return;
+            }
+
+            var email = Credential.NormalizeEmail(command.Email!);
             if (await credentials.FindByUserAsync(command.TenantId, command.UserId, token) is not null)
             {
                 // Sudah punya kredensial (seed dev, atau event lama yang dikirim ulang dengan ID berbeda).

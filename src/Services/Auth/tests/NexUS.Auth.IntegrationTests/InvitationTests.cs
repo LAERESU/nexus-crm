@@ -38,8 +38,26 @@ public partial class InvitationTests(OracleAuthFixture fixture)
     private async Task<UserCreated> PublishUserCreatedAsync(string email, Guid? eventId = null)
     {
         var created = new UserCreated(eventId ?? Guid.NewGuid(), DateTimeOffset.UtcNow, Tenant, Guid.NewGuid(), email, "Pengguna Baru");
-        await fixture.Factory.Services.GetRequiredService<IEventPublisher>().PublishAsync(created);
+        await PublishAsync(created);
         return created;
+    }
+
+    /// <summary>Publish bersifat mandatory: diulang sampai antrean consumer Auth siap menerima.</summary>
+    private async Task PublishAsync(UserCreated created)
+    {
+        var publisher = fixture.Factory.Services.GetRequiredService<IEventPublisher>();
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await publisher.PublishAsync(created);
+                return;
+            }
+            catch (Exception) when (attempt < 60)
+            {
+                await Task.Delay(500);
+            }
+        }
     }
 
     private async Task<List<MailSummary>> MailsToAsync(string email)
@@ -145,7 +163,7 @@ public partial class InvitationTests(OracleAuthFixture fixture)
         var first = await PublishUserCreatedAsync(email);
         await WaitForTokenAsync(email);
 
-        await fixture.Factory.Services.GetRequiredService<IEventPublisher>().PublishAsync(first);
+        await PublishAsync(first);
         // Penanda: event berikutnya selesai diproses berarti duplikat di depannya juga sudah lewat antrean.
         var marker = NewEmail();
         await PublishUserCreatedAsync(marker);
