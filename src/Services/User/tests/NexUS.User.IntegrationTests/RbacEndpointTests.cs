@@ -74,10 +74,11 @@ public class RbacEndpointTests(OracleUserFixture fixture)
     }
 
     [Fact]
-    public async Task Katalog_permission_dapat_dibaca_semua_user_login()
+    public async Task Katalog_permission_dapat_dibaca_pemegang_role_read_saja()
     {
-        var catalog = await fixture.ClientAs(OracleUserFixture.TenantA, roles: "member")
-            .GetFromJsonAsync<List<PermissionBody>>("/api/v1/permissions");
+        (await fixture.MemberClient(OracleUserFixture.TenantA).GetAsync("/api/v1/permissions")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var catalog = await Admin().GetFromJsonAsync<List<PermissionBody>>("/api/v1/permissions");
 
         catalog!.Select(p => p.Code).Should().BeEquivalentTo(DefaultRoleCatalog.Permissions.Select(p => p.Code));
         catalog.Should().OnlyContain(p => p.Module.Length > 0 && p.Code.StartsWith(p.Module + "."));
@@ -255,7 +256,7 @@ public class RbacEndpointTests(OracleUserFixture fixture)
         var admin = Admin();
         var user = await CreateUserAsync(admin);
         var other = await CreateUserAsync(admin);
-        var asUser = fixture.ClientAs(OracleUserFixture.TenantA, userId: user.Id, roles: "member");
+        var asUser = fixture.ClientAs(OracleUserFixture.TenantA, userId: user.Id);
 
         (await asUser.GetAsync($"/api/v1/users/{user.Id}/permissions")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await asUser.GetAsync($"/api/v1/users/{other.Id}/permissions")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -263,13 +264,13 @@ public class RbacEndpointTests(OracleUserFixture fixture)
     }
 
     [Fact]
-    public async Task Tanpa_role_admin_endpoint_kelola_role_mengembalikan_403_tetapi_baca_boleh()
+    public async Task Tanpa_permission_role_manage_dan_role_read_endpoint_role_mengembalikan_403()
     {
-        var member = fixture.ClientAs(OracleUserFixture.TenantA, roles: "member");
+        var member = fixture.MemberClient(OracleUserFixture.TenantA);
 
         (await member.PostAsJsonAsync("/api/v1/roles", new { code = NewCode(), name = "X" })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await member.PutAsJsonAsync($"/api/v1/users/{Guid.NewGuid()}/roles", new { roles = Array.Empty<object>() })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await member.GetAsync("/api/v1/roles")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await member.GetAsync("/api/v1/roles")).StatusCode.Should().Be(HttpStatusCode.Forbidden); // MEMBER tidak punya role.read
     }
 
     [Fact]

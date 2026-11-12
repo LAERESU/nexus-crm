@@ -92,6 +92,12 @@ public interface IRoleReadService
     Task<PagedResult<RoleDto>> ListAsync(string? search, int page, int size, CancellationToken ct);
 }
 
+public interface ICurrentUserPermissions
+{
+    /// <summary>True bila user yang sedang login memegang <paramref name="permission"/> (pada scope mana pun).</summary>
+    Task<bool> HasAsync(string permission, CancellationToken ct);
+}
+
 public interface IUserPermissionReadService
 {
     /// <summary>Akses efektif user, dihitung dari database pada saat dipanggil (tanpa cache).</summary>

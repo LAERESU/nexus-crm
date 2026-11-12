@@ -67,16 +67,17 @@ public sealed class SetUserRolesCommandHandler(
 
 public sealed record GetUserPermissionsQuery(Guid UserId) : IRequest<UserPermissionsDto>;
 
-public sealed class GetUserPermissionsQueryHandler(IUserPermissionReadService permissionService, ICurrentUser currentUser)
+public sealed class GetUserPermissionsQueryHandler(
+    IUserPermissionReadService permissionService, ICurrentUser currentUser, ICurrentUserPermissions currentUserPermissions)
     : IRequestHandler<GetUserPermissionsQuery, UserPermissionsDto>
 {
-    // Token sementara membawa role "admin" (ADR-0006); NX-020 menggantinya dengan pemeriksaan permission.
-    private const string AdminRole = "admin";
+    public const string ManagePermission = "user.manage";
 
     public async Task<UserPermissionsDto> Handle(GetUserPermissionsQuery request, CancellationToken ct)
     {
-        // Kepemilikan objek: hak akses orang lain hanya boleh dibaca admin; user biasa hanya miliknya sendiri.
-        if (request.UserId != currentUser.UserId && !currentUser.Roles.Contains(AdminRole))
+        // Kepemilikan objek: endpoint ini hanya meminta login (service lain memanggilnya dengan token user sendiri untuk
+        // mengisi cache permission), jadi hak akses orang lain hanya boleh dibaca pemegang user.manage.
+        if (request.UserId != currentUser.UserId && !await currentUserPermissions.HasAsync(ManagePermission, ct))
             throw new ForbiddenException("Anda hanya dapat melihat permission akun sendiri.");
 
         return await permissionService.GetAsync(request.UserId, ct) ?? throw new NotFoundException("User tidak ditemukan.");

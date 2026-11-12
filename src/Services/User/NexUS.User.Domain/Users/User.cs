@@ -32,11 +32,14 @@ public sealed class User : AggregateRoot
 
     private User() { } // untuk EF Core
 
-    public static User Create(long tenantId, string email, string fullName, string? jobTitle, long? departmentId)
+    /// <param name="publicId">Hanya untuk menautkan ke ID yang sudah ada (seed dev); biasanya dibiarkan kosong.</param>
+    public static User Create(
+        long tenantId, string email, string fullName, string? jobTitle, long? departmentId, Guid? publicId = null)
     {
         if (tenantId <= 0) throw new DomainException("Tenant wajib diisi.");
 
         var user = new User { TenantId = tenantId, Email = NormalizeEmail(email) };
+        if (publicId is { } id && id != Guid.Empty) user.PublicId = id;
         user.ApplyProfile(fullName, jobTitle);
         user.DepartmentId = departmentId;
         user.AddDomainEvent(new UserCreatedDomainEvent(user.PublicId, tenantId, user.Email, user.FullName));
@@ -59,6 +62,8 @@ public sealed class User : AggregateRoot
     {
         if (Status == UserStatus.Active) return;
         Status = UserStatus.Active;
+        // User nonaktif tidak punya permission, jadi cache permission-nya harus dihapus saat status berubah.
+        AddDomainEvent(new NexUS.User.Domain.Roles.RoleChangedDomainEvent(TenantId, null, PublicId, NexUS.User.Domain.Roles.RoleChangeReason.UserStatusChanged));
         AddDomainEvent(new UserUpdatedDomainEvent(PublicId, TenantId, Email, FullName));
     }
 
@@ -66,6 +71,7 @@ public sealed class User : AggregateRoot
     {
         if (Status == UserStatus.Inactive) return;
         Status = UserStatus.Inactive;
+        AddDomainEvent(new NexUS.User.Domain.Roles.RoleChangedDomainEvent(TenantId, null, PublicId, NexUS.User.Domain.Roles.RoleChangeReason.UserStatusChanged));
         AddDomainEvent(new UserDeactivatedDomainEvent(PublicId, TenantId));
     }
 

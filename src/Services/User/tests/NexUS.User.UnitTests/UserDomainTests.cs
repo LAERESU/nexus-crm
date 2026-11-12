@@ -53,7 +53,11 @@ public class UserDomainTests
         user.Deactivate(); // sudah nonaktif: tidak ada event kedua
 
         user.Status.Should().Be(UserStatus.Inactive);
-        user.PopDomainEvents().Should().ContainSingle().Which.Should().BeOfType<UserDeactivatedDomainEvent>();
+        var events = user.PopDomainEvents();
+        events.Should().HaveCount(2); // UserDeactivated + RoleChanged (cache permission user itu dihapus)
+        events.OfType<UserDeactivatedDomainEvent>().Should().ContainSingle();
+        events.OfType<NexUS.User.Domain.Roles.RoleChangedDomainEvent>().Should().ContainSingle()
+            .Which.Reason.Should().Be(NexUS.User.Domain.Roles.RoleChangeReason.UserStatusChanged);
     }
 
     [Fact]

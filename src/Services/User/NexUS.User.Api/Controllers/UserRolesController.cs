@@ -30,10 +30,10 @@ public sealed class UserRolesController(ISender mediator) : ControllerBase
 
     /// <summary>
     /// Akses efektif user: role beserta scope-nya dan daftar permission (dihitung langsung dari database, tanpa
-    /// cache). Dipakai Auth/Gateway; user biasa hanya boleh membaca miliknya sendiri, selain itu 403.
+    /// cache). Dipakai Auth/Gateway; hanya login yang diminta; milik orang lain hanya boleh dibaca pemegang user.manage, selain itu 403.
     /// </summary>
     [HttpGet("permissions")]
-    [Authorize(Policy = Policies.UserRead)]
+    [Authorize(Policy = Policies.Authenticated)]
     [ProducesResponseType<UserPermissionsDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

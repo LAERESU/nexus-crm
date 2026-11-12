@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.Extensions.Logging;
+using NexUS.BuildingBlocks.Auth;
 using NexUS.BuildingBlocks.Common.Domain;
 using NexUS.BuildingBlocks.Common.Exceptions;
 using NexUS.BuildingBlocks.Messaging;
@@ -13,7 +15,9 @@ using UserEntity = NexUS.User.Domain.Users.User;
 
 namespace NexUS.User.Infrastructure.Persistence;
 
-public sealed class UserDbContext(DbContextOptions<UserDbContext> options, TimeProvider timeProvider, ICurrentUser currentUser)
+public sealed class UserDbContext(
+    DbContextOptions<UserDbContext> options, TimeProvider timeProvider, ICurrentUser currentUser,
+    IPermissionCache permissionCache, ILogger<UserDbContext> logger)
     : DbContext(options), IUnitOfWork
 {
     /// <summary>Pelaku sistem untuk kolom CREATED_BY/UPDATED_BY; ID internal user belum ada di token.</summary>
@@ -199,7 +203,9 @@ public sealed class UserDbContext(DbContextOptions<UserDbContext> options, TimeP
 
         try
         {
-            return await base.SaveChangesAsync(cancellationToken);
+            var saved = await base.SaveChangesAsync(cancellationToken);
+            await InvalidatePermissionCacheAsync(events);
+            return saved;
         }
         catch (DbUpdateConcurrencyException ex)
         {
@@ -214,6 +220,43 @@ public sealed class UserDbContext(DbContextOptions<UserDbContext> options, TimeP
                 throw new ConcurrencyException("Penugasan diubah oleh proses lain; muat ulang lalu coba lagi.");
 
             throw new DomainException("Data dengan email atau kode yang sama sudah ada di tenant ini.");
+        }
+    }
+
+    /// <summary>
+    /// Perubahan role langsung berlaku: cache permission user terdampak dihapus setelah commit (RabbitMQ belum ada, jadi
+    /// consumer RoleChanged menyusul di NX-028). Best effort: kegagalan tidak membatalkan perubahan yang sudah tersimpan.
+    /// </summary>
+    private async Task InvalidatePermissionCacheAsync(IReadOnlyCollection<IDomainEvent> events)
+    {
+        var changes = events.OfType<RoleChangedDomainEvent>().ToList();
+        if (changes.Count == 0) return;
+
+        try
+        {
+            foreach (var tenant in changes.GroupBy(e => e.TenantId))
+            {
+                var userIds = tenant.Where(e => e.UserId is not null).Select(e => e.UserId!.Value).ToHashSet();
+
+                var roleIds = tenant.Where(e => e.RoleId is not null).Select(e => e.RoleId!.Value).Distinct().ToList();
+                if (roleIds.Count > 0)
+                {
+                    // Pemegang role (termasuk yang akunnya nonaktif) lewat penghubung; filter global dilewati karena
+                    // tenant sudah diberikan eksplisit dan perubahan bisa datang dari seeder tanpa user.
+                    var holders = await (from ur in UserRoles.IgnoreQueryFilters().AsNoTracking()
+                                         join r in Roles.IgnoreQueryFilters().AsNoTracking() on ur.RoleId equals r.Id
+                                         join u in Users.IgnoreQueryFilters().AsNoTracking() on ur.UserId equals u.Id
+                                         where r.TenantId == tenant.Key && u.TenantId == tenant.Key && roleIds.Contains(r.PublicId)
+                                         select u.PublicId).Distinct().ToListAsync();
+                    userIds.UnionWith(holders);
+                }
+
+                await permissionCache.InvalidateAsync(tenant.Key, userIds);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Cache permission tidak dapat dihapus setelah RoleChanged; perubahan role baru berlaku setelah TTL");
         }
     }
 }

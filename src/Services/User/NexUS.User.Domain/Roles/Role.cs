@@ -125,6 +125,7 @@ public enum RoleChangeReason
 {
     RolePermissionsChanged,
     UserRolesChanged,
+    UserStatusChanged,
 }
 
 /// <summary>

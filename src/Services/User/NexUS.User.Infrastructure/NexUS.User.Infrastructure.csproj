@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\NexUS.User.Application\NexUS.User.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Messaging\NexUS.BuildingBlocks.Messaging.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Auth\NexUS.BuildingBlocks.Auth.csproj" />
   </ItemGroup>
 
 </Project>

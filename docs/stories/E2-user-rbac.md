@@ -41,8 +41,9 @@ Referensi utama: `ARCHITECTURE.md` B.2, C.2 (USR_SCHEMA), G.2.
   3. Consumer `RoleChanged` menghapus cache terkait.
   4. Terapkan `[Authorize(Policy = "...")]` di semua endpoint yang sudah ada.
 - **Acceptance criteria:**
-  - [ ] User tanpa `user.manage` mendapat 403 di endpoint admin.
-  - [ ] Setelah role diubah, akses berubah paling lambat setelah cache terhapus (event) tanpa menunggu TTL.
+  - [x] User tanpa `user.manage` mendapat 403 di endpoint admin.
+  - [x] Setelah role diubah, akses berubah paling lambat setelah cache terhapus (event) tanpa menunggu TTL.
+- **Catatan:** invalidasi dilakukan langsung oleh User Service setelah commit, bukan lewat consumer `RoleChanged` (belum ada RabbitMQ; menyusul setelah NX-028). Retry/circuit breaker Polly untuk panggilan ke User Service ditunda. Lihat ADR-0009.
 
 ---
 

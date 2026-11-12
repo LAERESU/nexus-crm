@@ -1,0 +1,117 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using NexUS.User.Domain.Users;
+using NexUS.User.Infrastructure.Persistence;
+using UserEntity = NexUS.User.Domain.Users.User;
+
+namespace NexUS.User.Infrastructure.Seeding;
+
+/// <summary>Harus sama dengan <c>Seed</c> milik Auth Service agar kredensial admin dev menunjuk ke user yang ada di sini.</summary>
+public sealed class DevSeedOptions
+{
+    public const string SectionName = "Seed";
+
+    public long TenantId { get; set; } = 1;
+    public string TenantCode { get; set; } = "demo";
+    public string TenantName { get; set; } = "Demo";
+    public Guid AdminUserId { get; set; } = Guid.Parse("6f1c2a5e-0d3b-4c8e-9a71-2b4d5e6f7a80");
+    public string AdminEmail { get; set; } = "admin@demo.local";
+    public string AdminFullName { get; set; } = "Administrator Demo";
+}
+
+/// <summary>
+/// Membuat tenant "demo" dan admin dev dengan role TENANT_ADMIN di Development, sehingga admin dev (yang kredensialnya dibuat
+/// Auth Service) lolos policy permission. Menunggu seed role bawaan, mengulang sampai database tersedia, dan tidak pernah
+/// berjalan di environment lain.
+/// </summary>
+public sealed class DevSeeder(
+    IServiceScopeFactory scopes,
+    DefaultRoleSeeder roleSeeder,
+    IOptions<DevSeedOptions> options,
+    IHostEnvironment environment,
+    TimeProvider timeProvider,
+    ILogger<DevSeeder> logger) : BackgroundService
+{
+    public const string AdminRoleCode = "TENANT_ADMIN";
+
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(5);
+
+    private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Selesai saat seed berhasil, dilewati, atau dihentikan (untuk tes).</summary>
+    public Task Completion => _completion.Task;
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            if (!environment.IsDevelopment()) return;
+
+            await roleSeeder.Completion.WaitAsync(stoppingToken);
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await SeedAsync(options.Value, stoppingToken);
+                    return;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogWarning(ex, "Seed data dev gagal; mencoba lagi dalam {Delay}", RetryDelay);
+                    await Task.Delay(RetryDelay, stoppingToken);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            _completion.TrySetResult();
+        }
+    }
+
+    private async Task SeedAsync(DevSeedOptions seed, CancellationToken ct)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<UserDbContext>();
+
+        // Seeder berjalan tanpa user/request, jadi filter tenant dilewati dan tenant diberikan eksplisit.
+        if (!await db.Tenants.IgnoreQueryFilters().AnyAsync(t => t.Id == seed.TenantId, ct))
+        {
+            if (await db.Tenants.IgnoreQueryFilters().AnyAsync(t => t.Code == seed.TenantCode, ct))
+            {
+                // Mengulang tidak akan membantu; developer perlu membersihkan database dev atau mengganti Seed:TenantCode.
+                logger.LogError("Seed dev dilewati: tenant berkode {Code} sudah ada dengan ID selain {TenantId}", seed.TenantCode, seed.TenantId);
+                return;
+            }
+
+            // ID tenant harus sama dengan klaim tid di kredensial Auth, jadi tidak diserahkan ke identity.
+            var now = timeProvider.GetUtcNow();
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO TENANTS (ID, TENANT_ID, CODE, NAME, CREATED_AT, CREATED_BY)
+                VALUES ({seed.TenantId}, 0, {seed.TenantCode}, {seed.TenantName}, {now}, {UserDbContext.SystemActor})
+                """, ct);
+        }
+
+        // Tenant yang baru dibuat belum kebagian role bawaan dari seed startup; idempoten bila sudah ada.
+        await scope.ServiceProvider.GetRequiredService<DefaultRoleProvisioner>().ProvisionTenantAsync(seed.TenantId, ct);
+
+        if (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.PublicId == seed.AdminUserId, ct)) return;
+
+        var roleId = await db.Roles.IgnoreQueryFilters()
+            .Where(r => r.TenantId == seed.TenantId && r.Code == AdminRoleCode && !r.IsDeleted)
+            .Select(r => (long?)r.Id).FirstOrDefaultAsync(ct)
+            ?? throw new InvalidOperationException($"Role {AdminRoleCode} belum tersedia untuk tenant {seed.TenantId}.");
+
+        var admin = UserEntity.Create(seed.TenantId, seed.AdminEmail, seed.AdminFullName, null, null, seed.AdminUserId);
+        admin.SetRoles([new RoleAssignment(roleId, RoleScopeType.Global, null)]);
+        db.Users.Add(admin);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Seed dev: admin {Email} dibuat di tenant {TenantId}", seed.AdminEmail, seed.TenantId);
+    }
+}

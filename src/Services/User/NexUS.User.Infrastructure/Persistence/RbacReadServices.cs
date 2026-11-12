@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NexUS.User.Domain.Users;
 using NexUS.BuildingBlocks.Common.Results;
 using NexUS.User.Application.Abstractions;
 using NexUS.User.Application.Roles;
@@ -56,9 +57,11 @@ public sealed class UserPermissionReadService(UserDbContext db) : IUserPermissio
 {
     public async Task<UserPermissionsDto?> GetAsync(Guid userPublicId, CancellationToken ct)
     {
-        var userId = await db.Users.AsNoTracking().Where(u => u.PublicId == userPublicId)
-            .Select(u => (long?)u.Id).FirstOrDefaultAsync(ct);
-        if (userId is null) return null;
+        var user = await db.Users.AsNoTracking().Where(u => u.PublicId == userPublicId)
+            .Select(u => new { u.Id, u.Status }).FirstOrDefaultAsync(ct);
+        if (user is null) return null;
+        var userId = user.Id;
+        var isActive = user.Status == UserStatus.Active; // akun nonaktif tidak memberi permission apa pun
 
         var assignments = await (from ur in db.UserRoles.AsNoTracking()
                                  join r in db.Roles.AsNoTracking() on ur.RoleId equals r.Id
@@ -70,7 +73,7 @@ public sealed class UserPermissionReadService(UserDbContext db) : IUserPermissio
                              join r in db.Roles.AsNoTracking() on ur.RoleId equals r.Id
                              join rp in db.RolePermissions.AsNoTracking() on ur.RoleId equals rp.RoleId
                              join p in db.Permissions.AsNoTracking() on rp.PermissionId equals p.Id
-                             where ur.UserId == userId
+                             where ur.UserId == userId && isActive
                              select new { p.Code, ur.ScopeType, ur.ScopeId }).Distinct().ToListAsync(ct);
 
         return new UserPermissionsDto(
