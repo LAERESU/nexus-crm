@@ -20,9 +20,14 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddNexusHealthChecks(builder.Configuration);
 builder.Services.AddNexusJwtAuth(builder.Configuration);
-builder.Services.AddAuthorization();
 // Permission user diambil dari User Service (Services:User:BaseUrl) dengan cache Redis (NX-020).
 builder.Services.AddNexusPermissionAuthorization(builder.Configuration);
+// Tanpa alamat User Service semua endpoint ber-permission akan 403; lebih baik gagal saat start.
+builder.Services.AddOptions<UserServiceOptions>()
+    .Validate(
+        options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _),
+        "Services:User:BaseUrl wajib diisi dengan URL User Service (mis. http://user:8080).")
+    .ValidateOnStart();
 
 var app = builder.Build();
 

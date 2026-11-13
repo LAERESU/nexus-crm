@@ -13,6 +13,14 @@ public enum ProjectStatus
     Archived,
 }
 
+public enum ProjectPriority
+{
+    Low,
+    Medium,
+    High,
+    Urgent,
+}
+
 /// <summary>Proyek milik satu tenant. Pembuatnya menjadi pemilik sekaligus anggota berperan <see cref="ProjectRole.Manager"/>.</summary>
 public sealed partial class Project : AggregateRoot
 {
@@ -26,8 +34,12 @@ public sealed partial class Project : AggregateRoot
     public string Name { get; private set; } = default!;
     public string? Description { get; private set; }
     public ProjectStatus Status { get; private set; }
+    public ProjectPriority Priority { get; private set; }
     public DateOnly? StartDate { get; private set; }
     public DateOnly? EndDate { get; private set; }
+
+    /// <summary>Persentase tugas selesai (0–100); dihitung dari tugas, belum diisi di story ini.</summary>
+    public int ProgressPct { get; private set; }
 
     /// <summary>ID publik user pemilik (milik User Service).</summary>
     public Guid OwnerId { get; private set; }
@@ -43,8 +55,8 @@ public sealed partial class Project : AggregateRoot
     private static partial Regex CodePattern();
 
     public static Project Create(
-        long tenantId, string code, string name, string? description, DateOnly? startDate, DateOnly? endDate,
-        Guid ownerId, Guid? departmentId)
+        long tenantId, string code, string name, string? description, ProjectPriority priority,
+        DateOnly? startDate, DateOnly? endDate, Guid ownerId, Guid? departmentId, DateTimeOffset now)
     {
         if (tenantId <= 0) throw new DomainException("Tenant wajib diisi.");
         if (ownerId == Guid.Empty) throw new DomainException("Pemilik proyek wajib diisi.");
@@ -56,21 +68,29 @@ public sealed partial class Project : AggregateRoot
             Status = ProjectStatus.Planning,
             OwnerId = ownerId,
         };
-        project.SetDetails(name, description, startDate, endDate, departmentId);
-        project._members.Add(new ProjectMember(tenantId, ownerId, ProjectRole.Manager));
+        project.SetDetails(name, description, priority, startDate, endDate, departmentId);
+        project._members.Add(new ProjectMember(tenantId, ownerId, ProjectRole.Manager, now));
         project.AddDomainEvent(new ProjectCreatedDomainEvent(tenantId, project.PublicId, project.Code, project.Name, ownerId));
         return project;
     }
 
-    /// <summary>Mengubah data proyek. Proyek yang diarsipkan tidak bisa diubah, dan arsip hanya lewat <see cref="Archive"/>.</summary>
-    public void Update(string name, string? description, ProjectStatus status, DateOnly? startDate, DateOnly? endDate, Guid? departmentId)
+    /// <summary>
+    /// Mengubah data proyek. Proyek yang diarsipkan tidak bisa diubah, dan arsip hanya lewat <see cref="Archive"/>.
+    /// Bila tidak ada nilai yang berubah, tidak ada event yang dicatat.
+    /// </summary>
+    public void Update(
+        string name, string? description, ProjectStatus status, ProjectPriority priority,
+        DateOnly? startDate, DateOnly? endDate, Guid? departmentId)
     {
         if (Status == ProjectStatus.Archived) throw new DomainException("Proyek yang diarsipkan tidak bisa diubah.");
         if (status == ProjectStatus.Archived) throw new DomainException("Gunakan arsip proyek untuk mengarsipkan.");
 
-        SetDetails(name, description, startDate, endDate, departmentId);
+        var before = (Name, Description, Status, Priority, StartDate, EndDate, DepartmentId);
+        SetDetails(name, description, priority, startDate, endDate, departmentId);
         Status = status;
-        AddDomainEvent(new ProjectUpdatedDomainEvent(TenantId, PublicId, Code, Name, ToName(Status)));
+
+        if (before != (Name, Description, Status, Priority, StartDate, EndDate, DepartmentId))
+            AddDomainEvent(new ProjectUpdatedDomainEvent(TenantId, PublicId, Code, Name, ToName(Status)));
     }
 
     /// <summary>Mengarsipkan proyek; mengulang arsip tidak berbuat apa-apa.</summary>
@@ -82,7 +102,8 @@ public sealed partial class Project : AggregateRoot
         AddDomainEvent(new ProjectArchivedDomainEvent(TenantId, PublicId));
     }
 
-    private void SetDetails(string name, string? description, DateOnly? startDate, DateOnly? endDate, Guid? departmentId)
+    private void SetDetails(
+        string name, string? description, ProjectPriority priority, DateOnly? startDate, DateOnly? endDate, Guid? departmentId)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new DomainException("Nama proyek wajib diisi.");
         if (name.Trim().Length > NameMaxLength) throw new DomainException($"Nama proyek maksimal {NameMaxLength} karakter.");
@@ -93,9 +114,11 @@ public sealed partial class Project : AggregateRoot
 
         if (startDate is { } start && endDate is { } end && start > end)
             throw new DomainException("Tanggal mulai tidak boleh setelah tanggal selesai.");
+        if (!Enum.IsDefined(priority)) throw new DomainException("Prioritas proyek tidak dikenal.");
 
         Name = name.Trim();
         Description = trimmedDescription;
+        Priority = priority;
         StartDate = startDate;
         EndDate = endDate;
         DepartmentId = departmentId == Guid.Empty ? null : departmentId;
@@ -132,6 +155,22 @@ public sealed partial class Project : AggregateRoot
         }
 
         status = default;
+        return false;
+    }
+
+    /// <summary>Nama prioritas di kolom PRIORITY (huruf besar).</summary>
+    public static string ToName(ProjectPriority priority) => priority.ToString().ToUpperInvariant();
+
+    public static bool TryParsePriority(string? name, out ProjectPriority priority)
+    {
+        foreach (var candidate in Enum.GetValues<ProjectPriority>())
+        {
+            if (!string.Equals(ToName(candidate), name?.Trim(), StringComparison.OrdinalIgnoreCase)) continue;
+            priority = candidate;
+            return true;
+        }
+
+        priority = default;
         return false;
     }
 }

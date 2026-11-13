@@ -9,12 +9,14 @@ using NexUS.Project.Application.Projects;
 
 namespace NexUS.Project.Api.Controllers;
 
+/// <param name="Priority"><c>low</c>, <c>medium</c> (bawaan), <c>high</c>, atau <c>urgent</c>.</param>
 public sealed record CreateProjectRequest(
-    string Code, string Name, string? Description, DateOnly? StartDate, DateOnly? EndDate, Guid? DepartmentId);
+    string Code, string Name, string? Description, string? Priority, DateOnly? StartDate, DateOnly? EndDate, Guid? DepartmentId);
 
 /// <param name="Status"><c>planning</c>, <c>active</c>, <c>on_hold</c>, atau <c>completed</c>.</param>
+/// <param name="Priority"><c>low</c>, <c>medium</c>, <c>high</c>, atau <c>urgent</c>.</param>
 public sealed record UpdateProjectRequest(
-    string Name, string? Description, string Status, DateOnly? StartDate, DateOnly? EndDate, Guid? DepartmentId);
+    string Name, string? Description, string Status, string Priority, DateOnly? StartDate, DateOnly? EndDate, Guid? DepartmentId);
 
 [ApiController]
 [Route("api/v1/projects")]
@@ -48,7 +50,7 @@ public sealed class ProjectsController(ISender mediator) : ControllerBase
     public async Task<CreatedAtActionResult> Create(CreateProjectRequest request, CancellationToken ct)
     {
         var project = await mediator.Send(new CreateProjectCommand(
-            request.Code, request.Name, request.Description, request.StartDate, request.EndDate, request.DepartmentId), ct);
+            request.Code, request.Name, request.Description, request.Priority, request.StartDate, request.EndDate, request.DepartmentId), ct);
         WithEtag(project);
         return CreatedAtAction(nameof(Get), new { id = project.Id }, project);
     }
@@ -57,12 +59,13 @@ public sealed class ProjectsController(ISender mediator) : ControllerBase
     [HttpPut("{id:guid}")]
     [Authorize(Policy = Policies.ProjectUpdate)]
     [ProducesResponseType<ProjectDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ProjectDto> Update(Guid id, UpdateProjectRequest request, CancellationToken ct) =>
         WithEtag(await mediator.Send(new UpdateProjectCommand(
-            id, request.Name, request.Description, request.Status, request.StartDate, request.EndDate, request.DepartmentId,
-            RequireIfMatch()), ct));
+            id, request.Name, request.Description, request.Status, request.Priority, request.StartDate, request.EndDate,
+            request.DepartmentId, RequireIfMatch()), ct));
 
     /// <summary>Mengarsipkan proyek (status <c>archived</c>); proyek tidak lagi muncul di daftar bawaan.</summary>
     [HttpDelete("{id:guid}")]

@@ -20,17 +20,20 @@ public sealed class ProjectMember : Entity
 
     public ProjectRole Role { get; private set; }
 
+    public DateTimeOffset JoinedAt { get; private set; }
+
     private ProjectMember() { } // untuk EF Core
 
-    internal ProjectMember(long tenantId, Guid userId, ProjectRole role)
+    internal ProjectMember(long tenantId, Guid userId, ProjectRole role, DateTimeOffset joinedAt)
     {
         if (userId == Guid.Empty) throw new DomainException("User anggota wajib diisi.");
 
         TenantId = tenantId;
         UserId = userId;
         Role = role;
+        JoinedAt = joinedAt;
     }
 
-    /// <summary>Nama peran di kolom ROLE (huruf besar).</summary>
+    /// <summary>Nama peran di kolom PROJECT_ROLE (huruf besar).</summary>
     public static string ToName(ProjectRole role) => role.ToString().ToUpperInvariant();
 }

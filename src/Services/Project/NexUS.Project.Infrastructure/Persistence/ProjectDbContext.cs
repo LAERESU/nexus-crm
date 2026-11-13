@@ -17,6 +17,7 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
     public const long SystemActor = 0;
 
     private const int OracleUniqueViolation = 1; // ORA-00001
+    private const string ProjectCodeIndex = "UX_PROJECTS_TNT_CODE";
 
     // Dibaca saat query dijalankan (bukan saat model dibuat), sehingga filter mengikuti user pada request ini.
     private long CurrentTenantId => currentUser.TenantId;
@@ -41,6 +42,10 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
             e.Property(x => x.Status).HasColumnName("STATUS").HasMaxLength(20).HasConversion(
                 status => ProjectEntity.ToName(status),
                 value => ParseStatus(value));
+            e.Property(x => x.Priority).HasColumnName("PRIORITY").HasMaxLength(10).HasConversion(
+                priority => ProjectEntity.ToName(priority),
+                value => Enum.Parse<ProjectPriority>(value, true));
+            e.Property(x => x.ProgressPct).HasColumnName("PROGRESS_PCT");
             // Provider Oracle belum memetakan DateOnly; kolom DATE diisi lewat DateTime tanpa jam.
             e.Property(x => x.StartDate).HasColumnName("START_DATE").HasColumnType("DATE").HasConversion(
                 date => date.HasValue ? date.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
@@ -61,9 +66,10 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
             MapEntity(e);
             e.Property(x => x.ProjectId).HasColumnName("PROJECT_ID");
             e.Property(x => x.UserId).HasColumnName("USER_ID");
-            e.Property(x => x.Role).HasColumnName("ROLE").HasMaxLength(20).HasConversion(
+            e.Property(x => x.Role).HasColumnName("PROJECT_ROLE").HasMaxLength(20).HasConversion(
                 role => ProjectMember.ToName(role),
                 value => Enum.Parse<ProjectRole>(value, true));
+            e.Property(x => x.JoinedAt).HasColumnName("JOINED_AT");
             e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
         });
 
@@ -145,9 +151,11 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
         {
             throw new ConcurrencyException($"Data diubah oleh proses lain: {ex.Entries.Count} entitas bentrok.");
         }
-        catch (DbUpdateException ex) when (ex.InnerException is OracleException { Number: OracleUniqueViolation })
+        catch (DbUpdateException ex) when (ex.InnerException is OracleException { Number: OracleUniqueViolation } oracle
+            && oracle.Message.Contains(ProjectCodeIndex, StringComparison.OrdinalIgnoreCase))
         {
             // Dua permintaan bersamaan lolos pemeriksaan di handler; index unik di database yang memutuskan.
+            // Pelanggaran constraint unik lain bukan kesalahan klien dan diteruskan sebagai error server.
             throw new DomainException("Kode proyek sudah dipakai di tenant ini.");
         }
     }

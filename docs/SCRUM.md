@@ -1,7 +1,7 @@
 # NexUS — Scrum & Pelacak Progres
 
 > File ini dipakai untuk melihat **sudah sampai mana pengembangan**. Langkah rinci setiap story ada di `docs/stories/`. Perbarui status story setiap hari, dan isi bagian Sprint Log di akhir setiap sprint.
-> Terakhir diperbarui: 2026-11-08
+> Terakhir diperbarui: 2026-11-14
 
 ---
 
@@ -202,7 +202,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | 0 | Persiapan | Repo awal, keputusan D1–D6, tim, backlog siap | NX-001 | ✅ |
 | 1 | Fondasi | Template service, docker-compose, CI hijau | NX-002–007, NX-009 | ✅ |
 | 2 | Fondasi | Login end-to-end via Gateway, deploy otomatis ke dev | NX-010–017 (NX-008 ditunda) | ✅ |
-| 3 | Layanan inti | User & RBAC berjalan | NX-018–024 | 🟨 |
+| 3 | Layanan inti | User & RBAC berjalan | NX-018–024 | ✅ |
 | 4 | Layanan inti | Proyek & anggota berjalan | NX-025–031 | 🟨 |
 | 5 | Layanan inti | Tugas, kanban, dashboard dasar | NX-032–042 | ⬜ |
 | 6 | SOP Builder | Editor SOP + notifikasi in-app | NX-044–048, NX-055–056 | ⬜ |

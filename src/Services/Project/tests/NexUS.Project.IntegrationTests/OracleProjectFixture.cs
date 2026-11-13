@@ -64,6 +64,7 @@ public sealed class OracleProjectFixture : IAsyncLifetime
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Oracle"] = ConnectionString,
+                ["Services:User:BaseUrl"] = "http://user.invalid",
             }))
             .ConfigureServices(services =>
             {
@@ -87,7 +88,12 @@ public sealed class OracleProjectFixture : IAsyncLifetime
     }
 
     /// <summary>Menetapkan permission (scope global) seorang user, seperti jawaban User Service.</summary>
-    public void Grant(long tenantId, Guid userId, params string[] permissions) => _permissions.Set(tenantId, userId, permissions);
+    public void Grant(long tenantId, Guid userId, params string[] permissions) =>
+        _permissions.Set(tenantId, userId, permissions.Select(code => new GrantedPermission(code, "global", null)).ToList());
+
+    /// <summary>Menetapkan permission dengan scope tertentu (<c>global</c>, <c>project</c>, <c>department</c>).</summary>
+    public void GrantScoped(long tenantId, Guid userId, params (string Code, string ScopeType, Guid? ScopeId)[] permissions) =>
+        _permissions.Set(tenantId, userId, permissions.Select(p => new GrantedPermission(p.Code, p.ScopeType, p.ScopeId)).ToList());
 
     /// <summary>Klien sebagai user tertentu; tanpa <paramref name="userId"/> berarti manajer proyek tenant itu.</summary>
     public HttpClient ClientAs(long tenantId, Guid? userId = null)
@@ -156,8 +162,8 @@ public sealed class OracleProjectFixture : IAsyncLifetime
     {
         private readonly ConcurrentDictionary<(long, Guid), IReadOnlyList<GrantedPermission>> _granted = new();
 
-        public void Set(long tenantId, Guid userId, string[] permissions) =>
-            _granted[(tenantId, userId)] = permissions.Select(code => new GrantedPermission(code, "global", null)).ToList();
+        public void Set(long tenantId, Guid userId, IReadOnlyList<GrantedPermission> permissions) =>
+            _granted[(tenantId, userId)] = permissions;
 
         public Task<IReadOnlyList<GrantedPermission>> GetAsync(long tenantId, Guid userId, CancellationToken ct = default) =>
             Task.FromResult(_granted.TryGetValue((tenantId, userId), out var permissions) ? permissions : []);

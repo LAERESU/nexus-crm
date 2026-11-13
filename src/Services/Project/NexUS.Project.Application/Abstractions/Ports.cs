@@ -25,3 +25,20 @@ public interface IProjectReadService
 
 /// <param name="Status">Nama status API; null berarti semua kecuali yang diarsipkan.</param>
 public sealed record ProjectFilter(string? Search, string? Status, Guid? OwnerId, Guid? DepartmentId, int Page, int Size);
+
+/// <summary>Kode permission yang diperiksa terhadap scope penugasan role (sama dengan nama policy di Api).</summary>
+public static class ProjectPermissions
+{
+    public const string Create = "project.create";
+    public const string Update = "project.update";
+}
+
+/// <summary>
+/// Pemeriksaan scope atas permission tulis. Policy endpoint hanya memastikan user memegang permission pada scope apa
+/// pun; di sini dipastikan scope-nya mencakup objek yang disentuh: global, proyek itu sendiri, atau departemennya.
+/// </summary>
+public interface IProjectAccess
+{
+    /// <summary>Melempar <c>ForbiddenException</c> (403) bila tidak ada penugasan yang mencakup proyek/departemen ini.</summary>
+    Task EnsureAsync(string permission, Guid? projectId, Guid? departmentId, CancellationToken ct);
+}

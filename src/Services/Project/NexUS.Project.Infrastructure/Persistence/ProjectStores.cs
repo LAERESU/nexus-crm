@@ -24,12 +24,11 @@ public sealed class ProjectRepository(ProjectDbContext db) : IProjectRepository
 public sealed class ProjectReadService(ProjectDbContext db) : IProjectReadService
 {
     public async Task<ProjectDto?> GetAsync(Guid publicId, CancellationToken ct) =>
-        await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.PublicId == publicId, ct) is { } project ? ToDto(project) : null;
+        await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.PublicId == publicId, ct) is { } project ? ProjectDto.From(project) : null;
 
     public async Task<PagedResult<ProjectDto>> ListAsync(ProjectFilter filter, CancellationToken ct)
     {
-        var page = PagedResult<ProjectDto>.NormalizePage(filter.Page);
-        var size = PagedResult<ProjectDto>.NormalizeSize(filter.Size);
+        var (page, size) = (filter.Page, filter.Size); // sudah dibatasi validator
 
         var query = db.Projects.AsNoTracking();
 
@@ -53,10 +52,6 @@ public sealed class ProjectReadService(ProjectDbContext db) : IProjectReadServic
         var total = await query.LongCountAsync(ct);
         var items = await query.OrderBy(p => p.Name).ThenBy(p => p.Id).Skip((page - 1) * size).Take(size).ToListAsync(ct);
 
-        return new PagedResult<ProjectDto>(items.Select(ToDto).ToList(), page, size, total);
+        return new PagedResult<ProjectDto>(items.Select(ProjectDto.From).ToList(), page, size, total);
     }
-
-    private static ProjectDto ToDto(ProjectEntity p) => new(
-        p.PublicId, p.Code, p.Name, p.Description, ProjectStatusNames.ToApi(p.Status), p.StartDate, p.EndDate,
-        p.OwnerId, p.DepartmentId, p.RowVersion, p.CreatedAt);
 }

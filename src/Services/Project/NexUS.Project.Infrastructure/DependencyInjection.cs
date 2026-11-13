@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using NexUS.Project.Application.Abstractions;
 using NexUS.Project.Application.Common;
 using NexUS.Project.Infrastructure.Persistence;
+using NexUS.Project.Infrastructure.Security;
 using Oracle.EntityFrameworkCore.Infrastructure;
 
 namespace NexUS.Project.Infrastructure;
@@ -22,6 +23,7 @@ public static class DependencyInjection
 
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IProjectReadService, ProjectReadService>();
+        services.AddScoped<IProjectAccess, ProjectAccess>();
 
         return services;
     }

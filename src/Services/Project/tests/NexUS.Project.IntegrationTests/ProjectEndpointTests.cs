@@ -14,8 +14,8 @@ public class ProjectEndpointTests(OracleProjectFixture fixture)
     private const long B = OracleProjectFixture.TenantB;
 
     private sealed record ProjectBody(
-        Guid Id, string Code, string Name, string? Description, string Status, DateOnly? StartDate, DateOnly? EndDate,
-        Guid OwnerId, Guid? DepartmentId, long RowVersion);
+        Guid Id, string Code, string Name, string? Description, string Status, string Priority, DateOnly? StartDate, DateOnly? EndDate,
+        int ProgressPct, Guid OwnerId, Guid? DepartmentId, long RowVersion);
 
     private sealed record Paged(List<ProjectBody> Items, int Page, int Size, long TotalCount);
 
@@ -50,6 +50,7 @@ public class ProjectEndpointTests(OracleProjectFixture fixture)
         name,
         description = (string?)null,
         status,
+        priority = "high",
         startDate = "2026-11-16",
         endDate = "2027-01-31",
         departmentId = (Guid?)null,
@@ -75,6 +76,8 @@ public class ProjectEndpointTests(OracleProjectFixture fixture)
         response.Headers.ETag!.Tag.Should().Be("\"0\"");
         project.Code.Should().Be(code.ToUpperInvariant());
         project.Status.Should().Be("planning");
+        project.Priority.Should().Be("medium", "prioritas bawaan");
+        project.ProgressPct.Should().Be(0);
         project.StartDate.Should().Be(new DateOnly(2026, 11, 16));
         project.EndDate.Should().Be(new DateOnly(2026, 12, 31));
         project.OwnerId.Should().Be(OracleProjectFixture.ManagerId(A));
@@ -82,13 +85,15 @@ public class ProjectEndpointTests(OracleProjectFixture fixture)
         (await client.GetFromJsonAsync<ProjectBody>($"/api/v1/projects/{project.Id}")).Should().Be(project);
 
         var role = await fixture.ScalarAsync(
-            "SELECT m.ROLE FROM PROJECT_MEMBERS m JOIN PROJECTS p ON p.ID = m.PROJECT_ID WHERE p.PUBLIC_ID = :id AND m.USER_ID = :usr",
+            "SELECT m.PROJECT_ROLE FROM PROJECT_MEMBERS m JOIN PROJECTS p ON p.ID = m.PROJECT_ID WHERE p.PUBLIC_ID = :id AND m.USER_ID = :usr",
             new OracleParameter("id", OracleDbType.Raw) { Value = project.Id.ToByteArray() },
             new OracleParameter("usr", OracleDbType.Raw) { Value = OracleProjectFixture.ManagerId(A).ToByteArray() });
         role.Should().Be("MANAGER");
 
         var events = Convert.ToInt32(await fixture.ScalarAsync(
-            $"SELECT COUNT(*) FROM OUTBOX_MESSAGES WHERE TYPE LIKE '%ProjectCreatedDomainEvent%' AND PAYLOAD LIKE '%{code.ToUpperInvariant()}%'"));
+            "SELECT COUNT(*) FROM OUTBOX_MESSAGES WHERE TYPE LIKE :type AND PAYLOAD LIKE :payload",
+            new OracleParameter("type", "%ProjectCreatedDomainEvent%"),
+            new OracleParameter("payload", $"%{code.ToUpperInvariant()}%")));
         events.Should().Be(1);
     }
 
@@ -122,6 +127,7 @@ public class ProjectEndpointTests(OracleProjectFixture fixture)
         var body = (await updated.Content.ReadFromJsonAsync<ProjectBody>())!;
         body.Name.Should().Be("Proyek Diubah");
         body.Status.Should().Be("active");
+        body.Priority.Should().Be("high");
         body.Description.Should().BeNull();
         body.EndDate.Should().Be(new DateOnly(2027, 1, 31));
         body.RowVersion.Should().Be(project.RowVersion + 1);
@@ -201,6 +207,59 @@ public class ProjectEndpointTests(OracleProjectFixture fixture)
         (await other.SendAsync(WithIfMatch(HttpMethod.Put, url, project.RowVersion, UpdateBody()))).StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await other.SendAsync(WithIfMatch(HttpMethod.Delete, url, project.RowVersion))).StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await ListAsync(other, $"search={project.Code}")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Menyimpan_ulang_data_yang_sama_tidak_menulis_event_dan_tidak_menaikkan_versi()
+    {
+        var client = fixture.ClientAs(A);
+        var project = await CreateAsync(client);
+        var url = $"/api/v1/projects/{project.Id}";
+        var first = (await (await client.SendAsync(WithIfMatch(HttpMethod.Put, url, project.RowVersion, UpdateBody())))
+            .Content.ReadFromJsonAsync<ProjectBody>())!;
+
+        var again = await client.SendAsync(WithIfMatch(HttpMethod.Put, url, first.RowVersion, UpdateBody()));
+
+        again.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await again.Content.ReadFromJsonAsync<ProjectBody>())!.RowVersion.Should().Be(first.RowVersion);
+        Convert.ToInt32(await fixture.ScalarAsync(
+            "SELECT COUNT(*) FROM OUTBOX_MESSAGES WHERE TYPE LIKE :type AND PAYLOAD LIKE :payload",
+            new OracleParameter("type", "%ProjectUpdatedDomainEvent%"),
+            new OracleParameter("payload", $"%{project.Code}%"))).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Permission_berscope_hanya_berlaku_untuk_proyek_atau_departemen_yang_dicakup()
+    {
+        var manager = fixture.ClientAs(A);
+        var department = Guid.NewGuid();
+        var inScope = await CreateAsync(manager);
+        var inDepartment = await CreateAsync(manager, departmentId: department);
+        var outside = await CreateAsync(manager);
+
+        var scoped = Guid.NewGuid();
+        fixture.GrantScoped(A, scoped,
+            ("project.read", "global", null),
+            ("project.update", "project", inScope.Id),
+            ("project.update", "department", department),
+            ("project.create", "department", department));
+        var client = fixture.ClientAs(A, scoped);
+
+        (await client.SendAsync(WithIfMatch(HttpMethod.Put, $"/api/v1/projects/{inScope.Id}", inScope.RowVersion, UpdateBody())))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.SendAsync(WithIfMatch(HttpMethod.Delete, $"/api/v1/projects/{inDepartment.Id}", inDepartment.RowVersion)))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Di luar cakupan: permission ada, tetapi bukan untuk proyek ini.
+        (await client.SendAsync(WithIfMatch(HttpMethod.Put, $"/api/v1/projects/{outside.Id}", outside.RowVersion, UpdateBody())))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await client.SendAsync(WithIfMatch(HttpMethod.Delete, $"/api/v1/projects/{outside.Id}", outside.RowVersion)))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await manager.GetFromJsonAsync<ProjectBody>($"/api/v1/projects/{outside.Id}"))!.Status.Should().Be("planning");
+
+        // Membuat proyek hanya di departemen yang dicakup.
+        (await client.PostAsJsonAsync("/api/v1/projects", NewProject(departmentId: department))).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await client.PostAsJsonAsync("/api/v1/projects", NewProject())).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
