@@ -12,7 +12,7 @@ builder.Host.AddNexusSerilog();
 
 builder.Services
     .AddProjectApplication()
-    .AddProjectInfrastructure();
+    .AddProjectInfrastructure(builder.Configuration);
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
@@ -20,6 +20,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddNexusHealthChecks(builder.Configuration);
 builder.Services.AddNexusJwtAuth(builder.Configuration);
+builder.Services.AddAuthorization();
+// Permission user diambil dari User Service (Services:User:BaseUrl) dengan cache Redis (NX-020).
+builder.Services.AddNexusPermissionAuthorization(builder.Configuration);
 
 var app = builder.Build();
 

@@ -10,10 +10,10 @@
 | Item | Nilai |
 | --- | --- |
 | Fase | 2 · Layanan inti |
-| Sprint aktif | Sprint 3 |
-| Tanggal mulai sprint | 2026-11-09 |
-| Tanggal selesai sprint | 2026-11-20 |
-| Sprint goal | User & RBAC berjalan: admin tenant bisa mengelola user, departemen, role, dan permission |
+| Sprint aktif | Sprint 4 |
+| Tanggal mulai sprint | 2026-11-13 |
+| Tanggal selesai sprint | 2026-11-27 |
+| Sprint goal | Proyek & anggota berjalan |
 | Progres keseluruhan | 23 / 64 story selesai (36%) |
 | Hambatan aktif | NX-008 ditunda: butuh cluster Kubernetes dan keputusan D3 |
 
@@ -129,7 +129,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 
 | ID | Story | SP | Sprint | Status |
 | --- | --- | --- | --- | --- |
-| NX-025 | Schema & CRUD proyek (soft delete, paging, filter) | 8 | 4 | ⬜ |
+| NX-025 | Schema & CRUD proyek (soft delete, paging, filter) | 8 | 4 | 🔍 |
 | NX-026 | Kelola anggota proyek & peran proyek | 5 | 4 | ⬜ |
 | NX-027 | Milestone proyek | 3 | 4 | ⬜ |
 | NX-028 | Outbox pattern + publish event proyek | 5 | 4 | ⬜ |
@@ -203,7 +203,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | 1 | Fondasi | Template service, docker-compose, CI hijau | NX-002–007, NX-009 | ✅ |
 | 2 | Fondasi | Login end-to-end via Gateway, deploy otomatis ke dev | NX-010–017 (NX-008 ditunda) | ✅ |
 | 3 | Layanan inti | User & RBAC berjalan | NX-018–024 | 🟨 |
-| 4 | Layanan inti | Proyek & anggota berjalan | NX-025–031 | ⬜ |
+| 4 | Layanan inti | Proyek & anggota berjalan | NX-025–031 | 🟨 |
 | 5 | Layanan inti | Tugas, kanban, dashboard dasar | NX-032–042 | ⬜ |
 | 6 | SOP Builder | Editor SOP + notifikasi in-app | NX-044–048, NX-055–056 | ⬜ |
 | 7 | SOP Builder | Versioning, approval, publish, email | NX-049–052, NX-057 | ⬜ |
