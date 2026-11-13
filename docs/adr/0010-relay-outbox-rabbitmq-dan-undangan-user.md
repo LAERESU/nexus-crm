@@ -29,5 +29,5 @@ Story NX-028 menyebut MassTransit. Paket yang terpasang di repo, `MassTransit.Ra
 - Kegagalan permanen saat publish menahan relay (urutan dijaga) sampai diperbaiki; alamat email yang tidak valid dilewati dan dicatat.
 - Antrean consumer harus sudah ada sebelum event pertama dikirim; sampai Auth pernah berjalan, `UserCreated` menunggu di outbox.
 - `Email:ActivationUrlTemplate` wajib diisi di setiap environment.
-- Belum ada kirim ulang undangan, dan halaman web `/activate` belum dibuat (tautan di email mengarah ke sana).
+- Belum ada kirim ulang undangan. Halaman web `/activate` (tujuan tautan di email) ditambahkan menyusul sebagai perbaikan NX-021.
 - Baris outbox yang sudah terproses belum dibersihkan.

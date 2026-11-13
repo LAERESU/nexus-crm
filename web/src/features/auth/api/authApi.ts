@@ -27,6 +27,12 @@ export const authApi = {
       .post<TokenResponse>('/auth/login', request, { skipAuthRefresh: true })
       .then((r) => r.data),
 
+  /** Mengisi password pertama akun undangan dengan token dari email (NX-021). */
+  activate: (token: string, password: string) =>
+    httpClient
+      .post<void>('/auth/activate', { token, password }, { skipAuthRefresh: true })
+      .then(() => undefined),
+
   /** Memulihkan sesi dari refresh token (cookie httpOnly); berbagi satu request dengan refresh otomatis. */
   restoreSession: () => refreshAccessToken(),
 
