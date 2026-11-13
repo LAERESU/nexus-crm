@@ -65,6 +65,16 @@ public sealed class SetUserRolesCommandHandler(
     }
 }
 
+/// <summary>Akses efektif user yang sedang login (dipakai aplikasi web untuk menu, route, dan tombol).</summary>
+public sealed record GetMyPermissionsQuery : IRequest<UserPermissionsDto>;
+
+public sealed class GetMyPermissionsQueryHandler(IUserPermissionReadService permissionService, ICurrentUser currentUser)
+    : IRequestHandler<GetMyPermissionsQuery, UserPermissionsDto>
+{
+    public async Task<UserPermissionsDto> Handle(GetMyPermissionsQuery request, CancellationToken ct) =>
+        await permissionService.GetAsync(currentUser.UserId, ct) ?? throw new NotFoundException("Profil user tidak ditemukan.");
+}
+
 public sealed record GetUserPermissionsQuery(Guid UserId) : IRequest<UserPermissionsDto>;
 
 public sealed class GetUserPermissionsQueryHandler(

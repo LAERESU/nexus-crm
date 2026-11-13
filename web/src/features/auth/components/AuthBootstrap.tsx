@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { authApi } from '@/features/auth/api/authApi'
+import { loadPermissions } from '@/features/auth/api/loadPermissions'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import { queryClient } from '@/shared/api/queryClient'
 
@@ -8,6 +9,7 @@ import { queryClient } from '@/shared/api/queryClient'
  * Saat aplikasi dimuat, sesi dipulihkan dari refresh token (cookie httpOnly) karena access token hanya ada di
  * memori dan hilang ketika halaman di-refresh. Cache data server dibersihkan setiap kali sesi berakhir atau user
  * berganti, agar user berikutnya di tab yang sama tidak melihat data user/tenant sebelumnya.
+ * Permission dimuat setiap kali access token berganti (login, pemulihan sesi, refresh).
  */
 export function AuthBootstrap({ children }: { children: ReactNode }) {
   useEffect(
@@ -17,11 +19,13 @@ export function AuthBootstrap({ children }: { children: ReactNode }) {
         const switched =
           previous.user !== null && state.user !== null && previous.user.id !== state.user.id
         if (ended || switched) queryClient.clear()
+        if (state.accessToken && state.accessToken !== previous.accessToken) void loadPermissions()
       }),
     [],
   )
 
   useEffect(() => {
+    if (useAuthStore.getState().status === 'authenticated') void loadPermissions()
     if (useAuthStore.getState().status !== 'unknown') return
     const startedAt = useAuthStore.getState().generation
     authApi.restoreSession().catch(() => {

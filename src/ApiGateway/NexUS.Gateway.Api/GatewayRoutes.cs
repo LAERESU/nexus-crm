@@ -5,6 +5,8 @@ public static class GatewayRoutes
     /// <summary>
     /// Path milik komunikasi antar service yang diblokir di Gateway (selalu 404). Tulis segmen resource secara
     /// literal: pola dengan parameter di posisi resource kalah prioritas dari route YARP dan tidak akan memblokir.
+    /// Pengecualian: <c>GET /api/v1/users/me/permissions</c> (permission milik sendiri, dipakai aplikasi web) punya
+    /// route YARP literal sendiri yang lebih spesifik daripada pola di bawah.
     /// </summary>
     public static readonly string[] InternalPaths =
     [

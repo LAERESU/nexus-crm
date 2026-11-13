@@ -29,7 +29,10 @@ export const routes = [
         element: <MainLayout />,
         children: [
           { index: true, element: withSuspense(<DashboardPage />) },
-          { path: 'admin/users', element: withSuspense(<UserListPage />) },
+          {
+            element: <RequireAuth permission="user.read" />,
+            children: [{ path: 'admin/users', element: withSuspense(<UserListPage />) }],
+          },
           { path: '403', element: withSuspense(<ForbiddenPage />) },
           { path: '*', element: withSuspense(<NotFoundPage />) },
         ],

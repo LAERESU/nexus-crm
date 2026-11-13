@@ -91,7 +91,13 @@ function renderPage() {
 }
 
 describe('UserListPage', () => {
-  beforeEach(() => useAuthStore.getState().login(fakeJwt()))
+  beforeEach(() => {
+    useAuthStore.getState().login(fakeJwt())
+    useAuthStore.getState().setPermissions(useAuthStore.getState().generation, 'user-1', [
+      { code: 'user.read', scopeType: 'global' },
+      { code: 'user.manage', scopeType: 'global' },
+    ])
+  })
   afterEach(() => {
     listOverride = undefined
     httpClient.defaults.adapter = originalAdapter
@@ -104,6 +110,20 @@ describe('UserListPage', () => {
     expect(await screen.findByText('Budi Santoso', {}, slow)).toBeInTheDocument()
     expect(screen.getByText('45 user')).toBeInTheDocument()
     expect(listRequests(requests)[0]?.params).toMatchObject({ page: 1, size: 20 })
+  })
+
+  it('tanpa user.manage global, tombol undang, edit, dan nonaktifkan tersembunyi', async () => {
+    backend()
+    useAuthStore.getState().setPermissions(useAuthStore.getState().generation, 'user-1', [
+      { code: 'user.read', scopeType: 'global' },
+      { code: 'user.manage', scopeType: 'department' },
+    ])
+    renderPage()
+
+    expect(await screen.findByText('Budi Santoso', {}, slow)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Undang user/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Nonaktifkan' })).not.toBeInTheDocument()
   })
 
   it('pencarian di-debounce: satu request untuk seluruh ketikan, kembali ke halaman 1', async () => {

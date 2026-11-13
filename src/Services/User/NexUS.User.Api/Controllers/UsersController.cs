@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NexUS.BuildingBlocks.Common.Results;
 using NexUS.User.Application.Users;
+using Roles = NexUS.User.Application.Roles;
 
 namespace NexUS.User.Api.Controllers;
 
@@ -32,6 +33,16 @@ public sealed class UsersController(ISender mediator) : ControllerBase
     [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<UserDto> Me(CancellationToken ct) => WithEtag(await mediator.Send(new GetMeQuery(), ct));
+
+    /// <summary>
+    /// Akses efektif user yang sedang login: role beserta scope-nya dan daftar permission. Dipakai aplikasi web untuk
+    /// tampilan (menu, route, tombol); <c>GET {id}/permissions</c> tetap khusus antar service dan diblokir di Gateway.
+    /// </summary>
+    [HttpGet("me/permissions")]
+    [Authorize(Policy = Policies.Authenticated)]
+    [ProducesResponseType<Roles.UserPermissionsDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<Roles.UserPermissionsDto> MyPermissions(CancellationToken ct) => mediator.Send(new GetMyPermissionsQuery(), ct);
 
     [HttpGet("{id:guid}")]
     [Authorize(Policy = Policies.UserRead)]

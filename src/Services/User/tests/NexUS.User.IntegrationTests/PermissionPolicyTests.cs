@@ -59,6 +59,11 @@ public class PermissionPolicyTests(OracleUserFixture fixture)
         (await client.GetAsync("/api/v1/users/me")).StatusCode.Should().Be(HttpStatusCode.OK);
         var own = await client.GetFromJsonAsync<PermissionsBody>($"/api/v1/users/{noRoles.Id}/permissions");
         own!.Permissions.Should().BeEmpty();
+        (await client.GetFromJsonAsync<PermissionsBody>("/api/v1/users/me/permissions"))!.Permissions.Should().BeEmpty();
+
+        // Aplikasi web membaca permission sendiri lewat /me/permissions (endpoint {id}/permissions diblokir Gateway).
+        var admin = await fixture.ClientAs(Tenant).GetFromJsonAsync<PermissionsBody>("/api/v1/users/me/permissions");
+        admin!.Permissions.Select(p => p.Code).Should().Contain("user.manage");
     }
 
     [Fact]

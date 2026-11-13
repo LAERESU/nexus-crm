@@ -2,6 +2,7 @@ import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { Alert, Button, Flex, Input, Select, Space, Table, Tag, Typography } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useState } from 'react'
+import { usePermission } from '@/features/auth/hooks/usePermission'
 import type { User, UserStatus } from '@/features/users/api/usersApi'
 import { EditUserDrawer } from '@/features/users/components/EditUserDrawer'
 import { InviteUserModal } from '@/features/users/components/InviteUserModal'
@@ -18,6 +19,7 @@ interface Filters {
 }
 
 export default function UserListPage() {
+  const canManage = usePermission('user.manage')
   const [searchText, setSearchText] = useState('')
   const [filters, setFilters] = useState<Filters>({})
   // Halaman berlaku untuk kata kunci saat halaman itu dipilih; kata kunci baru selalu mulai dari halaman 1,
@@ -71,7 +73,9 @@ export default function UserListPage() {
       render: (value: UserStatus) =>
         value === 'active' ? <Tag color="green">Aktif</Tag> : <Tag>Nonaktif</Tag>,
     },
-    {
+  ]
+  if (canManage)
+    columns.push({
       title: 'Aksi',
       key: 'actions',
       render: (_, user) => (
@@ -82,8 +86,7 @@ export default function UserListPage() {
           <UserStatusButton user={user} />
         </Space>
       ),
-    },
-  ]
+    })
 
   return (
     <>
@@ -91,9 +94,11 @@ export default function UserListPage() {
         <Typography.Title level={3} style={{ margin: 0 }}>
           Pengguna
         </Typography.Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setInviteOpen(true)}>
-          Undang user
-        </Button>
+        {canManage && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setInviteOpen(true)}>
+            Undang user
+          </Button>
+        )}
       </Flex>
 
       <Flex gap={12} wrap style={{ margin: '16px 0' }}>
@@ -182,16 +187,20 @@ export default function UserListPage() {
         }}
       />
 
-      <InviteUserModal
-        open={inviteOpen}
-        departments={departmentItems}
-        onClose={() => setInviteOpen(false)}
-      />
-      <EditUserDrawer
-        user={editingUser}
-        departments={departmentItems}
-        onClose={() => setEditing(null)}
-      />
+      {canManage && (
+        <>
+          <InviteUserModal
+            open={inviteOpen}
+            departments={departmentItems}
+            onClose={() => setInviteOpen(false)}
+          />
+          <EditUserDrawer
+            user={editingUser}
+            departments={departmentItems}
+            onClose={() => setEditing(null)}
+          />
+        </>
+      )}
     </>
   )
 }

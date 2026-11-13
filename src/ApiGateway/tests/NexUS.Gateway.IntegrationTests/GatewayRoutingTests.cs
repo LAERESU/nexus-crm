@@ -38,6 +38,19 @@ public class GatewayRoutingTests(GatewayFixture fixture) : IClassFixture<Gateway
         fixture.Received.Count.Should().Be(before);
     }
 
+    [Fact]
+    public async Task Permission_milik_sendiri_diteruskan_tetapi_hanya_untuk_GET()
+    {
+        var response = await fixture.CreateClient().GetAsync("/api/v1/users/me/permissions");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        LastReceived().Path.Should().Be("/api/v1/users/me/permissions");
+
+        var before = fixture.Received.Count;
+        (await fixture.CreateClient().PutAsync("/api/v1/users/me/permissions", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        fixture.Received.Count.Should().Be(before);
+    }
+
     [Theory]
     [InlineData("/api/v1/auth/login")]
     [InlineData("/api/v1/users/42")]
