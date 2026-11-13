@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace NexUS.Project.IntegrationTests;
 
-public class HealthEndpointTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class HealthEndpointTests(ProjectApiFactory factory) : IClassFixture<ProjectApiFactory>
 {
     [Fact]
     public async Task Health_live_mengembalikan_200()
@@ -26,4 +26,11 @@ public class HealthEndpointTests(WebApplicationFactory<Program> factory) : IClas
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
+}
+
+/// <summary>Host tanpa database: hanya konfigurasi wajib yang diisi.</summary>
+public sealed class ProjectApiFactory : WebApplicationFactory<Program>
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder) =>
+        builder.UseSetting("Services:User:BaseUrl", "http://user.invalid");
 }

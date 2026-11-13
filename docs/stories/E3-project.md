@@ -13,9 +13,10 @@ Referensi utama: `ARCHITECTURE.md` A.2, A.3, B.3, C.2 (PRJ_SCHEMA), D.4–D.6.
   3. Command/query: create, update (dengan `If-Match` → `ROW_VERSION`), archive (soft delete), get, list (filter status, owner, departemen, search, paging).
   4. Pembuat proyek otomatis menjadi anggota dengan peran `MANAGER`.
 - **Acceptance criteria:**
-  - [ ] Update dengan `ROW_VERSION` usang → 409.
-  - [ ] Proyek yang diarsipkan tidak muncul di list default.
-  - [ ] Unit test domain + integration test endpoint lulus.
+  - [x] Update dengan `ROW_VERSION` usang → 409.
+  - [x] Proyek yang diarsipkan tidak muncul di list default.
+  - [x] Unit test domain + integration test endpoint lulus.
+- **Catatan:** arsip adalah status `ARCHIVED` (bukan `IS_DELETED`): `DELETE /projects/{id}` mengarsipkan, dan arsip tampil dengan `?status=archived`. Tabel `PROJECT_MEMBERS` dibuat di sini karena langkah 4 membutuhkannya; endpoint anggota dan pemeriksaan keanggotaan tetap di NX-026. `OWNER_ID`/`DEPARTMENT_ID` menyimpan ID publik dari User Service tanpa divalidasi ke sana. Permission tulis diperiksa terhadap scope penugasan role (global, proyek itu, atau departemennya); pemeriksaan keanggotaan untuk membaca tetap di NX-026. Arsip belum bisa dibatalkan dan proyek arsip tetap memegang kodenya. Kode `ExpectRowVersion`/audit/outbox di `ProjectDbContext` masih salinan dari User Service; pemindahan ke BuildingBlocks belum dikerjakan. Event proyek tersimpan di outbox; pengirimnya ke RabbitMQ dipasang di NX-028.
 
 ---
 
