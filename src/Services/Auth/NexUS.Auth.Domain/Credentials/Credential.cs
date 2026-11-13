@@ -9,10 +9,14 @@ public sealed class Credential : AggregateRoot
     public const int MaxFailedAttempts = 5;
     public static readonly TimeSpan FailureWindow = TimeSpan.FromMinutes(15);
     public static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(15);
+    public static readonly TimeSpan ActivationLifetime = TimeSpan.FromHours(72);
 
     public Guid UserId { get; private set; }
     public string Email { get; private set; } = default!;
-    public string PasswordHash { get; private set; } = default!;
+    /// <summary>Kosong selama akun belum diaktifkan (undangan belum dipakai).</summary>
+    public string? PasswordHash { get; private set; }
+    public string? ActivationTokenHash { get; private set; }
+    public DateTimeOffset? ActivationExpiresAt { get; private set; }
     public int FailedAttempts { get; private set; }
     public DateTimeOffset? FirstFailedAt { get; private set; }
     public DateTimeOffset? LockedUntil { get; private set; }
@@ -32,6 +36,40 @@ public sealed class Credential : AggregateRoot
             Email = NormalizeEmail(email),
             PasswordHash = passwordHash,
         };
+    }
+
+    /// <summary>Kredensial untuk user yang baru diundang: belum punya password, hanya token aktivasi (hash).</summary>
+    public static Credential Invite(long tenantId, Guid userId, string email, string activationTokenHash, DateTimeOffset now)
+    {
+        if (tenantId <= 0) throw new DomainException("Tenant wajib diisi.");
+        if (userId == Guid.Empty) throw new DomainException("User wajib diisi.");
+        if (string.IsNullOrWhiteSpace(activationTokenHash)) throw new DomainException("Token aktivasi wajib diisi.");
+
+        return new Credential
+        {
+            TenantId = tenantId,
+            UserId = userId,
+            Email = NormalizeEmail(email),
+            ActivationTokenHash = activationTokenHash,
+            ActivationExpiresAt = now + ActivationLifetime,
+        };
+    }
+
+    public bool IsActivated => PasswordHash is not null;
+
+    public bool CanActivate(DateTimeOffset now) =>
+        !IsActivated && ActivationTokenHash is not null && ActivationExpiresAt is { } expires && expires > now;
+
+    /// <summary>Mengisi password pertama. Token hanya berlaku sekali dan sampai <see cref="ActivationExpiresAt"/>.</summary>
+    public void Activate(string passwordHash, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash)) throw new DomainException("Hash password wajib diisi.");
+        if (!CanActivate(now)) throw new DomainException("Token aktivasi tidak valid atau sudah kedaluwarsa.");
+
+        PasswordHash = passwordHash;
+        ActivationTokenHash = null;
+        ActivationExpiresAt = null;
+        AddDomainEvent(new CredentialActivatedDomainEvent(PublicId, TenantId, UserId));
     }
 
     public static string NormalizeEmail(string email)
@@ -84,6 +122,8 @@ public sealed class Credential : AggregateRoot
 public sealed record TokenRevokedDomainEvent(
     Guid CredentialId, long TenantId, Guid UserId, Guid SessionId, RefreshTokenRevocationReason Reason, int RevokedTokens, string? IpAddress)
     : DomainEvent;
+
+public sealed record CredentialActivatedDomainEvent(Guid CredentialId, long TenantId, Guid UserId) : DomainEvent;
 
 public sealed record UserLoggedInDomainEvent(Guid CredentialId, long TenantId, Guid UserId) : DomainEvent;
 

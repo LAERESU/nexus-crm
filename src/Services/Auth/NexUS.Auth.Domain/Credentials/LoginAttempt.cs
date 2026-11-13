@@ -7,6 +7,7 @@ public enum LoginFailureReason
     UserNotFound,
     InvalidLogin,
     Locked,
+    NotActivated,
 }
 
 /// <summary>Satu baris LOGIN_HISTORY. Email yang dicoba sengaja tidak disimpan (data pribadi).</summary>

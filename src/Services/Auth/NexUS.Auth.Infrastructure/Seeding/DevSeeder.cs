@@ -30,6 +30,7 @@ public sealed class DevSeeder(
     IServiceScopeFactory scopes,
     IOptions<DevSeedOptions> options,
     IHostEnvironment environment,
+    TimeProvider timeProvider,
     ILogger<DevSeeder> logger) : BackgroundService
 {
     public const int MaxAttempts = 10;
@@ -82,11 +83,24 @@ public sealed class DevSeeder(
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
         var email = Credential.NormalizeEmail(seed.AdminEmail);
-        if (await db.Credentials.AnyAsync(c => c.TenantId == seed.TenantId && c.Email == email, ct)) return;
-
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-        var credential = Credential.Create(seed.TenantId, seed.AdminUserId, email, hasher.Hash(seed.AdminPassword!));
-        db.Credentials.Add(credential);
+        var credential = await db.Credentials.FirstOrDefaultAsync(c => c.TenantId == seed.TenantId && c.Email == email, ct);
+        if (credential is null)
+        {
+            credential = Credential.Create(seed.TenantId, seed.AdminUserId, email, hasher.Hash(seed.AdminPassword!));
+            db.Credentials.Add(credential);
+        }
+        else if (credential.CanActivate(timeProvider.GetUtcNow()))
+        {
+            // UserCreated untuk admin dev (dari seed User Service) tiba lebih dulu dan membuat kredensial undangan:
+            // password seed tetap harus berlaku.
+            credential.Activate(hasher.Hash(seed.AdminPassword!), timeProvider.GetUtcNow());
+        }
+        else
+        {
+            return;
+        }
+
         db.Entry(credential).Property(AuthDbContext.RolesProperty).CurrentValue = seed.AdminRoles;
         await db.SaveChangesAsync(ct);
 

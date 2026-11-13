@@ -21,6 +21,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options, TimeP
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<LoginAttempt> LoginAttempts => Set<LoginAttempt>();
     public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
+    public DbSet<ProcessedEvent> ProcessedEvents => Set<ProcessedEvent>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -34,6 +35,9 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options, TimeP
             e.Property(x => x.UserId).HasColumnName("USER_ID");
             e.Property(x => x.Email).HasColumnName("EMAIL").HasMaxLength(320);
             e.Property(x => x.PasswordHash).HasColumnName("PASSWORD_HASH").HasMaxLength(200);
+            e.Property(x => x.ActivationTokenHash).HasColumnName("ACTIVATION_TOKEN_HASH").HasMaxLength(64);
+            e.Property(x => x.ActivationExpiresAt).HasColumnName("ACTIVATION_EXPIRES_AT");
+            e.Ignore(x => x.IsActivated);
             e.Property(x => x.FailedAttempts).HasColumnName("FAILED_ATTEMPTS");
             e.Property(x => x.FirstFailedAt).HasColumnName("FIRST_FAILED_AT");
             e.Property(x => x.LockedUntil).HasColumnName("LOCKED_UNTIL");
@@ -84,7 +88,18 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options, TimeP
             e.Property(x => x.RetryCount).HasColumnName("RETRY_COUNT");
             e.Property(x => x.Error).HasColumnName("ERROR").HasMaxLength(2000);
         });
+
+        MapProcessedEvents(model);
     }
+
+    private static void MapProcessedEvents(ModelBuilder model) => model.Entity<ProcessedEvent>(e =>
+    {
+        e.ToTable("PROCESSED_EVENTS");
+        e.HasKey(x => new { x.EventId, x.Consumer });
+        e.Property(x => x.EventId).HasColumnName("EVENT_ID");
+        e.Property(x => x.Consumer).HasColumnName("CONSUMER").HasMaxLength(200);
+        e.Property(x => x.ProcessedAt).HasColumnName("PROCESSED_AT");
+    });
 
     /// <summary>Kolom wajib CONTEXT.md bagian 5; soft delete difilter otomatis.</summary>
     private static void MapEntity<T>(EntityTypeBuilder<T> e) where T : Entity

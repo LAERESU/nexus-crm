@@ -12,6 +12,11 @@ public interface ICredentialRepository
 
     Task AddAsync(Credential credential, CancellationToken ct);
 
+    Task<Credential?> FindByUserAsync(long tenantId, Guid userId, CancellationToken ct);
+
+    /// <summary>Mencari kredensial yang menunggu aktivasi berdasarkan hash token di tenant tertentu.</summary>
+    Task<Credential?> FindByActivationHashAsync(long tenantId, string activationTokenHash, CancellationToken ct);
+
     Task<Credential?> FindByIdAsync(long tenantId, long id, CancellationToken ct);
 
     /// <summary>Memuat ulang nilai terbaru dari database setelah konflik konkurensi.</summary>

@@ -152,4 +152,17 @@ public class LoginCommandHandlerTests
     {
         new LoginCommandValidator().Validate(new LoginCommand(email, password, null, null)).IsValid.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task Akun_yang_belum_diaktifkan_ditolak_dengan_pesan_generik()
+    {
+        var invited = Credential.Invite(7, Guid.NewGuid(), "baru@demo.local", "hash-token", _time.GetUtcNow());
+        _credentials.FindByEmailAsync("baru@demo.local", Arg.Any<CancellationToken>()).Returns(invited);
+
+        await FluentActions.Awaiting(() => Login("baru@demo.local")).Should().ThrowAsync<UnauthorizedException>()
+            .WithMessage(LoginCommandHandler.GenericFailureMessage);
+
+        _hasher.Received(1).VerifyDummy(Password);
+        await _attempts.Received(1).AddAsync(Arg.Is<LoginAttempt>(a => a.FailureReason == LoginFailureReason.NotActivated), Arg.Any<CancellationToken>());
+    }
 }

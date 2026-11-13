@@ -10,7 +10,7 @@ using Oracle.ManagedDataAccess.Client;
 namespace NexUS.Auth.IntegrationTests;
 
 /// <summary>
-/// Oracle Free dan Redis sungguhan (Testcontainers) dengan migrasi <c>db/auth</c> yang sama seperti Flyway,
+/// Oracle Free, Redis, RabbitMQ, dan Mailpit sungguhan (Testcontainers) dengan migrasi <c>db/auth</c> yang sama seperti Flyway,
 /// lalu Auth Service berjalan di atasnya dengan seed admin dev.
 /// </summary>
 public sealed class OracleAuthFixture : IAsyncLifetime
@@ -32,13 +32,30 @@ public sealed class OracleAuthFixture : IAsyncLifetime
         .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Ready to accept connections"))
         .Build();
 
+    private readonly IContainer _rabbit = new ContainerBuilder("rabbitmq:3.13-management-alpine")
+        .WithEnvironment("RABBITMQ_DEFAULT_USER", "nexus")
+        .WithEnvironment("RABBITMQ_DEFAULT_PASS", "nexus_test")
+        .WithPortBinding(5672, assignRandomHostPort: true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"))
+        .Build();
+
+    private readonly IContainer _mailpit = new ContainerBuilder("axllent/mailpit:latest")
+        .WithPortBinding(1025, assignRandomHostPort: true)
+        .WithPortBinding(8025, assignRandomHostPort: true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPort(8025).ForPath("/readyz")))
+        .Build();
+
     public WebApplicationFactory<Program> Factory { get; private set; } = default!;
+
+    /// <summary>API HTTP Mailpit untuk membaca email yang dikirim Auth Service.</summary>
+    public HttpClient Mailpit { get; private set; } = default!;
     public string ConnectionString { get; private set; } = default!;
     public string RedisConnectionString { get; private set; } = default!;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_oracle.StartAsync(), _redis.StartAsync());
+        await Task.WhenAll(_oracle.StartAsync(), _redis.StartAsync(), _rabbit.StartAsync(), _mailpit.StartAsync());
+        Mailpit = new HttpClient { BaseAddress = new Uri($"http://{_mailpit.Hostname}:{_mailpit.GetMappedPublicPort(8025)}/") };
         RedisConnectionString = $"{_redis.Hostname}:{_redis.GetMappedPublicPort(6379)},abortConnect=false";
         ConnectionString =
             $"User Id=AUTH_SCHEMA;Password={SchemaPassword};Data Source={_oracle.Hostname}:{_oracle.GetMappedPublicPort(1521)}/FREEPDB1";
@@ -52,6 +69,10 @@ public sealed class OracleAuthFixture : IAsyncLifetime
                 ["ConnectionStrings:Oracle"] = ConnectionString,
                 ["ConnectionStrings:Redis"] = RedisConnectionString,
                 ["Seed:AdminPassword"] = AdminPassword,
+                ["ConnectionStrings:RabbitMq"] = $"amqp://nexus:nexus_test@{_rabbit.Hostname}:{_rabbit.GetMappedPublicPort(5672)}",
+                ["Email:SmtpHost"] = _mailpit.Hostname,
+                ["Email:SmtpPort"] = _mailpit.GetMappedPublicPort(1025).ToString(),
+                ["Email:ActivationUrlTemplate"] = "http://localhost:5173/activate?token={token}",
             })));
         _ = Factory.Server; // memicu start host (dan seeder) sekarang
         await Factory.Services.GetRequiredService<DevSeeder>().Completion.WaitAsync(TimeSpan.FromMinutes(2));
@@ -60,8 +81,11 @@ public sealed class OracleAuthFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         if (Factory is not null) await Factory.DisposeAsync();
+        Mailpit?.Dispose();
         await _oracle.DisposeAsync();
         await _redis.DisposeAsync();
+        await _rabbit.DisposeAsync();
+        await _mailpit.DisposeAsync();
     }
 
     /// <summary>Menjalankan V*.sql di db/auth berurutan, sama seperti Flyway.</summary>
