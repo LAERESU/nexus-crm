@@ -93,7 +93,7 @@ function renderPage() {
 describe('UserListPage', () => {
   beforeEach(() => {
     useAuthStore.getState().login(fakeJwt())
-    useAuthStore.getState().setPermissions(useAuthStore.getState().generation, [
+    useAuthStore.getState().setPermissions(useAuthStore.getState().generation, 'user-1', [
       { code: 'user.read', scopeType: 'global' },
       { code: 'user.manage', scopeType: 'global' },
     ])
@@ -114,7 +114,7 @@ describe('UserListPage', () => {
 
   it('tanpa user.manage global, tombol undang, edit, dan nonaktifkan tersembunyi', async () => {
     backend()
-    useAuthStore.getState().setPermissions(useAuthStore.getState().generation, [
+    useAuthStore.getState().setPermissions(useAuthStore.getState().generation, 'user-1', [
       { code: 'user.read', scopeType: 'global' },
       { code: 'user.manage', scopeType: 'department' },
     ])

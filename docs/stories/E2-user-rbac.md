@@ -91,4 +91,4 @@ Referensi utama: `ARCHITECTURE.md` B.2, C.2 (USR_SCHEMA), G.2.
 - **Acceptance criteria:**
   - [x] User tanpa izin yang membuka URL admin diarahkan ke `/403`.
   - [x] Tombol aksi tersembunyi untuk user tanpa permission terkait.
-- **Catatan:** permission dimuat dari `GET /users/{id}/permissions` setiap access token berganti (respons login tidak memuatnya). `/admin/users` butuh `user.read`; tombol aksinya butuh `user.manage` di scope global, sama dengan policy backend.
+- **Catatan:** permission dimuat dari `GET /users/me/permissions` (endpoint baru; `{id}/permissions` diblokir Gateway) setiap access token berganti (respons login tidak memuatnya). `/admin/users` butuh `user.read`; tombol aksinya butuh `user.manage` di scope global, sama dengan policy backend.

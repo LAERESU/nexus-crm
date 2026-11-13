@@ -1,6 +1,5 @@
-import { Button, Result, Spin } from 'antd'
+import { Result, Spin } from 'antd'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { loadPermissions } from '@/features/auth/api/loadPermissions'
 import { grantsPermission, useAuthStore } from '@/features/auth/store/authStore'
 
 /**
@@ -17,18 +16,14 @@ export function RequireAuth({ permission }: { permission?: string }) {
   if (status === 'anonymous') return <Navigate to="/login" state={{ from: location }} replace />
   if (!permission) return <Outlet />
 
-  if (permissionsStatus === 'loading') return <Spin fullscreen tip="Memuat hak akses..." />
+  if (permissionsStatus === 'loading') return <Spin size="large" aria-label="Memuat hak akses" />
+  // Tombol coba lagi ada di peringatan MainLayout, yang membungkus semua route ber-permission.
   if (permissionsStatus === 'error')
     return (
       <Result
         status="warning"
-        title="Hak akses gagal dimuat"
-        subTitle="Halaman ini belum bisa dibuka. Periksa koneksi lalu coba lagi."
-        extra={
-          <Button type="primary" onClick={() => void loadPermissions()}>
-            Coba lagi
-          </Button>
-        }
+        title="Halaman belum bisa dibuka"
+        subTitle="Hak akses Anda gagal dimuat. Periksa koneksi lalu coba lagi."
       />
     )
   return allowed ? <Outlet /> : <Navigate to="/403" replace />

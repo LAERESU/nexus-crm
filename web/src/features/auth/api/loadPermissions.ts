@@ -1,26 +1,27 @@
 import { authApi } from '@/features/auth/api/authApi'
 import { useAuthStore } from '@/features/auth/store/authStore'
 
-/** Generasi sesi yang permission-nya sedang dimuat. */
-let loadingGeneration: number | null = null
+/** Sesi (generasi + user) yang permission-nya sedang dimuat. */
+let loading: { generation: number; userId: string } | null = null
 
 /**
- * Memuat permission user yang sedang login ke `authStore`. Satu pemuatan per sesi pada satu waktu: bila access
+ * Memuat permission user yang sedang login ke `authStore`. Satu pemuatan per sesi dan user pada satu waktu: bila access
  * token berganti selama pemuatan (refresh karena 401), request yang sedang berjalan sudah diulang dengan token
  * baru, sehingga pemicu berikutnya dilewati dan tidak ada putaran muat-refresh.
  */
 export async function loadPermissions(): Promise<void> {
   const { user, generation } = useAuthStore.getState()
-  if (!user || loadingGeneration === generation) return
+  if (!user || (loading?.generation === generation && loading.userId === user.id)) return
 
-  loadingGeneration = generation
+  const current = { generation, userId: user.id }
+  loading = current
   useAuthStore.getState().retryPermissions(generation)
   try {
-    const permissions = await authApi.permissions(user.id)
-    useAuthStore.getState().setPermissions(generation, permissions)
+    const permissions = await authApi.permissions()
+    useAuthStore.getState().setPermissions(generation, user.id, permissions)
   } catch {
-    useAuthStore.getState().failPermissions(generation)
+    useAuthStore.getState().failPermissions(generation, user.id)
   } finally {
-    if (loadingGeneration === generation) loadingGeneration = null
+    if (loading === current) loading = null
   }
 }

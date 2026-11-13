@@ -2,7 +2,6 @@ import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { Alert, Button, Flex, Input, Select, Space, Table, Tag, Typography } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useState } from 'react'
-import { Can } from '@/features/auth/components/Can'
 import { usePermission } from '@/features/auth/hooks/usePermission'
 import type { User, UserStatus } from '@/features/users/api/usersApi'
 import { EditUserDrawer } from '@/features/users/components/EditUserDrawer'
@@ -95,11 +94,11 @@ export default function UserListPage() {
         <Typography.Title level={3} style={{ margin: 0 }}>
           Pengguna
         </Typography.Title>
-        <Can permission="user.manage">
+        {canManage && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setInviteOpen(true)}>
             Undang user
           </Button>
-        </Can>
+        )}
       </Flex>
 
       <Flex gap={12} wrap style={{ margin: '16px 0' }}>
@@ -188,16 +187,20 @@ export default function UserListPage() {
         }}
       />
 
-      <InviteUserModal
-        open={inviteOpen}
-        departments={departmentItems}
-        onClose={() => setInviteOpen(false)}
-      />
-      <EditUserDrawer
-        user={editingUser}
-        departments={departmentItems}
-        onClose={() => setEditing(null)}
-      />
+      {canManage && (
+        <>
+          <InviteUserModal
+            open={inviteOpen}
+            departments={departmentItems}
+            onClose={() => setInviteOpen(false)}
+          />
+          <EditUserDrawer
+            user={editingUser}
+            departments={departmentItems}
+            onClose={() => setEditing(null)}
+          />
+        </>
+      )}
     </>
   )
 }

@@ -28,4 +28,5 @@ NX-020 mengganti pemetaan sementara policy ke role `admin` di token (ADR-0006) d
 - Setiap cache miss di User Service menjalankan beberapa query ringan; optimasi query khusus permission dan memoization per request ditunda.
 - Race cache-aside tetap mungkin (pembacaan lama menimpa key yang baru dihapus); dibatasi oleh TTL 15 menit.
 - Retry dan circuit breaker (Polly) untuk panggilan ke User Service belum ada karena paketnya belum tersedia di repo; saat ini hanya timeout (`Services:User:TimeoutSeconds`, default 5 detik). Harus ditambahkan sebelum service lain memakai `UserServicePermissionSource` di produksi.
+- Aplikasi web membaca permission user yang login lewat `GET /api/v1/users/me/permissions` (NX-024), satu-satunya bentuk yang diteruskan Gateway; `GET /users/{id}/permissions` tetap internal. Hasilnya hanya untuk tampilan.
 - Service selain User perlu `Services:User:BaseUrl` dan memanggil `AddNexusPermissionAuthorization` setelah `AddNexusJwtAuth`.

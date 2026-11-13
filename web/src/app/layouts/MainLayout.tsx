@@ -6,11 +6,12 @@ import {
   LogoutOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Flex, Layout, Menu, Typography } from 'antd'
+import { Alert, Button, Flex, Layout, Menu, Typography } from 'antd'
 import type { MenuProps } from 'antd'
 import { useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { authApi } from '@/features/auth/api/authApi'
+import { loadPermissions } from '@/features/auth/api/loadPermissions'
 import { grantsPermission, useAuthStore } from '@/features/auth/store/authStore'
 
 const { Header, Sider, Content } = Layout
@@ -43,6 +44,7 @@ export function MainLayout() {
   const user = useAuthStore((s) => s.user)
   const clear = useAuthStore((s) => s.clear)
   const permissions = useAuthStore((s) => s.permissions)
+  const permissionsFailed = useAuthStore((s) => s.permissionsStatus === 'error')
   const menuItems = buildMenu((permission) => grantsPermission(permissions, permission))
   const [loggingOut, setLoggingOut] = useState(false)
 
@@ -79,6 +81,19 @@ export function MainLayout() {
           </Flex>
         </Header>
         <Content style={{ margin: 24 }}>
+          {permissionsFailed && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Hak akses gagal dimuat, sehingga sebagian menu dan tombol tidak tampil."
+              action={
+                <Button size="small" onClick={() => void loadPermissions()}>
+                  Coba lagi
+                </Button>
+              }
+            />
+          )}
           <Outlet />
         </Content>
       </Layout>

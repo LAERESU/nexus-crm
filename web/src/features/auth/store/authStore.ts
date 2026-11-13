@@ -42,14 +42,13 @@ interface AuthState {
   /** Token baru dari refresh untuk sesi yang sama (generasi tetap). */
   setAccessToken: (accessToken: string) => void
   clear: () => void
-  /** Menyimpan permission hasil muat; diabaikan bila sesi sudah berganti sejak `generation` itu. */
-  setPermissions: (generation: number, permissions: PermissionGrant[]) => void
+  /** Menyimpan permission hasil muat; diabaikan bila sesi atau user sudah berganti sejak pemuatan dimulai. */
+  setPermissions: (generation: number, userId: string, permissions: PermissionGrant[]) => void
   /** Gagal memuat: daftar yang sudah ada (mis. dari sebelum refresh token) tetap dipakai. */
-  failPermissions: (generation: number) => void
+  failPermissions: (generation: number, userId: string) => void
   /** Pemuatan diulang setelah gagal: kembali ke `loading`. */
   retryPermissions: (generation: number) => void
   hasRole: (role: string) => boolean
-  hasPermission: (permission: string) => boolean
 }
 
 /**
@@ -94,8 +93,10 @@ export function grantsPermission(permissions: PermissionGrant[], permission: str
 export const useAuthStore = create<AuthState>()((set, get) => {
   const apply = (accessToken: string, nextGeneration: number) => {
     const user = decodeSessionUser(accessToken)
-    // Sesi baru (generasi naik) mulai tanpa permission; refresh token sesi yang sama mempertahankannya.
-    const sameSession = user !== null && nextGeneration === get().generation
+    // Sesi baru (generasi naik) atau user lain (cookie diganti tab lain) mulai tanpa permission; refresh token
+    // untuk user dan sesi yang sama mempertahankannya.
+    const sameSession =
+      user !== null && nextGeneration === get().generation && get().user?.id === user.id
     set({
       ...(user
         ? { accessToken, user, status: 'authenticated' }
@@ -104,6 +105,9 @@ export const useAuthStore = create<AuthState>()((set, get) => {
       ...(sameSession ? {} : noPermissions),
     })
   }
+
+  const isCurrent = (generation: number, userId: string) =>
+    get().generation === generation && get().user?.id === userId
 
   return {
     accessToken: null,
@@ -121,11 +125,11 @@ export const useAuthStore = create<AuthState>()((set, get) => {
         generation: s.generation + 1,
         ...noPermissions,
       })),
-    setPermissions: (generation, permissions) => {
-      if (get().generation === generation) set({ permissions, permissionsStatus: 'ready' })
+    setPermissions: (generation, userId, permissions) => {
+      if (isCurrent(generation, userId)) set({ permissions, permissionsStatus: 'ready' })
     },
-    failPermissions: (generation) => {
-      if (get().generation === generation && get().permissionsStatus !== 'ready')
+    failPermissions: (generation, userId) => {
+      if (isCurrent(generation, userId) && get().permissionsStatus !== 'ready')
         set({ permissionsStatus: 'error' })
     },
     retryPermissions: (generation) => {
@@ -133,6 +137,5 @@ export const useAuthStore = create<AuthState>()((set, get) => {
         set({ permissionsStatus: 'loading' })
     },
     hasRole: (role) => get().user?.roles.includes(role) ?? false,
-    hasPermission: (permission) => grantsPermission(get().permissions, permission),
   }
 })
