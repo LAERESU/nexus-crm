@@ -1,4 +1,6 @@
 import { httpClient } from '@/shared/api/httpClient'
+import { ifMatch } from '@/shared/api/ifMatch'
+import { MAX_PAGE_SIZE } from '@/shared/types/paging'
 import type { PagedResult } from '@/shared/types/paging'
 
 export interface Role {
@@ -20,13 +22,11 @@ export interface Permission {
   description: string | null
 }
 
-/** Batas `size` endpoint list (CONTEXT.md bagian 6); matriks menampilkan satu halaman role berukuran maksimum. */
-export const MAX_ROLES = 100
-
 export const rolesApi = {
+  /** Matriks menampilkan satu halaman role berukuran maksimum. */
   list: () =>
     httpClient
-      .get<PagedResult<Role>>('/roles', { params: { page: 1, size: MAX_ROLES } })
+      .get<PagedResult<Role>>('/roles', { params: { page: 1, size: MAX_PAGE_SIZE } })
       .then((r) => r.data),
 
   /** Katalog seluruh permission yang dikenal sistem. */
@@ -35,11 +35,7 @@ export const rolesApi = {
   /** Mengganti seluruh permission role; `rowVersion` adalah versi role saat perubahan mulai dibuat. */
   setPermissions: (id: string, rowVersion: number, permissions: string[]) =>
     httpClient
-      .put<Role>(
-        `/roles/${id}/permissions`,
-        { permissions },
-        { headers: { 'If-Match': `"${rowVersion}"` } },
-      )
+      .put<Role>(`/roles/${id}/permissions`, { permissions }, ifMatch(rowVersion))
       .then((r) => r.data),
 }
 

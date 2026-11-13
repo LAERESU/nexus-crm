@@ -1,5 +1,6 @@
-import { Alert, App, Button, Space, Spin, Typography } from 'antd'
-import { useState } from 'react'
+import { Alert, App, Button, Modal, Space, Spin, Typography } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
+import { useBlocker } from 'react-router-dom'
 import { usePermission } from '@/features/auth/hooks/usePermission'
 import type { Role } from '@/features/roles/api/rolesApi'
 import { PermissionMatrix } from '@/features/roles/components/PermissionMatrix'
@@ -13,11 +14,13 @@ import { parseProblem, problemMessage } from '@/shared/api/problemDetails'
 /** Perubahan satu role yang belum disimpan, beserta versi role saat perubahan mulai dibuat. */
 interface Draft {
   baseRowVersion: number
-  permissions: string[]
+  permissions: ReadonlySet<string>
 }
 
-const sameSet = (a: readonly string[], b: readonly string[]) =>
-  a.length === b.length && a.every((code) => b.includes(code))
+const sameSet = (a: ReadonlySet<string>, b: readonly string[]) =>
+  a.size === new Set(b).size && b.every((code) => a.has(code))
+
+const noRoles: Role[] = []
 
 export default function RoleManagementPage() {
   const { message } = App.useApp()
@@ -25,7 +28,34 @@ export default function RoleManagementPage() {
   const roles = useRoles()
   const catalog = usePermissionCatalog()
   const save = useSetRolePermissions()
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({})
+  const [storedDrafts, setDrafts] = useState<Record<string, Draft>>({})
+  const items = roles.data?.items ?? noRoles
+
+  // Draft yang isinya sudah sama dengan server (mis. admin lain menyimpan perubahan yang sama) bukan lagi perubahan.
+  const drafts = useMemo(() => {
+    const dirty: Record<string, Draft> = {}
+    for (const role of items) {
+      const draft = storedDrafts[role.id]
+      if (draft && !sameSet(draft.permissions, role.permissions)) dirty[role.id] = draft
+    }
+    return dirty
+  }, [items, storedDrafts])
+  const selected = useMemo(() => {
+    const byRole = new Map<string, ReadonlySet<string>>()
+    for (const role of items)
+      byRole.set(role.id, drafts[role.id]?.permissions ?? new Set(role.permissions))
+    return byRole
+  }, [items, drafts])
+  const hasDrafts = Object.keys(drafts).length > 0
+
+  // Perubahan yang belum disimpan tidak hilang diam-diam saat pindah halaman atau menutup tab.
+  const blocker = useBlocker(hasDrafts)
+  useEffect(() => {
+    if (!hasDrafts) return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [hasDrafts])
 
   const dropDraft = (roleId: string) =>
     setDrafts((current) => {
@@ -36,26 +66,21 @@ export default function RoleManagementPage() {
 
   const toggle = (role: Role, permission: string, checked: boolean) =>
     setDrafts((current) => {
-      const base = current[role.id]?.permissions ?? role.permissions
-      const permissions = checked
-        ? [...base.filter((code) => code !== permission), permission]
-        : base.filter((code) => code !== permission)
-      const next = { ...current }
-      // Kembali sama dengan yang tersimpan: tidak ada lagi yang perlu disimpan.
-      if (sameSet(permissions, role.permissions)) delete next[role.id]
-      else
-        next[role.id] = {
-          baseRowVersion: current[role.id]?.baseRowVersion ?? role.rowVersion,
-          permissions,
-        }
-      return next
+      const draft = current[role.id]
+      const permissions = new Set(draft?.permissions ?? role.permissions)
+      if (checked) permissions.add(permission)
+      else permissions.delete(permission)
+      return {
+        ...current,
+        [role.id]: { baseRowVersion: draft?.baseRowVersion ?? role.rowVersion, permissions },
+      }
     })
 
   const saveRole = (role: Role) => {
     const draft = drafts[role.id]
     if (!draft) return
     save.mutate(
-      { roleId: role.id, rowVersion: draft.baseRowVersion, permissions: draft.permissions },
+      { roleId: role.id, rowVersion: draft.baseRowVersion, permissions: [...draft.permissions] },
       {
         onSuccess: () => {
           dropDraft(role.id)
@@ -76,8 +101,7 @@ export default function RoleManagementPage() {
   }
 
   const error = roles.error ?? catalog.error
-  const items = roles.data?.items ?? []
-  const saving = (role: Role) => save.isPending && save.variables.roleId === role.id
+  const savingRoleId = save.isPending ? save.variables.roleId : null
 
   return (
     <>
@@ -120,7 +144,9 @@ export default function RoleManagementPage() {
           roles={items}
           permissions={catalog.data}
           editable={canManage}
-          selected={(role) => new Set(drafts[role.id]?.permissions ?? role.permissions)}
+          // Selama satu role disimpan, kolomnya dikunci agar centang susulan tidak hilang saat hasil simpan tiba.
+          lockedRoleId={savingRoleId}
+          selected={selected}
           onToggle={toggle}
           renderRoleActions={(role) =>
             drafts[role.id] && (
@@ -129,8 +155,8 @@ export default function RoleManagementPage() {
                   type="primary"
                   size="small"
                   aria-label={`Simpan ${role.name}`}
-                  loading={saving(role)}
-                  disabled={save.isPending && !saving(role)}
+                  loading={savingRoleId === role.id}
+                  disabled={savingRoleId !== null && savingRoleId !== role.id}
                   onClick={() => saveRole(role)}
                 >
                   Simpan
@@ -138,7 +164,7 @@ export default function RoleManagementPage() {
                 <Button
                   size="small"
                   aria-label={`Batalkan perubahan ${role.name}`}
-                  disabled={save.isPending}
+                  disabled={savingRoleId !== null}
                   onClick={() => dropDraft(role.id)}
                 >
                   Batal
@@ -150,6 +176,18 @@ export default function RoleManagementPage() {
       ) : (
         !error && <Spin size="large" aria-label="Memuat role" />
       )}
+
+      <Modal
+        title="Tinggalkan halaman?"
+        open={blocker.state === 'blocked'}
+        okText="Tinggalkan"
+        okButtonProps={{ danger: true }}
+        cancelText="Tetap di sini"
+        onOk={() => blocker.proceed?.()}
+        onCancel={() => blocker.reset?.()}
+      >
+        Ada perubahan permission yang belum disimpan dan akan hilang.
+      </Modal>
     </>
   )
 }

@@ -1,4 +1,6 @@
 import { httpClient } from '@/shared/api/httpClient'
+import { ifMatch } from '@/shared/api/ifMatch'
+import { MAX_PAGE_SIZE } from '@/shared/types/paging'
 import type { PagedResult } from '@/shared/types/paging'
 
 export type UserStatus = 'active' | 'inactive'
@@ -39,11 +41,6 @@ export interface InviteUserRequest {
 }
 
 export type UpdateUserRequest = Omit<InviteUserRequest, 'email'>
-
-/** Batas `size` endpoint list (CONTEXT.md bagian 6). */
-export const MAX_PAGE_SIZE = 100
-
-const ifMatch = (rowVersion: number) => ({ headers: { 'If-Match': `"${rowVersion}"` } })
 
 export const usersApi = {
   list: (params: UserListParams) =>

@@ -1,5 +1,6 @@
 import { Checkbox, Table, Tag, Typography } from 'antd'
 import type { TableColumnsType } from 'antd'
+import { useMemo } from 'react'
 import type { ReactNode } from 'react'
 import type { Permission, Role } from '@/features/roles/api/rolesApi'
 
@@ -8,9 +9,11 @@ interface PermissionMatrixProps {
   /** Katalog permission; baris dikelompokkan per modul. */
   permissions: Permission[]
   /** Permission tiap role yang ditampilkan (termasuk perubahan yang belum disimpan). */
-  selected: (role: Role) => ReadonlySet<string>
+  selected: ReadonlyMap<string, ReadonlySet<string>>
   /** Role sistem selalu read-only; `false` membuat seluruh matriks read-only. */
   editable: boolean
+  /** Role yang sedang disimpan: kolomnya dikunci sementara. */
+  lockedRoleId?: string | null
   onToggle: (role: Role, permission: string, checked: boolean) => void
   /** Isi tambahan di kepala kolom role (mis. tombol simpan). */
   renderRoleActions?: (role: Role) => ReactNode
@@ -25,12 +28,12 @@ function toRows(permissions: Permission[]): Row[] {
   const sorted = [...permissions].sort(
     (a, b) => a.module.localeCompare(b.module) || a.code.localeCompare(b.code),
   )
+  const perModule = new Map<string, number>()
+  for (const { module } of sorted) perModule.set(module, (perModule.get(module) ?? 0) + 1)
   return sorted.map((permission, index) => ({
     ...permission,
     moduleSpan:
-      index > 0 && sorted[index - 1]?.module === permission.module
-        ? 0
-        : sorted.filter((p) => p.module === permission.module).length,
+      sorted[index - 1]?.module === permission.module ? 0 : (perModule.get(permission.module) ?? 1),
   }))
 }
 
@@ -40,9 +43,11 @@ export function PermissionMatrix({
   permissions,
   selected,
   editable,
+  lockedRoleId = null,
   onToggle,
   renderRoleActions,
 }: PermissionMatrixProps) {
+  const rows = useMemo(() => toRows(permissions), [permissions])
   const columns: TableColumnsType<Row> = [
     {
       title: 'Modul',
@@ -69,7 +74,7 @@ export function PermissionMatrix({
       ),
     },
     ...roles.map((role) => {
-      const current = selected(role)
+      const current = selected.get(role.id)
       return {
         key: role.id,
         align: 'center' as const,
@@ -84,8 +89,8 @@ export function PermissionMatrix({
         render: (_: unknown, row: Row) => (
           <Checkbox
             aria-label={`${role.name}: ${row.code}`}
-            checked={current.has(row.code)}
-            disabled={!editable || role.isSystem}
+            checked={current?.has(row.code) ?? false}
+            disabled={!editable || role.isSystem || role.id === lockedRoleId}
             onChange={(e) => onToggle(role, row.code, e.target.checked)}
           />
         ),
@@ -97,7 +102,7 @@ export function PermissionMatrix({
     <Table<Row>
       rowKey="code"
       columns={columns}
-      dataSource={toRows(permissions)}
+      dataSource={rows}
       pagination={false}
       bordered
       size="small"

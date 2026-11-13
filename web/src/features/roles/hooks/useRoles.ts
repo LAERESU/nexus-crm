@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { loadPermissions } from '@/features/auth/api/loadPermissions'
 import { roleKeys, rolesApi } from '@/features/roles/api/rolesApi'
 import type { Role } from '@/features/roles/api/rolesApi'
 import type { PagedResult } from '@/shared/types/paging'
@@ -26,8 +27,9 @@ export function useSetRolePermissions() {
   return useMutation({
     mutationFn: ({ roleId, rowVersion, permissions }: SetRolePermissionsInput) =>
       rolesApi.setPermissions(roleId, rowVersion, permissions),
-    // Role hasil simpan (dengan rowVersion baru) langsung menggantikan baris di cache.
-    onSuccess: (saved) =>
+    onSuccess: async (saved) => {
+      // Refetch yang sedang berjalan membaca keadaan sebelum simpan: batalkan agar tidak menimpa hasil ini.
+      await queryClient.cancelQueries({ queryKey: roleKeys.list() })
       queryClient.setQueryData<PagedResult<Role>>(
         roleKeys.list(),
         (current) =>
@@ -35,7 +37,10 @@ export function useSetRolePermissions() {
             ...current,
             items: current.items.map((r) => (r.id === saved.id ? saved : r)),
           },
-      ),
+      )
+      // Role yang diubah bisa jadi milik user ini sendiri: menu dan tombol mengikuti permission terbaru.
+      void loadPermissions()
+    },
     // Gagal (mis. 409): muat ulang agar matriks menampilkan keadaan server terbaru.
     onError: () => void queryClient.invalidateQueries({ queryKey: roleKeys.list() }),
   })

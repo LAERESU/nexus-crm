@@ -2,17 +2,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App as AntdApp } from 'antd'
-import { AxiosError } from 'axios'
-import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import type { Permission, Role } from '@/features/roles/api/rolesApi'
 import RoleManagementPage from '@/features/roles/pages/RoleManagementPage'
 import { httpClient } from '@/shared/api/httpClient'
+import { respond, slow } from '@/test/http'
 import { fakeJwt } from '@/test/tokens'
 
 const originalAdapter = httpClient.defaults.adapter
-const slow = { timeout: 5000 }
 
 const catalog: Permission[] = [
   { code: 'user.read', module: 'user', description: 'Melihat user' },
@@ -47,12 +46,7 @@ interface Write {
   ifMatch: unknown
 }
 
-function respond(config: InternalAxiosRequestConfig, status: number, data: unknown = {}) {
-  const response: AxiosResponse = { data, status, statusText: String(status), headers: {}, config }
-  return status >= 400
-    ? Promise.reject(new AxiosError('gagal', String(status), config, undefined, response))
-    : Promise.resolve(response)
-}
+let ownPermissionLoads = 0
 
 /** Backend tiruan yang menyimpan permission role, seperti server sungguhan. */
 function backend({ conflict = false } = {}) {
@@ -75,6 +69,12 @@ function backend({ conflict = false } = {}) {
       return respond(config, 200, { ...role })
     }
     if (config.url === '/permissions') return respond(config, 200, catalog)
+    if (config.url === '/users/me/permissions') {
+      ownPermissionLoads += 1
+      return respond(config, 200, {
+        permissions: ['role.read', 'role.manage'].map((code) => ({ code, scopeType: 'global' })),
+      })
+    }
     return respond(config, 200, {
       items: roles.map((r) => ({ ...r })),
       page: 1,
@@ -87,13 +87,18 @@ function backend({ conflict = false } = {}) {
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const router = createMemoryRouter([
+    { path: '/', element: <RoleManagementPage /> },
+    { path: '/lain', element: <p>Halaman lain</p> },
+  ])
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <AntdApp>
-        <RoleManagementPage />
+        <RouterProvider router={router} />
       </AntdApp>
     </QueryClientProvider>,
   )
+  return { ...view, router }
 }
 
 const box = (label: string) => screen.findByRole('checkbox', { name: label }, slow)
@@ -110,6 +115,7 @@ function grantPermissions(...codes: string[]) {
 describe('RoleManagementPage', () => {
   beforeEach(() => grantPermissions('role.read', 'role.manage'))
   afterEach(() => {
+    ownPermissionLoads = 0
     httpClient.defaults.adapter = originalAdapter
   })
 
@@ -181,6 +187,33 @@ describe('RoleManagementPage', () => {
     expect(await box('Staf: user.manage')).not.toBeChecked()
     expect(await box('Staf: task.read')).not.toBeChecked()
     expect(screen.queryByRole('button', { name: 'Simpan Staf' })).not.toBeInTheDocument()
+  })
+
+  it('pindah halaman dengan perubahan belum disimpan meminta konfirmasi', async () => {
+    backend()
+    const { router } = renderPage()
+    const user = userEvent.setup()
+
+    await user.click(await box('Staf: user.read'))
+    void router.navigate('/lain')
+
+    expect(await screen.findByText('Tinggalkan halaman?', {}, slow)).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/')
+
+    await user.click(screen.getByRole('button', { name: 'Tinggalkan' }))
+    expect(await screen.findByText('Halaman lain', {}, slow)).toBeInTheDocument()
+  })
+
+  it('menyimpan role memuat ulang permission user yang login', async () => {
+    const writes = backend()
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(await box('Staf: user.read'))
+    await user.click(screen.getByRole('button', { name: 'Simpan Staf' }))
+
+    await waitFor(() => expect(writes).toHaveLength(1), slow)
+    await waitFor(() => expect(ownPermissionLoads).toBe(1), slow)
   })
 
   it('tanpa role.manage seluruh matriks read-only', async () => {
