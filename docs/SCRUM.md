@@ -14,7 +14,7 @@
 | Tanggal mulai sprint | 2026-11-09 |
 | Tanggal selesai sprint | 2026-11-20 |
 | Sprint goal | User & RBAC berjalan: admin tenant bisa mengelola user, departemen, role, dan permission |
-| Progres keseluruhan | 22 / 64 story selesai (34%) |
+| Progres keseluruhan | 23 / 64 story selesai (36%) |
 | Hambatan aktif | NX-008 ditunda: butuh cluster Kubernetes dan keputusan D3 |
 
 Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 🔍 Review · ✅ Done · 🟥 Blocked
@@ -75,7 +75,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | --- | --- | --- | --- | --- | --- |
 | E0 | Fondasi & DevOps | 1 | 10 | 9 | 90% |
 | E1 | Auth & Gateway | 1 | 7 | 7 | 100% |
-| E2 | User & RBAC | 2 | 7 | 6 | 86% |
+| E2 | User & RBAC | 2 | 7 | 7 | 100% |
 | E3 | Project Management | 2 | 7 | 0 | 0% |
 | E4 | Task Management | 2 | 9 | 0 | 0% |
 | E5 | Dashboard | 2 | 3 | 0 | 0% |
@@ -122,7 +122,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | NX-020 | Permission policy dinamis + cache permission di Redis | 5 | 3 | ✅ |
 | NX-021 | Undang user via email (event `UserCreated`) | 3 | 3 | ✅ |
 | NX-022 | Halaman user list + form user | 5 | 3 | ✅ |
-| NX-023 | Halaman role + matriks permission | 5 | 3 | 🔍 |
+| NX-023 | Halaman role + matriks permission | 5 | 3 | ✅ |
 | NX-024 | Proteksi route & komponen `<Can>` di React | 3 | 3 | ✅ |
 
 ### E3 · Project Management
@@ -238,6 +238,25 @@ Salin template di bawah untuk setiap sprint yang selesai, terbaru di atas.
 **Retro — perbaiki (action item + PIC):** ...
 -->
 
+### Sprint 3 — 2026-11-09 s.d. 2026-11-13 (selesai lebih awal)
+
+**Sprint goal:** User & RBAC berjalan: admin tenant bisa mengelola user, departemen, role, dan permission
+**Tercapai?** Ya (teruji lokal; belum diuji di stack berjalan)
+
+| Metrik | Nilai |
+| --- | --- |
+| SP direncanakan | 37 |
+| SP selesai | 37 |
+| Story selesai | 7 (NX-018–024) |
+| Story dibawa ke sprint berikutnya | 0 |
+
+**Selesai:** NX-018, NX-019, NX-020, NX-021, NX-022, NX-023, NX-024
+**Belum selesai (alasan):** —
+**Hambatan:** GitHub Actions tidak berjalan (akun terkunci billing); CI digantikan sementara oleh tes lokal dan code review per PR.
+**Hasil review (catatan PO):** —
+**Retro — pertahankan:** code review per PR menemukan masalah nyata sebelum merge (mis. endpoint permission yang diblokir Gateway di NX-024).
+**Retro — perbaiki (action item + PIC):** halaman web (NX-022–024) hanya diuji dengan backend tiruan; jalankan uji end-to-end di stack lokal. Putuskan lisensi MassTransit (ADR-0010).
+
 ### Sprint 2 — selesai 2026-10-18
 
 **Sprint goal:** Login end-to-end via Gateway, deploy otomatis ke dev
@@ -276,6 +295,7 @@ Salin template di bawah untuk setiap sprint yang selesai, terbaru di atas.
 | Tanggal | Isu | Dampak (story) | PIC | Status |
 | --- | --- | --- | --- | --- |
 | 2026-11-07 | Belum ada cluster Kubernetes dev; keputusan D3 (lokasi deployment) belum diambil | NX-008 | | Terbuka |
+| 2026-11-13 | GitHub Actions tidak berjalan (akun terkunci billing); CI digantikan tes lokal + code review per PR | Semua PR | | Terbuka |
 
 ## 9. Riwayat Velocity
 
@@ -283,3 +303,4 @@ Salin template di bawah untuk setiap sprint yang selesai, terbaru di atas.
 | --- | --- | --- | --- |
 | 1 | 31 | 31 | Semua story selesai |
 | 2 | 43 | 35 | NX-008 ditunda (butuh cluster) |
+| 3 | 37 | 37 | Semua story selesai; CI tidak berjalan (billing) |
