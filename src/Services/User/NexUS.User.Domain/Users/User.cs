@@ -55,7 +55,7 @@ public sealed class User : AggregateRoot
 
         // Tanpa perubahan tidak ada UPDATE di database, jadi tidak boleh ada event ke consumer.
         if (FullName != oldName || JobTitle != oldTitle || DepartmentId != oldDepartment)
-            AddDomainEvent(new UserUpdatedDomainEvent(PublicId, TenantId, Email, FullName));
+            AddDomainEvent(new UserUpdatedDomainEvent(PublicId, TenantId, Email, FullName, Status == UserStatus.Active));
     }
 
     public void Activate()
@@ -64,7 +64,7 @@ public sealed class User : AggregateRoot
         Status = UserStatus.Active;
         // User nonaktif tidak punya permission, jadi cache permission-nya harus dihapus saat status berubah.
         AddDomainEvent(new NexUS.User.Domain.Roles.RoleChangedDomainEvent(TenantId, null, PublicId, NexUS.User.Domain.Roles.RoleChangeReason.UserStatusChanged));
-        AddDomainEvent(new UserUpdatedDomainEvent(PublicId, TenantId, Email, FullName));
+        AddDomainEvent(new UserUpdatedDomainEvent(PublicId, TenantId, Email, FullName, IsActive: true));
     }
 
     public void Deactivate()
@@ -116,6 +116,7 @@ public sealed class User : AggregateRoot
 
 public sealed record UserCreatedDomainEvent(Guid UserId, long TenantId, string Email, string FullName) : DomainEvent;
 
-public sealed record UserUpdatedDomainEvent(Guid UserId, long TenantId, string Email, string FullName) : DomainEvent;
+/// <param name="IsActive">Status user saat event terjadi; bawaan <c>true</c> untuk payload outbox lama yang belum memuatnya.</param>
+public sealed record UserUpdatedDomainEvent(Guid UserId, long TenantId, string Email, string FullName, bool IsActive = true) : DomainEvent;
 
 public sealed record UserDeactivatedDomainEvent(Guid UserId, long TenantId) : DomainEvent;

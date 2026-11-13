@@ -24,11 +24,39 @@ public class UserOutboxMapperTests
     }
 
     [Fact]
-    public void Hanya_UserCreated_yang_diambil_relay_event_lain_tetap_tertunda_di_outbox()
+    public void UserUpdated_dan_UserDeactivated_dipetakan_ke_kontraknya()
     {
-        _mapper.PublishedTypes.Should().Equal(typeof(UserCreatedDomainEvent).FullName);
+        var userId = Guid.NewGuid();
+        var updated = new UserUpdatedDomainEvent(userId, 7, "budi@contoh.com", "Budi Baru", IsActive: false);
+        var deactivated = new UserDeactivatedDomainEvent(userId, 7);
+
+        _mapper.Map(OutboxMessage.From(updated)).Should()
+            .Be(new UserUpdated(updated.EventId, updated.OccurredAt, 7, userId, "budi@contoh.com", "Budi Baru", false));
+        _mapper.Map(OutboxMessage.From(deactivated)).Should()
+            .Be(new UserDeactivated(deactivated.EventId, deactivated.OccurredAt, 7, userId));
+    }
+
+    [Fact]
+    public void Payload_UserUpdated_lama_tanpa_IsActive_dianggap_aktif()
+    {
+        var message = OutboxMessage.From(new UserUpdatedDomainEvent(Guid.NewGuid(), 7, "a@b.c", "A"));
+        message.Payload.Should().Contain("isActive");
+        var legacy = System.Text.Json.JsonSerializer.Deserialize<UserUpdatedDomainEvent>(
+            "{\"userId\":\"" + Guid.NewGuid() + "\",\"tenantId\":7,\"email\":\"a@b.c\",\"fullName\":\"A\"}",
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+
+        legacy!.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Relay_hanya_mengambil_tipe_yang_punya_kontrak()
+    {
+        _mapper.PublishedTypes.Should().BeEquivalentTo(
+        [
+            typeof(UserCreatedDomainEvent).FullName, typeof(UserUpdatedDomainEvent).FullName, typeof(UserDeactivatedDomainEvent).FullName,
+        ]);
         OutboxMessage.From(new UserCreatedDomainEvent(Guid.NewGuid(), 7, "a@b.c", "A")).Type
-            .Should().StartWith(_mapper.PublishedTypes.Single() + ",");
+            .Should().StartWith(typeof(UserCreatedDomainEvent).FullName + ",");
     }
 
     [Fact]

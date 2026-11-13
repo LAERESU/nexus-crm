@@ -22,4 +22,8 @@ public sealed class ProjectAccess(IPermissionService permissions, ICurrentUser c
 
         if (!allowed) throw new ForbiddenException("Izin Anda tidak mencakup proyek atau departemen ini.");
     }
+
+    public async Task<bool> CanSeeAllAsync(CancellationToken ct) =>
+        (await permissions.GetAsync(currentUser.TenantId, currentUser.UserId, ct)).Any(g =>
+            g.Code == ProjectPermissions.ReadAll && string.Equals(g.ScopeType, "global", StringComparison.OrdinalIgnoreCase));
 }

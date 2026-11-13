@@ -16,7 +16,8 @@ public static class DefaultRoleCatalog
         new("user.manage", "Mengelola user, departemen, dan tenant"),
         new("role.read", "Melihat role dan permission"),
         new("role.manage", "Mengelola role dan penugasan role ke user"),
-        new("project.read", "Melihat proyek"),
+        new("project.read", "Melihat proyek yang diikuti"),
+        new("project.all.read", "Melihat semua proyek tanpa menjadi anggota"),
         new("project.create", "Membuat proyek"),
         new("project.update", "Mengubah proyek"),
         new("project.member.manage", "Mengelola anggota proyek"),
@@ -39,14 +40,14 @@ public static class DefaultRoleCatalog
     /// <summary>Permission baca: dimiliki TENANT_ADMIN dan AUDITOR (read-only).</summary>
     private static readonly string[] ReadPermissions =
     [
-        "user.read", "role.read", "project.read", "task.read", "sop.read", "audit.read", "dashboard.read",
+        "user.read", "role.read", "project.read", "project.all.read", "task.read", "sop.read", "audit.read", "dashboard.read",
     ];
 
     // SUPER_ADMIN (platform, "kelola tenant") sengaja tidak ada: ia bukan role per tenant dan belum ada permission-nya.
     public static readonly IReadOnlyList<RoleDefinition> Roles =
     [
-        new("TENANT_ADMIN", "Admin Tenant", "Mengelola user, role, dan kategori SOP; membaca semua modul",
-            [.. ReadPermissions, "user.manage", "role.manage", "sop.category.manage"]),
+        new("TENANT_ADMIN", "Admin Tenant", "Mengelola user, role, anggota proyek, dan kategori SOP; membaca semua modul",
+            [.. ReadPermissions, "user.manage", "role.manage", "project.member.manage", "sop.category.manage"]),
         new("PROJECT_MANAGER", "Manajer Proyek", "Mengelola proyek, anggota, dan tugas",
             ["project.read", "project.create", "project.update", "project.member.manage",
              "task.read", "task.create", "task.update", "task.delete", "sop.read", "dashboard.read"]),

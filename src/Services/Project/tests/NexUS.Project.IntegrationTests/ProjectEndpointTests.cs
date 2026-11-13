@@ -169,7 +169,10 @@ public class ProjectEndpointTests(OracleProjectFixture fixture)
     [Fact]
     public async Task List_mendukung_filter_status_pemilik_departemen_pencarian_dan_paging()
     {
-        var manager = fixture.ClientAs(A);
+        // Melihat semua proyek tenant (termasuk milik orang lain) butuh project.all.read.
+        var lister = Guid.NewGuid();
+        fixture.Grant(A, lister, "project.read", "project.create", "project.update", "project.all.read");
+        var manager = fixture.ClientAs(A, lister);
         var otherOwner = Guid.NewGuid();
         fixture.Grant(A, otherOwner, "project.read", "project.create", "project.update");
         var marker = $"filter-{Guid.NewGuid():N}";
@@ -244,6 +247,14 @@ public class ProjectEndpointTests(OracleProjectFixture fixture)
             ("project.update", "department", department),
             ("project.create", "department", department));
         var client = fixture.ClientAs(A, scoped);
+        // Kepemilikan objek dipenuhi (manager di ketiga proyek), sehingga yang diuji di sini hanya scope permission.
+        foreach (var project in new[] { inScope, inDepartment, outside })
+            (await manager.PostAsJsonAsync($"/api/v1/projects/{project.Id}/members", new { userId = scoped, role = "manager" }))
+                .StatusCode.Should().Be(HttpStatusCode.Created);
+        // Menambah anggota menaikkan versi proyek.
+        inScope = (await manager.GetFromJsonAsync<ProjectBody>($"/api/v1/projects/{inScope.Id}"))!;
+        inDepartment = (await manager.GetFromJsonAsync<ProjectBody>($"/api/v1/projects/{inDepartment.Id}"))!;
+        outside = (await manager.GetFromJsonAsync<ProjectBody>($"/api/v1/projects/{outside.Id}"))!;
 
         (await client.SendAsync(WithIfMatch(HttpMethod.Put, $"/api/v1/projects/{inScope.Id}", inScope.RowVersion, UpdateBody())))
             .StatusCode.Should().Be(HttpStatusCode.OK);
@@ -271,9 +282,10 @@ public class ProjectEndpointTests(OracleProjectFixture fixture)
         // Tanpa login.
         (await fixture.Factory.CreateClient().GetAsync("/api/v1/projects")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        // Anggota (hanya project.read): boleh membaca, tidak boleh membuat, mengubah, atau mengarsipkan.
+        // Pemegang project.read yang bukan anggota: boleh membuka daftar (kosong baginya), tidak boleh membuka proyek ini,
+        // membuat, mengubah, atau mengarsipkan.
         var member = fixture.MemberClient(A);
-        (await member.GetAsync(url)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await member.GetAsync(url)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await member.GetAsync("/api/v1/projects")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await member.PostAsJsonAsync("/api/v1/projects", NewProject())).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await member.SendAsync(WithIfMatch(HttpMethod.Put, url, project.RowVersion, UpdateBody()))).StatusCode.Should().Be(HttpStatusCode.Forbidden);

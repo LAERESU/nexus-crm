@@ -31,13 +31,14 @@ public sealed class UpdateProjectCommandValidator : AbstractValidator<UpdateProj
     }
 }
 
-public sealed class UpdateProjectCommandHandler(IProjectRepository projects, IProjectAccess access, IUnitOfWork unitOfWork)
+public sealed class UpdateProjectCommandHandler(
+    IProjectRepository projects, IProjectAccess access, ProjectGuard guard, IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateProjectCommand, ProjectDto>
 {
     public async Task<ProjectDto> Handle(UpdateProjectCommand request, CancellationToken ct)
     {
         var project = await projects.FindAsync(request.Id, ct) ?? throw new NotFoundException("Proyek tidak ditemukan.");
-        await access.EnsureAsync(ProjectPermissions.Update, project.PublicId, project.DepartmentId, ct);
+        await guard.EnsureCanManageAsync(ProjectPermissions.Update, project, ct);
         // Memindahkan proyek ke departemen lain juga butuh izin atas departemen tujuan.
         if (request.DepartmentId != project.DepartmentId)
             await access.EnsureAsync(ProjectPermissions.Update, project.PublicId, request.DepartmentId, ct);
@@ -56,13 +57,13 @@ public sealed class UpdateProjectCommandHandler(IProjectRepository projects, IPr
 
 public sealed record ArchiveProjectCommand(Guid Id, long ExpectedRowVersion) : IRequest;
 
-public sealed class ArchiveProjectCommandHandler(IProjectRepository projects, IProjectAccess access, IUnitOfWork unitOfWork)
+public sealed class ArchiveProjectCommandHandler(IProjectRepository projects, ProjectGuard guard, IUnitOfWork unitOfWork)
     : IRequestHandler<ArchiveProjectCommand>
 {
     public async Task Handle(ArchiveProjectCommand request, CancellationToken ct)
     {
         var project = await projects.FindAsync(request.Id, ct) ?? throw new NotFoundException("Proyek tidak ditemukan.");
-        await access.EnsureAsync(ProjectPermissions.Update, project.PublicId, project.DepartmentId, ct);
+        await guard.EnsureCanManageAsync(ProjectPermissions.Update, project, ct);
 
         unitOfWork.ExpectRowVersion(project, request.ExpectedRowVersion);
         project.Archive();

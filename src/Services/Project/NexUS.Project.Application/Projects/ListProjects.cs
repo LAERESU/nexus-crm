@@ -24,17 +24,26 @@ public sealed class ListProjectsQueryValidator : AbstractValidator<ListProjectsQ
     }
 }
 
-public sealed class ListProjectsQueryHandler(IProjectReadService projects) : IRequestHandler<ListProjectsQuery, PagedResult<ProjectDto>>
+public sealed class ListProjectsQueryHandler(IProjectReadService projects, ProjectGuard guard)
+    : IRequestHandler<ListProjectsQuery, PagedResult<ProjectDto>>
 {
-    public Task<PagedResult<ProjectDto>> Handle(ListProjectsQuery request, CancellationToken ct) =>
-        projects.ListAsync(
-            new ProjectFilter(request.Search?.Trim(), request.Status, request.OwnerId, request.DepartmentId, request.Page, request.Size), ct);
+    public async Task<PagedResult<ProjectDto>> Handle(ListProjectsQuery request, CancellationToken ct) =>
+        // Tanpa izin melihat semua proyek, daftar hanya berisi proyek yang diikuti user.
+        await projects.ListAsync(
+            new ProjectFilter(
+                request.Search?.Trim(), request.Status, request.OwnerId, request.DepartmentId, await guard.ListScopeAsync(ct),
+                request.Page, request.Size),
+            ct);
 }
 
 public sealed record GetProjectQuery(Guid Id) : IRequest<ProjectDto>;
 
-public sealed class GetProjectQueryHandler(IProjectReadService projects) : IRequestHandler<GetProjectQuery, ProjectDto>
+public sealed class GetProjectQueryHandler(IProjectReadService projects, ProjectGuard guard) : IRequestHandler<GetProjectQuery, ProjectDto>
 {
-    public async Task<ProjectDto> Handle(GetProjectQuery request, CancellationToken ct) =>
-        await projects.GetAsync(request.Id, ct) ?? throw new NotFoundException("Proyek tidak ditemukan.");
+    public async Task<ProjectDto> Handle(GetProjectQuery request, CancellationToken ct)
+    {
+        var project = await projects.GetAsync(request.Id, ct) ?? throw new NotFoundException("Proyek tidak ditemukan.");
+        await guard.EnsureCanReadAsync(request.Id, ct);
+        return project;
+    }
 }

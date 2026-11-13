@@ -5,6 +5,7 @@ using NexUS.BuildingBlocks.Common.Exceptions;
 using NexUS.BuildingBlocks.Messaging;
 using NexUS.Project.Application.Common;
 using NexUS.Project.Domain.Projects;
+using NexUS.Project.Domain.Users;
 using Oracle.ManagedDataAccess.Client;
 using ProjectEntity = NexUS.Project.Domain.Projects.Project;
 
@@ -24,7 +25,9 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
 
     public DbSet<ProjectEntity> Projects => Set<ProjectEntity>();
     public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+    public DbSet<UserRef> UserRefs => Set<UserRef>();
     public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
+    public DbSet<ProcessedEvent> ProcessedEvents => Set<ProcessedEvent>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -71,6 +74,27 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
                 value => Enum.Parse<ProjectRole>(value, true));
             e.Property(x => x.JoinedAt).HasColumnName("JOINED_AT");
             e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
+        });
+
+        model.Entity<UserRef>(e =>
+        {
+            e.ToTable("USER_REF");
+            MapEntity(e);
+            e.Property(x => x.UserId).HasColumnName("USER_ID");
+            e.Property(x => x.Email).HasColumnName("EMAIL").HasMaxLength(320);
+            e.Property(x => x.FullName).HasColumnName("FULL_NAME").HasMaxLength(200);
+            e.Property(x => x.IsActive).HasColumnName("IS_ACTIVE").HasColumnType("NUMBER(1)");
+            e.Property(x => x.LastEventAt).HasColumnName("LAST_EVENT_AT");
+            e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
+        });
+
+        model.Entity<ProcessedEvent>(e =>
+        {
+            e.ToTable("PROCESSED_EVENTS");
+            e.HasKey(x => new { x.EventId, x.Consumer });
+            e.Property(x => x.EventId).HasColumnName("EVENT_ID");
+            e.Property(x => x.Consumer).HasColumnName("CONSUMER").HasMaxLength(200);
+            e.Property(x => x.ProcessedAt).HasColumnName("PROCESSED_AT");
         });
 
         model.Entity<OutboxMessage>(e =>
@@ -122,6 +146,16 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        // Perubahan anggota ikut menaikkan ROW_VERSION proyeknya, sehingga dua perubahan anggota yang bersamaan
+        // (mis. dua manager saling mengeluarkan) tidak bisa sama-sama lolos: yang kedua bentrok versi (409).
+        var touchedProjectIds = ChangeTracker.Entries<ProjectMember>()
+            .Where(e => e.State is EntityState.Added or EntityState.Modified).Select(e => e.Entity.ProjectId).ToHashSet();
+        foreach (var project in ChangeTracker.Entries<ProjectEntity>())
+        {
+            if (project.State == EntityState.Unchanged && project.Entity.Id != 0 && touchedProjectIds.Contains(project.Entity.Id))
+                project.State = EntityState.Modified;
+        }
+
         var now = timeProvider.GetUtcNow();
         foreach (var entry in ChangeTracker.Entries<Entity>())
         {

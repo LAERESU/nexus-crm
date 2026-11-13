@@ -10,7 +10,7 @@ public enum ProjectRole
     Viewer,
 }
 
-/// <summary>Keanggotaan seorang user di satu proyek. Endpoint kelola anggota menyusul di NX-026.</summary>
+/// <summary>Keanggotaan seorang user di satu proyek; diubah lewat aggregate <see cref="Project"/>.</summary>
 public sealed class ProjectMember : Entity
 {
     public long ProjectId { get; private set; }
@@ -33,6 +33,11 @@ public sealed class ProjectMember : Entity
         Role = role;
         JoinedAt = joinedAt;
     }
+
+    internal void ChangeRole(ProjectRole role) => Role = role;
+
+    public static bool TryParseRole(string? name, out ProjectRole role) =>
+        Enum.TryParse(name?.Trim(), ignoreCase: true, out role) && Enum.IsDefined(role) && !int.TryParse(name, out _);
 
     /// <summary>Nama peran di kolom PROJECT_ROLE (huruf besar).</summary>
     public static string ToName(ProjectRole role) => role.ToString().ToUpperInvariant();

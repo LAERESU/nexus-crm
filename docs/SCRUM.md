@@ -130,7 +130,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | ID | Story | SP | Sprint | Status |
 | --- | --- | --- | --- | --- |
 | NX-025 | Schema & CRUD proyek (soft delete, paging, filter) | 8 | 4 | ✅ |
-| NX-026 | Kelola anggota proyek & peran proyek | 5 | 4 | ⬜ |
+| NX-026 | Kelola anggota proyek & peran proyek | 5 | 4 | 🔍 |
 | NX-027 | Milestone proyek | 3 | 4 | ⬜ |
 | NX-028 | Outbox pattern + publish event proyek | 5 | 4 | ⬜ |
 | NX-029 | Cache proyek & anggota di Redis | 3 | 4 | ⬜ |

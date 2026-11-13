@@ -18,7 +18,7 @@ namespace NexUS.Project.IntegrationTests;
 
 /// <summary>
 /// Oracle Free sungguhan (Testcontainers) dengan migrasi <c>db/prj</c> yang sama seperti Flyway, lalu Project Service
-/// berjalan di atasnya. Autentikasi memakai <see cref="TestAuthHandler"/>, dan permission user (yang di produksi
+/// berjalan di atasnya, plus RabbitMQ sungguhan untuk consumer event user. Autentikasi memakai <see cref="TestAuthHandler"/>, dan permission user (yang di produksi
 /// diambil dari User Service) diisi lewat <see cref="Grant"/>.
 /// </summary>
 public sealed class OracleProjectFixture : IAsyncLifetime
@@ -35,6 +35,13 @@ public sealed class OracleProjectFixture : IAsyncLifetime
         .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("DATABASE IS READY TO USE!"))
         .Build();
 
+    private readonly IContainer _rabbit = new ContainerBuilder("rabbitmq:3.13-management-alpine")
+        .WithEnvironment("RABBITMQ_DEFAULT_USER", "nexus")
+        .WithEnvironment("RABBITMQ_DEFAULT_PASS", "nexus_test")
+        .WithPortBinding(5672, assignRandomHostPort: true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"))
+        .Build();
+
     private readonly FakePermissionSource _permissions = new();
 
     public WebApplicationFactory<Program> Factory { get; private set; } = default!;
@@ -43,19 +50,23 @@ public sealed class OracleProjectFixture : IAsyncLifetime
     /// <summary>Manajer proyek tetap per tenant: boleh membaca, membuat, dan mengubah proyek.</summary>
     public static Guid ManagerId(long tenantId) => Guid.Parse($"a0000000-0000-0000-0000-{tenantId:D12}");
 
-    /// <summary>Anggota tetap per tenant: hanya boleh membaca proyek.</summary>
+    /// <summary>Admin tenant tetap per tenant: melihat semua proyek dan mengelola anggota tanpa menjadi anggota.</summary>
+    public static Guid AdminId(long tenantId) => Guid.Parse($"c0000000-0000-0000-0000-{tenantId:D12}");
+
+    /// <summary>Anggota tetap per tenant: hanya boleh membaca proyek yang diikutinya.</summary>
     public static Guid MemberId(long tenantId) => Guid.Parse($"b0000000-0000-0000-0000-{tenantId:D12}");
 
     public async Task InitializeAsync()
     {
-        await _oracle.StartAsync();
+        await Task.WhenAll(_oracle.StartAsync(), _rabbit.StartAsync());
         ConnectionString =
             $"User Id=PRJ_SCHEMA;Password={SchemaPassword};Data Source={_oracle.Hostname}:{_oracle.GetMappedPublicPort(1521)}/FREEPDB1";
         await ApplyMigrationsAsync();
 
         foreach (var tenant in new[] { TenantA, TenantB })
         {
-            Grant(tenant, ManagerId(tenant), "project.read", "project.create", "project.update");
+            Grant(tenant, ManagerId(tenant), "project.read", "project.create", "project.update", "project.member.manage");
+            Grant(tenant, AdminId(tenant), "project.read", "project.all.read", "project.member.manage");
             Grant(tenant, MemberId(tenant), "project.read");
         }
 
@@ -65,6 +76,7 @@ public sealed class OracleProjectFixture : IAsyncLifetime
             {
                 ["ConnectionStrings:Oracle"] = ConnectionString,
                 ["Services:User:BaseUrl"] = "http://user.invalid",
+                ["ConnectionStrings:RabbitMq"] = $"amqp://nexus:nexus_test@{_rabbit.Hostname}:{_rabbit.GetMappedPublicPort(5672)}",
             }))
             .ConfigureServices(services =>
             {
@@ -85,6 +97,7 @@ public sealed class OracleProjectFixture : IAsyncLifetime
     {
         if (Factory is not null) await Factory.DisposeAsync();
         await _oracle.DisposeAsync();
+        await _rabbit.DisposeAsync();
     }
 
     /// <summary>Menetapkan permission (scope global) seorang user, seperti jawaban User Service.</summary>
@@ -105,6 +118,8 @@ public sealed class OracleProjectFixture : IAsyncLifetime
     }
 
     public HttpClient MemberClient(long tenantId) => ClientAs(tenantId, MemberId(tenantId));
+
+    public HttpClient AdminClient(long tenantId) => ClientAs(tenantId, AdminId(tenantId));
 
     public async Task<object?> ScalarAsync(string sql, params OracleParameter[] parameters)
     {
