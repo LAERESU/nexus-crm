@@ -66,8 +66,9 @@ Referensi utama: `ARCHITECTURE.md` B.2, C.2 (USR_SCHEMA), G.2.
   1. `features/users`: `UserListPage` (tabel, search, filter status/departemen, paging server-side).
   2. `InviteUserModal` dan drawer edit user; aksi aktif/nonaktif.
 - **Acceptance criteria:**
-  - [ ] Search ber-debounce dan paging berjalan dari server.
-  - [ ] Error validasi dari server tampil di field yang tepat.
+  - [x] Search ber-debounce dan paging berjalan dari server.
+  - [x] Error validasi dari server tampil di field yang tepat.
+- **Catatan:** halaman di `/admin/users`; menu Admin belum disaring menurut permission (NX-024). Pilihan departemen memuat maksimal 100 departemen.
 
 ---
 

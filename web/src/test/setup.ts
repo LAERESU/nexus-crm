@@ -14,3 +14,10 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: () => false,
   }),
 })
+
+// jsdom juga tidak menyediakan ResizeObserver, yang dipakai Table antd.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
