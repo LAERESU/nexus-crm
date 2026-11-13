@@ -8,12 +8,7 @@ import { applyServerErrors } from '@/shared/api/problemDetails'
 
 // Batas panjang sama dengan backend (User.EmailMaxLength dst.).
 const userSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Email wajib diisi')
-    .max(320, 'Email maksimal 320 karakter')
-    .email('Format email tidak valid'),
+  email: z.string().trim().min(1, 'Email wajib diisi').max(320, 'Email maksimal 320 karakter'),
   fullName: z
     .string()
     .trim()
@@ -24,6 +19,11 @@ const userSchema = z.object({
 })
 
 export type UserFormValues = z.infer<typeof userSchema>
+
+// Format email hanya diperiksa saat mengundang; email user lama tidak ikut dikirim dan tidak bisa diubah di sini.
+const inviteSchema = userSchema.extend({
+  email: userSchema.shape.email.pipe(z.email('Format email tidak valid')),
+})
 
 const fields = ['email', 'fullName', 'jobTitle', 'departmentId'] as const
 
@@ -52,7 +52,10 @@ export function UserForm({
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
-  } = useForm<UserFormValues>({ resolver: zodResolver(userSchema), defaultValues: initialValues })
+  } = useForm<UserFormValues>({
+    resolver: zodResolver(emailReadOnly ? userSchema : inviteSchema),
+    defaultValues: initialValues,
+  })
 
   const submit = async (values: UserFormValues) => {
     setFormError(null)

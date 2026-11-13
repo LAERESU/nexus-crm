@@ -15,6 +15,8 @@ interface InviteUserModalProps {
 export function InviteUserModal({ open, departments, onClose }: InviteUserModalProps) {
   const { message } = App.useApp()
   const invite = useInviteUser()
+  // Selama mengirim modal tidak bisa ditutup, agar hasil yang datang belakangan tidak menutup undangan berikutnya.
+  const closable = !invite.isPending
 
   const submit = async (values: UserFormValues) => {
     const user = await invite.mutateAsync({
@@ -28,7 +30,16 @@ export function InviteUserModal({ open, departments, onClose }: InviteUserModalP
   }
 
   return (
-    <Modal title="Undang user" open={open} onCancel={onClose} footer={null} destroyOnHidden>
+    <Modal
+      title="Undang user"
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      closable={closable}
+      maskClosable={closable}
+      keyboard={closable}
+      destroyOnHidden
+    >
       <UserForm
         initialValues={emptyUserForm}
         departments={departments}

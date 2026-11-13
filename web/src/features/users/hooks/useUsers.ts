@@ -27,7 +27,8 @@ export function useDepartments() {
 
 function useInvalidateUserLists() {
   const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: userKeys.lists() })
+  // Tidak ditunggu: mutasi selesai begitu server menjawab, daftar dimuat ulang di latar belakang.
+  return () => void queryClient.invalidateQueries({ queryKey: userKeys.lists() })
 }
 
 export function useInviteUser() {

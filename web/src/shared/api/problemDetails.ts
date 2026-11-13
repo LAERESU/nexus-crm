@@ -3,8 +3,10 @@ import type { FieldValues, Path, UseFormSetError } from 'react-hook-form'
 
 /** Error dari backend dalam bentuk ProblemDetails (CONTEXT.md bagian 4), dengan `errors` per field untuk 400. */
 export interface Problem {
-  /** `undefined` bila server tidak terjangkau. */
+  /** `undefined` bila tidak ada respons server. */
   status?: number
+  /** Request gagal sebelum ada respons (jaringan/timeout), bukan kesalahan lain di aplikasi. */
+  network: boolean
   detail?: string
   /** Kunci sudah camelCase (`FullName` dari server menjadi `fullName`). */
   fieldErrors: Record<string, string[]>
@@ -13,7 +15,8 @@ export interface Problem {
 const camelCase = (name: string) => name.charAt(0).toLowerCase() + name.slice(1)
 
 export function parseProblem(error: unknown): Problem {
-  if (!(error instanceof AxiosError) || !error.response) return { fieldErrors: {} }
+  if (!(error instanceof AxiosError)) return { network: false, fieldErrors: {} }
+  if (!error.response) return { network: true, fieldErrors: {} }
 
   const body: unknown = error.response.data
   const fieldErrors: Record<string, string[]> = {}
@@ -30,14 +33,20 @@ export function parseProblem(error: unknown): Problem {
       }
     }
   }
-  return { status: error.response.status, detail, fieldErrors }
+  return { status: error.response.status, network: false, detail, fieldErrors }
 }
 
 /** Pesan umum untuk pengguna bila error tidak terkait field tertentu. */
 export function problemMessage(problem: Problem): string {
   switch (problem.status) {
     case undefined:
-      return 'Tidak dapat terhubung ke server. Coba lagi.'
+      return problem.network
+        ? 'Tidak dapat terhubung ke server. Coba lagi.'
+        : 'Terjadi kesalahan. Coba lagi.'
+    case 401:
+      return 'Sesi berakhir. Silakan masuk kembali.'
+    case 429:
+      return 'Terlalu banyak permintaan. Coba lagi nanti.'
     case 403:
       return 'Anda tidak memiliki izin untuk tindakan ini.'
     case 409:

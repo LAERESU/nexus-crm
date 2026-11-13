@@ -41,6 +41,8 @@ function respond(config: InternalAxiosRequestConfig, status: number, data: unkno
     : Promise.resolve(response)
 }
 
+let listOverride: ((params: Record<string, unknown>) => unknown) | undefined
+
 /** Backend tiruan; `write` menentukan jawaban untuk POST/PUT/PATCH. */
 function backend(write: { status: number; data?: unknown } = { status: 200, data: budi }) {
   const requests: Recorded[] = []
@@ -60,7 +62,16 @@ function backend(write: { status: number; data?: unknown } = { status: 200, data
         size: 100,
         totalCount: 1,
       })
-    return respond(config, 200, { items: [budi], page: 1, size: 20, totalCount: 45 })
+    return respond(
+      config,
+      200,
+      listOverride?.(config.params as Record<string, unknown>) ?? {
+        items: [budi],
+        page: 1,
+        size: 20,
+        totalCount: 45,
+      },
+    )
   }
   return requests
 }
@@ -82,6 +93,7 @@ function renderPage() {
 describe('UserListPage', () => {
   beforeEach(() => useAuthStore.getState().login(fakeJwt()))
   afterEach(() => {
+    listOverride = undefined
     httpClient.defaults.adapter = originalAdapter
   })
 
@@ -103,12 +115,29 @@ describe('UserListPage', () => {
     await user.click(screen.getByTitle('2'))
     await waitFor(() => expect(listRequests(requests).at(-1)?.params?.page).toBe(2))
 
+    const before = listRequests(requests).length
     await user.type(screen.getByLabelText('Cari user'), 'budi')
     await waitFor(() => expect(listRequests(requests).at(-1)?.params?.search).toBe('budi'), slow)
 
-    const searches = listRequests(requests).filter((r) => r.params?.search !== undefined)
-    expect(searches).toHaveLength(1)
-    expect(searches[0]?.params).toMatchObject({ search: 'budi', page: 1 })
+    // Tidak ada request antara (kata kunci sebagian, atau halaman 1 dengan kata kunci lama).
+    const afterTyping = listRequests(requests).slice(before)
+    expect(afterTyping).toHaveLength(1)
+    expect(afterTyping[0]?.params).toMatchObject({ search: 'budi', page: 1 })
+  })
+
+  it('mundur ke halaman terakhir bila halaman yang dibuka sudah tidak ada', async () => {
+    const requests = backend()
+    renderPage()
+    const user = userEvent.setup()
+    await screen.findByText('Budi Santoso', {}, slow)
+
+    // Halaman 3 kosong dan total menyusut menjadi 2 halaman.
+    listOverride = (params) =>
+      params.page === 3 ? { items: [], page: 3, size: 20, totalCount: 40 } : undefined
+    await user.click(screen.getByTitle('3'))
+
+    await waitFor(() => expect(listRequests(requests).at(-1)?.params?.page).toBe(2), slow)
+    expect(await screen.findByText('Budi Santoso', {}, slow)).toBeInTheDocument()
   })
 
   it('error validasi dari server tampil di field yang sesuai', async () => {

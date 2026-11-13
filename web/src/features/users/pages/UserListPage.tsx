@@ -1,43 +1,36 @@
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
-import {
-  Alert,
-  App,
-  Button,
-  Flex,
-  Input,
-  Popconfirm,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
+import { Alert, Button, Flex, Input, Select, Space, Table, Tag, Typography } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useState } from 'react'
 import type { User, UserStatus } from '@/features/users/api/usersApi'
 import { EditUserDrawer } from '@/features/users/components/EditUserDrawer'
 import { InviteUserModal } from '@/features/users/components/InviteUserModal'
-import { useDepartments, useSetUserStatus, useUsers } from '@/features/users/hooks/useUsers'
+import { UserStatusButton } from '@/features/users/components/UserStatusButton'
+import { useDepartments, useUsers } from '@/features/users/hooks/useUsers'
 import { parseProblem, problemMessage } from '@/shared/api/problemDetails'
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
 
 const DEFAULT_PAGE_SIZE = 20
 
 interface Filters {
-  search: string
   status?: UserStatus
   departmentId?: string
 }
 
 export default function UserListPage() {
-  const { message } = App.useApp()
-  const [filters, setFilters] = useState<Filters>({ search: '' })
-  const [page, setPage] = useState(1)
+  const [searchText, setSearchText] = useState('')
+  const [filters, setFilters] = useState<Filters>({})
+  // Halaman berlaku untuk kata kunci saat halaman itu dipilih; kata kunci baru selalu mulai dari halaman 1,
+  // tanpa request antara dengan pasangan halaman/kata kunci yang tidak cocok.
+  const [paging, setPaging] = useState({ page: 1, forSearch: '' })
   const [size, setSize] = useState(DEFAULT_PAGE_SIZE)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
 
-  const search = useDebouncedValue(filters.search.trim())
+  const search = useDebouncedValue(searchText.trim())
+  const page = paging.forSearch === search ? paging.page : 1
+  const goToPage = (next: number) => setPaging({ page: next, forSearch: search })
+
   const users = useUsers({
     search: search || undefined,
     status: filters.status,
@@ -46,30 +39,22 @@ export default function UserListPage() {
     size,
   })
   const departments = useDepartments()
-  const setStatus = useSetUserStatus()
   const departmentItems = departments.data?.items ?? []
+  const items = users.data?.items ?? []
+  const totalCount = users.data?.totalCount ?? 0
 
-  /** Mengubah filter selalu kembali ke halaman pertama. */
+  // Data menyusut (user dinonaktifkan di bawah filter, diubah admin lain): mundur ke halaman terakhir yang ada.
+  const lastPage = Math.max(1, Math.ceil(totalCount / size))
+  if (users.data && !users.isPlaceholderData && items.length === 0 && page > lastPage)
+    goToPage(lastPage)
+
   const changeFilters = (change: Partial<Filters>) => {
     setFilters((current) => ({ ...current, ...change }))
-    setPage(1)
+    goToPage(1)
   }
 
-  const toggleStatus = (user: User) => {
-    const status: UserStatus = user.status === 'active' ? 'inactive' : 'active'
-    setStatus.mutate(
-      { user, status },
-      {
-        onSuccess: () =>
-          message.success(
-            status === 'active'
-              ? `${user.fullName} diaktifkan.`
-              : `${user.fullName} dinonaktifkan.`,
-          ),
-        onError: (error) => message.error(problemMessage(parseProblem(error))),
-      },
-    )
-  }
+  // Baris terbaru dari daftar (rowVersion segar setelah dimuat ulang); snapshot dipakai bila barisnya tidak lagi tampil.
+  const editingUser = editing && (items.find((u) => u.id === editing.id) ?? editing)
 
   const columns: TableColumnsType<User> = [
     { title: 'Nama', dataIndex: 'fullName' },
@@ -94,24 +79,7 @@ export default function UserListPage() {
           <Button size="small" onClick={() => setEditing(user)}>
             Edit
           </Button>
-          <Popconfirm
-            title={
-              user.status === 'active'
-                ? `Nonaktifkan ${user.fullName}?`
-                : `Aktifkan ${user.fullName}?`
-            }
-            okText="Ya"
-            cancelText="Batal"
-            onConfirm={() => toggleStatus(user)}
-          >
-            <Button
-              size="small"
-              danger={user.status === 'active'}
-              loading={setStatus.isPending && setStatus.variables.user.id === user.id}
-            >
-              {user.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
-            </Button>
-          </Popconfirm>
+          <UserStatusButton user={user} />
         </Space>
       ),
     },
@@ -136,8 +104,8 @@ export default function UserListPage() {
           allowClear
           maxLength={200}
           style={{ width: 280 }}
-          value={filters.search}
-          onChange={(e) => changeFilters({ search: e.target.value })}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
         />
         <Select<UserStatus>
           aria-label="Filter status"
@@ -165,6 +133,19 @@ export default function UserListPage() {
         />
       </Flex>
 
+      {departments.isError && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Daftar departemen gagal dimuat."
+          action={
+            <Button size="small" onClick={() => departments.refetch()}>
+              Coba lagi
+            </Button>
+          }
+        />
+      )}
       {users.isError && (
         <Alert
           type="error"
@@ -183,19 +164,19 @@ export default function UserListPage() {
       <Table<User>
         rowKey="id"
         columns={columns}
-        dataSource={users.data?.items ?? []}
+        dataSource={items}
         loading={users.isFetching}
         scroll={{ x: true }}
         pagination={{
           current: page,
           pageSize: size,
-          total: users.data?.totalCount ?? 0,
+          total: totalCount,
           showSizeChanger: true,
           pageSizeOptions: [10, 20, 50, 100],
           showTotal: (total) => `${total} user`,
           onChange: (nextPage, nextSize) => {
             // Ganti ukuran halaman kembali ke halaman pertama.
-            setPage(nextSize === size ? nextPage : 1)
+            goToPage(nextSize === size ? nextPage : 1)
             setSize(nextSize)
           },
         }}
@@ -207,7 +188,7 @@ export default function UserListPage() {
         onClose={() => setInviteOpen(false)}
       />
       <EditUserDrawer
-        user={editing}
+        user={editingUser}
         departments={departmentItems}
         onClose={() => setEditing(null)}
       />

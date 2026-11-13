@@ -5,7 +5,7 @@ import type { UserFormValues } from '@/features/users/components/UserForm'
 import { useUpdateUser } from '@/features/users/hooks/useUsers'
 
 interface EditUserDrawerProps {
-  /** User yang diedit; `null` menutup drawer. */
+  /** User yang diedit (baris terbaru dari daftar); `null` menutup drawer. */
   user: User | null
   departments: Department[]
   onClose: () => void
@@ -14,6 +14,22 @@ interface EditUserDrawerProps {
 export function EditUserDrawer({ user, departments, onClose }: EditUserDrawerProps) {
   const { message } = App.useApp()
   const update = useUpdateUser()
+  // Selama menyimpan drawer tidak bisa ditutup, agar hasil yang datang belakangan tidak menutup drawer user lain.
+  const closable = !update.isPending
+
+  // Departemen user saat ini tetap bisa ditampilkan walau tidak termasuk daftar pilihan yang dimuat.
+  const options =
+    user?.departmentId && !departments.some((d) => d.id === user.departmentId)
+      ? [
+          ...departments,
+          {
+            id: user.departmentId,
+            code: '',
+            name: user.departmentName ?? 'Departemen saat ini',
+            parentId: null,
+          },
+        ]
+      : departments
 
   const submit = async (values: UserFormValues) => {
     if (!user) return
@@ -30,7 +46,15 @@ export function EditUserDrawer({ user, departments, onClose }: EditUserDrawerPro
   }
 
   return (
-    <Drawer title="Edit user" open={user !== null} onClose={onClose} destroyOnHidden>
+    <Drawer
+      title="Edit user"
+      open={user !== null}
+      onClose={onClose}
+      closable={closable}
+      maskClosable={closable}
+      keyboard={closable}
+      destroyOnHidden
+    >
       {user && (
         <UserForm
           key={user.id}
@@ -41,7 +65,7 @@ export function EditUserDrawer({ user, departments, onClose }: EditUserDrawerPro
             departmentId: user.departmentId,
           }}
           emailReadOnly
-          departments={departments}
+          departments={options}
           submitLabel="Simpan"
           onSubmit={submit}
           onCancel={onClose}

@@ -53,7 +53,12 @@ export function MainLayout() {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider breakpoint="lg" collapsedWidth={0} theme="light" aria-label="Sidebar">
         <div style={{ padding: 16, fontWeight: 700, fontSize: 18 }}>NexUS</div>
-        <Menu mode="inline" selectedKeys={[pathname]} items={menuItems} />
+        <Menu
+          mode="inline"
+          selectedKeys={[pathname.replace(/(.)\/+$/, '$1')]}
+          defaultOpenKeys={pathname.startsWith('/admin') ? ['/admin'] : []}
+          items={menuItems}
+        />
       </Sider>
       <Layout>
         <Header style={{ background: 'transparent', padding: '0 24px' }}>
