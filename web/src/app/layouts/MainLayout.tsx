@@ -26,6 +26,8 @@ function buildMenu(can: (permission: string) => boolean): MenuItem[] {
   const admin: MenuItem[] = []
   if (can('user.read'))
     admin.push({ key: '/admin/users', label: <Link to="/admin/users">Pengguna</Link> })
+  if (can('role.read'))
+    admin.push({ key: '/admin/roles', label: <Link to="/admin/roles">Role</Link> })
 
   const items: MenuItem[] = [
     { key: '/', icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },

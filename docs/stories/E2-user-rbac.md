@@ -78,7 +78,8 @@ Referensi utama: `ARCHITECTURE.md` B.2, C.2 (USR_SCHEMA), G.2.
   1. `RoleManagementPage` dengan `PermissionMatrix` (baris permission dikelompokkan per modul, kolom role, checkbox).
   2. Simpan perubahan per role; role sistem ditampilkan read-only.
 - **Acceptance criteria:**
-  - [ ] Perubahan checkbox tersimpan dan bertahan setelah reload.
+  - [x] Perubahan checkbox tersimpan dan bertahan setelah reload.
+- **Catatan:** halaman di `/admin/roles` (butuh `role.read`; mengubah butuh `role.manage` global). Matriks memuat maksimal 100 role. Membuat, mengganti nama, dan menghapus role belum ada di UI (tidak termasuk story ini).
 
 ---
 
