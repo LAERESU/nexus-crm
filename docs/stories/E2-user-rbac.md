@@ -56,7 +56,7 @@ Referensi utama: `ARCHITECTURE.md` B.2, C.2 (USR_SCHEMA), G.2.
 - **Acceptance criteria:**
   - [x] User baru menerima email dan bisa login setelah set password.
   - [x] Token aktivasi kedaluwarsa tidak bisa dipakai.
-- **Catatan:** relay outbox ke RabbitMQ dan consumer idempotent (bagian NX-028) dikerjakan di sini, memakai `RabbitMQ.Client` langsung karena MassTransit 9 berlisensi komersial. Halaman web `/activate` dan kirim ulang undangan belum ada. Lihat ADR-0010.
+- **Catatan:** relay outbox ke RabbitMQ dan consumer idempotent (bagian NX-028) dikerjakan di sini, memakai `RabbitMQ.Client` langsung karena MassTransit 9 berlisensi komersial. Halaman web `/activate` ditambahkan menyusul sebagai perbaikan (token dibaca dari fragment `#token=` agar tidak tercatat di log server); kirim ulang undangan belum ada. Lihat ADR-0010.
 
 ---
 

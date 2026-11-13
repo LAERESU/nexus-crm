@@ -1,19 +1,23 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Button, Form, Input, Result, Typography } from 'antd'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { authApi } from '@/features/auth/api/authApi'
-import { applyServerErrors } from '@/shared/api/problemDetails'
+import { useAuthStore } from '@/features/auth/store/authStore'
+import { parseProblem, problemMessage } from '@/shared/api/problemDetails'
 
-// Batas panjang sama dengan backend (ActivateAccountCommandValidator).
+// Sama dengan backend (ActivateAccountCommandValidator).
+const MIN_PASSWORD_LENGTH = 10
+const MAX_PASSWORD_LENGTH = 200
+
 const activateSchema = z
   .object({
     password: z
       .string()
-      .min(10, 'Password minimal 10 karakter')
-      .max(200, 'Password maksimal 200 karakter'),
+      .min(MIN_PASSWORD_LENGTH, `Password minimal ${MIN_PASSWORD_LENGTH} karakter`)
+      .max(MAX_PASSWORD_LENGTH, `Password maksimal ${MAX_PASSWORD_LENGTH} karakter`),
     confirm: z.string(),
   })
   .refine((v) => v.password === v.confirm, {
@@ -23,14 +27,26 @@ const activateSchema = z
 
 type ActivateValues = z.infer<typeof activateSchema>
 
-const fields = ['password'] as const
+/** Token dari tautan undangan: di fragment (`#token=`, tidak ikut terkirim ke server) atau di query string. */
+function readToken(hash: string, search: string): string {
+  const fromHash = new URLSearchParams(hash.replace(/^#/, '')).get('token')
+  return (fromHash ?? new URLSearchParams(search).get('token') ?? '').trim()
+}
 
-/** Halaman tujuan tautan di email undangan (`/activate?token=...`): user mengisi password pertamanya. */
+type Outcome = 'form' | 'done' | 'invalid-link'
+
+/** Halaman tujuan tautan di email undangan (`/activate#token=...`): user mengisi password pertamanya. */
 export default function ActivatePage() {
-  const [params] = useSearchParams()
-  const token = params.get('token')?.trim() ?? ''
+  const location = useLocation()
+  const navigate = useNavigate()
+  // Token dibaca sekali lalu dibuang dari address bar dan riwayat browser.
+  const [token] = useState(() => readToken(location.hash, location.search))
+  useEffect(() => {
+    if (location.hash || location.search) navigate('/activate', { replace: true })
+  }, [location.hash, location.search, navigate])
+
+  const [outcome, setOutcome] = useState<Outcome>('form')
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
   const {
     control,
     handleSubmit,
@@ -57,25 +73,53 @@ export default function ActivatePage() {
       />
     )
 
-  if (done)
+  if (outcome === 'done')
     return (
       <Result
         status="success"
         title="Akun aktif"
-        subTitle="Password tersimpan. Silakan masuk dengan email dan password Anda."
+        subTitle="Password tersimpan. Silakan masuk dengan email yang menerima undangan dan password Anda."
         extra={toLogin}
       />
     )
+
+  // Tautan salah, kedaluwarsa, atau sudah dipakai; server sengaja tidak membedakannya.
+  if (outcome === 'invalid-link')
+    return (
+      <Result
+        status="warning"
+        title="Tautan tidak berlaku"
+        subTitle="Tautan aktivasi ini tidak valid, sudah kedaluwarsa, atau sudah dipakai. Kalau akun Anda sudah aktif, silakan masuk; kalau belum, minta admin mengirim undangan baru."
+        extra={toLogin}
+      />
+    )
+
+  /** Sesi orang lain di browser ini diakhiri, agar user baru masuk sebagai dirinya sendiri. */
+  const endOtherSession = async () => {
+    if (useAuthStore.getState().status !== 'authenticated') return
+    try {
+      await authApi.logout()
+    } catch {
+      // Sesi lokal tetap diakhiri walau server tidak terjangkau.
+    }
+    useAuthStore.getState().clear()
+  }
 
   const onSubmit = async (values: ActivateValues) => {
     setError(null)
     try {
       await authApi.activate(token, values.password)
-      setDone(true)
     } catch (e) {
-      // 422: tautan salah, kedaluwarsa, atau sudah dipakai (pesan dari server sama untuk ketiganya).
-      setError(applyServerErrors(e, setFieldError, fields))
+      const problem = parseProblem(e)
+      const passwordErrors = problem.fieldErrors.password
+      if (problem.status === 422 || problem.fieldErrors.token) setOutcome('invalid-link')
+      else if (passwordErrors)
+        setFieldError('password', { type: 'server', message: passwordErrors.join(' ') })
+      else setError(problemMessage(problem))
+      return
     }
+    await endOtherSession()
+    setOutcome('done')
   }
 
   return (
@@ -94,7 +138,7 @@ export default function ActivatePage() {
           label="Password baru"
           htmlFor="activate-password"
           validateStatus={errors.password ? 'error' : ''}
-          help={errors.password?.message ?? 'Minimal 10 karakter.'}
+          help={errors.password?.message ?? `Minimal ${MIN_PASSWORD_LENGTH} karakter.`}
         >
           <Controller
             name="password"
