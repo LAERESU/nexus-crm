@@ -4,7 +4,13 @@ import { Spin } from 'antd'
 import { createBrowserRouter } from 'react-router-dom'
 import { AuthLayout } from '@/app/layouts/AuthLayout'
 import { MainLayout } from '@/app/layouts/MainLayout'
-import { DashboardPage, ForbiddenPage, LoginPage, NotFoundPage } from '@/app/lazyPages'
+import {
+  DashboardPage,
+  ForbiddenPage,
+  LoginPage,
+  NotFoundPage,
+  UserListPage,
+} from '@/app/lazyPages'
 import { RequireAuth } from '@/features/auth/components/RequireAuth'
 
 const withSuspense = (element: ReactNode) => (
@@ -23,6 +29,7 @@ export const routes = [
         element: <MainLayout />,
         children: [
           { index: true, element: withSuspense(<DashboardPage />) },
+          { path: 'admin/users', element: withSuspense(<UserListPage />) },
           { path: '403', element: withSuspense(<ForbiddenPage />) },
           { path: '*', element: withSuspense(<NotFoundPage />) },
         ],

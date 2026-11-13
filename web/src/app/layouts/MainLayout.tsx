@@ -15,13 +15,19 @@ import { useAuthStore } from '@/features/auth/store/authStore'
 
 const { Header, Sider, Content } = Layout
 
-// Menu selain Dashboard dinonaktifkan sampai halamannya dibuat di story fitur masing-masing.
+// Menu yang halamannya belum dibuat dinonaktifkan sampai story fiturnya dikerjakan.
+// Menu Admin belum disaring menurut permission (NX-024); otorisasi tetap di backend.
 const menuItems: MenuProps['items'] = [
   { key: '/', icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
   { key: '/projects', icon: <AppstoreOutlined />, label: 'Proyek', disabled: true },
   { key: '/tasks/my', icon: <CheckSquareOutlined />, label: 'Tugas', disabled: true },
   { key: '/sops', icon: <FileTextOutlined />, label: 'SOP', disabled: true },
-  { key: '/admin', icon: <SettingOutlined />, label: 'Admin', disabled: true },
+  {
+    key: '/admin',
+    icon: <SettingOutlined />,
+    label: 'Admin',
+    children: [{ key: '/admin/users', label: <Link to="/admin/users">Pengguna</Link> }],
+  },
 ]
 
 export function MainLayout() {
@@ -47,7 +53,12 @@ export function MainLayout() {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider breakpoint="lg" collapsedWidth={0} theme="light" aria-label="Sidebar">
         <div style={{ padding: 16, fontWeight: 700, fontSize: 18 }}>NexUS</div>
-        <Menu mode="inline" selectedKeys={[pathname]} items={menuItems} />
+        <Menu
+          mode="inline"
+          selectedKeys={[pathname.replace(/(.)\/+$/, '$1')]}
+          defaultOpenKeys={pathname.startsWith('/admin') ? ['/admin'] : []}
+          items={menuItems}
+        />
       </Sider>
       <Layout>
         <Header style={{ background: 'transparent', padding: '0 24px' }}>
