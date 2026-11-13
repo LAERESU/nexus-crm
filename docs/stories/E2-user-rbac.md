@@ -89,5 +89,6 @@ Referensi utama: `ARCHITECTURE.md` B.2, C.2 (USR_SCHEMA), G.2.
   2. `RequireAuth permission="..."` di router (ARCHITECTURE E.2) dan komponen `<Can permission>`.
   3. Sidebar hanya menampilkan menu yang diizinkan.
 - **Acceptance criteria:**
-  - [ ] User tanpa izin yang membuka URL admin diarahkan ke `/403`.
-  - [ ] Tombol aksi tersembunyi untuk user tanpa permission terkait.
+  - [x] User tanpa izin yang membuka URL admin diarahkan ke `/403`.
+  - [x] Tombol aksi tersembunyi untuk user tanpa permission terkait.
+- **Catatan:** permission dimuat dari `GET /users/{id}/permissions` setiap access token berganti (respons login tidak memuatnya). `/admin/users` butuh `user.read`; tombol aksinya butuh `user.manage` di scope global, sama dengan policy backend.

@@ -123,7 +123,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | NX-021 | Undang user via email (event `UserCreated`) | 3 | 3 | ✅ |
 | NX-022 | Halaman user list + form user | 5 | 3 | ✅ |
 | NX-023 | Halaman role + matriks permission | 5 | 3 | ⬜ |
-| NX-024 | Proteksi route & komponen `<Can>` di React | 3 | 3 | ⬜ |
+| NX-024 | Proteksi route & komponen `<Can>` di React | 3 | 3 | 🔍 |
 
 ### E3 · Project Management
 

@@ -11,30 +11,39 @@ import type { MenuProps } from 'antd'
 import { useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { authApi } from '@/features/auth/api/authApi'
-import { useAuthStore } from '@/features/auth/store/authStore'
+import { grantsPermission, useAuthStore } from '@/features/auth/store/authStore'
 
 const { Header, Sider, Content } = Layout
 
-// Menu yang halamannya belum dibuat dinonaktifkan sampai story fiturnya dikerjakan.
-// Menu Admin belum disaring menurut permission (NX-024); otorisasi tetap di backend.
-const menuItems: MenuProps['items'] = [
-  { key: '/', icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
-  { key: '/projects', icon: <AppstoreOutlined />, label: 'Proyek', disabled: true },
-  { key: '/tasks/my', icon: <CheckSquareOutlined />, label: 'Tugas', disabled: true },
-  { key: '/sops', icon: <FileTextOutlined />, label: 'SOP', disabled: true },
-  {
-    key: '/admin',
-    icon: <SettingOutlined />,
-    label: 'Admin',
-    children: [{ key: '/admin/users', label: <Link to="/admin/users">Pengguna</Link> }],
-  },
-]
+type MenuItem = NonNullable<MenuProps['items']>[number]
+
+/**
+ * Menu yang halamannya belum dibuat dinonaktifkan sampai story fiturnya dikerjakan. Menu yang butuh permission
+ * hanya tampil bila user memegangnya (tampilan saja; otorisasi tetap di backend).
+ */
+function buildMenu(can: (permission: string) => boolean): MenuItem[] {
+  const admin: MenuItem[] = []
+  if (can('user.read'))
+    admin.push({ key: '/admin/users', label: <Link to="/admin/users">Pengguna</Link> })
+
+  const items: MenuItem[] = [
+    { key: '/', icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
+    { key: '/projects', icon: <AppstoreOutlined />, label: 'Proyek', disabled: true },
+    { key: '/tasks/my', icon: <CheckSquareOutlined />, label: 'Tugas', disabled: true },
+    { key: '/sops', icon: <FileTextOutlined />, label: 'SOP', disabled: true },
+  ]
+  if (admin.length > 0)
+    items.push({ key: '/admin', icon: <SettingOutlined />, label: 'Admin', children: admin })
+  return items
+}
 
 export function MainLayout() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const clear = useAuthStore((s) => s.clear)
+  const permissions = useAuthStore((s) => s.permissions)
+  const menuItems = buildMenu((permission) => grantsPermission(permissions, permission))
   const [loggingOut, setLoggingOut] = useState(false)
 
   const logout = async () => {
