@@ -2,17 +2,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App as AntdApp } from 'antd'
-import { AxiosError } from 'axios'
-import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import type { User } from '@/features/users/api/usersApi'
 import UserListPage from '@/features/users/pages/UserListPage'
 import { httpClient } from '@/shared/api/httpClient'
+import { respond, slow } from '@/test/http'
 import { fakeJwt } from '@/test/tokens'
 
 const originalAdapter = httpClient.defaults.adapter
-const slow = { timeout: 5000 }
 
 const budi: User = {
   id: 'u-1',
@@ -32,13 +30,6 @@ interface Recorded {
   params?: Record<string, unknown>
   data?: unknown
   ifMatch?: unknown
-}
-
-function respond(config: InternalAxiosRequestConfig, status: number, data: unknown = {}) {
-  const response: AxiosResponse = { data, status, statusText: String(status), headers: {}, config }
-  return status >= 400
-    ? Promise.reject(new AxiosError('gagal', String(status), config, undefined, response))
-    : Promise.resolve(response)
 }
 
 let listOverride: ((params: Record<string, unknown>) => unknown) | undefined

@@ -9,6 +9,7 @@ import {
   ForbiddenPage,
   LoginPage,
   NotFoundPage,
+  RoleManagementPage,
   UserListPage,
 } from '@/app/lazyPages'
 import { RequireAuth } from '@/features/auth/components/RequireAuth'
@@ -32,6 +33,10 @@ export const routes = [
           {
             element: <RequireAuth permission="user.read" />,
             children: [{ path: 'admin/users', element: withSuspense(<UserListPage />) }],
+          },
+          {
+            element: <RequireAuth permission="role.read" />,
+            children: [{ path: 'admin/roles', element: withSuspense(<RoleManagementPage />) }],
           },
           { path: '403', element: withSuspense(<ForbiddenPage />) },
           { path: '*', element: withSuspense(<NotFoundPage />) },

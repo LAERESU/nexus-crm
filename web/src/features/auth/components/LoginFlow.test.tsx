@@ -1,7 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { AxiosError, AxiosHeaders } from 'axios'
-import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+import { AxiosHeaders } from 'axios'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { routes } from '@/app/router'
@@ -9,23 +8,10 @@ import { AuthBootstrap } from '@/features/auth/components/AuthBootstrap'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import { httpClient } from '@/shared/api/httpClient'
 import { queryClient } from '@/shared/api/queryClient'
+import { respond, slow } from '@/test/http'
 import { fakeJwt } from '@/test/tokens'
 
 const originalAdapter = httpClient.defaults.adapter
-// Halaman dimuat lazy; import pertama Ant Design di jsdom bisa lebih dari 1 detik.
-const slow = { timeout: 5000 }
-
-function respond(
-  config: InternalAxiosRequestConfig,
-  status: number,
-  data: unknown = {},
-  headers: Record<string, string> = {},
-) {
-  const response: AxiosResponse = { data, status, statusText: String(status), headers, config }
-  return status >= 400
-    ? Promise.reject(new AxiosError('gagal', String(status), config, undefined, response))
-    : Promise.resolve(response)
-}
 
 /** Backend tiruan: refresh (pemulihan sesi) dan login dapat diatur hasilnya. */
 function backend({ session = false, login = 200 as 200 | 401 | 429 } = {}) {
