@@ -5,6 +5,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import { AuthLayout } from '@/app/layouts/AuthLayout'
 import { MainLayout } from '@/app/layouts/MainLayout'
 import {
+  ActivatePage,
   DashboardPage,
   ForbiddenPage,
   LoginPage,
@@ -21,7 +22,10 @@ const withSuspense = (element: ReactNode) => (
 export const routes = [
   {
     element: <AuthLayout />,
-    children: [{ path: 'login', element: withSuspense(<LoginPage />) }],
+    children: [
+      { path: 'login', element: withSuspense(<LoginPage />) },
+      { path: 'activate', element: withSuspense(<ActivatePage />) },
+    ],
   },
   {
     element: <RequireAuth />,
