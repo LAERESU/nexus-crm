@@ -54,11 +54,17 @@ public class OutboxRelayTests(OracleUserFixture fixture)
         received.FullName.Should().Be("Pengguna Relay");
         messageId.Should().Be(received.EventId.ToString("D"));
 
-        // Event tanpa kontrak (mis. RoleChanged dari seed) tidak dibuang: tetap tertunda di outbox.
-        Convert.ToInt32(await fixture.ScalarAsync(
-            "SELECT COUNT(*) FROM OUTBOX_MESSAGES WHERE TYPE LIKE '%RoleChangedDomainEvent%' AND PROCESSED_AT IS NOT NULL")).Should().Be(0);
-        Convert.ToInt32(await fixture.ScalarAsync(
-            "SELECT COUNT(*) FROM OUTBOX_MESSAGES WHERE TYPE LIKE '%RoleChangedDomainEvent%' AND PROCESSED_AT IS NULL")).Should().BeGreaterThan(0);
+        // RoleChanged (dari seed) kini juga dipublikasikan; tanpa antrean penerima ia diparkir alternate exchange
+        // dan tidak menahan relay (ADR-0012).
+        var pendingRoleChanged = int.MaxValue;
+        for (var attempt = 0; attempt < 40 && pendingRoleChanged > 0; attempt++)
+        {
+            pendingRoleChanged = Convert.ToInt32(await fixture.ScalarAsync(
+                "SELECT COUNT(*) FROM OUTBOX_MESSAGES WHERE TYPE LIKE '%RoleChangedDomainEvent%' AND PROCESSED_AT IS NULL"));
+            if (pendingRoleChanged > 0) await Task.Delay(250);
+        }
+
+        pendingRoleChanged.Should().Be(0);
 
         // ID event = ID baris outbox, dan baris itu ditandai terproses (tidak dikirim ulang).
         var processed = 0;

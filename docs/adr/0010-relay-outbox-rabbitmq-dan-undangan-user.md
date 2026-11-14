@@ -1,6 +1,6 @@
 # ADR-0010: Relay Outbox ke RabbitMQ dan Undangan User lewat Token Aktivasi
 
-- **Status:** Diterima
+- **Status:** Diterima (poin 3 dan 6 diubah ADR-0012)
 - **Tanggal:** 2026-11-13
 
 ## Konteks
