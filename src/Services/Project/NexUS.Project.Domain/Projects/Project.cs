@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using NexUS.BuildingBlocks.Common.Domain;
 using NexUS.BuildingBlocks.Common.Exceptions;
@@ -79,12 +80,17 @@ public sealed partial class Project : AggregateRoot
     /// Mengubah data proyek. Proyek yang diarsipkan tidak bisa diubah, dan arsip hanya lewat <see cref="Archive"/>.
     /// Bila tidak ada nilai yang berubah, tidak ada event yang dicatat.
     /// </summary>
+    /// <param name="milestones">
+    /// Rentang tanggal milestone proyek; wajib diisi bila <see cref="NarrowsDates"/> bernilai true, karena rentang tanggal
+    /// proyek harus tetap mencakup semua milestone-nya.
+    /// </param>
     public void Update(
         string name, string? description, ProjectStatus status, ProjectPriority priority,
-        DateOnly? startDate, DateOnly? endDate, Guid? departmentId)
+        DateOnly? startDate, DateOnly? endDate, Guid? departmentId, MilestoneSpan milestones)
     {
         if (Status == ProjectStatus.Archived) throw new DomainException("Proyek yang diarsipkan tidak bisa diubah.");
         if (status == ProjectStatus.Archived) throw new DomainException("Gunakan arsip proyek untuk mengarsipkan.");
+        EnsureCovers(startDate, endDate, milestones);
 
         var before = (Name, Description, Status, Priority, StartDate, EndDate, DepartmentId);
         SetDetails(name, description, priority, startDate, endDate, departmentId);
@@ -93,6 +99,28 @@ public sealed partial class Project : AggregateRoot
         if (before != (Name, Description, Status, Priority, StartDate, EndDate, DepartmentId))
             AddDomainEvent(new ProjectUpdatedDomainEvent(TenantId, PublicId, Code, Name, ToName(Status)));
     }
+
+    /// <summary>Rentang tanggal baru lebih sempit daripada sekarang (milestone yang ada bisa jatuh di luarnya).</summary>
+    public bool NarrowsDates(DateOnly? startDate, DateOnly? endDate) =>
+        (startDate is { } start && (StartDate is null || start > StartDate))
+        || (endDate is { } end && (EndDate is null || end < EndDate));
+
+    /// <summary>
+    /// Dipanggil saat milestone dibuat atau tanggalnya berubah: versi proyek ikut naik, sehingga perubahan milestone dan
+    /// perubahan rentang tanggal proyek yang bersamaan tidak bisa sama-sama lolos (yang kedua 409).
+    /// </summary>
+    public void RegisterMilestoneChange() => MarkChildrenChanged();
+
+    private static void EnsureCovers(DateOnly? startDate, DateOnly? endDate, MilestoneSpan milestones)
+    {
+        if ((startDate is { } start && milestones.Earliest is { } earliest && earliest < start)
+            || (endDate is { } end && milestones.Latest is { } latest && latest > end))
+            throw new DomainException(
+                $"Rentang tanggal proyek harus mencakup semua milestone ({Format(milestones.Earliest)} s.d. {Format(milestones.Latest)}).");
+    }
+
+    /// <summary>Tanggal untuk pesan ke pengguna, selalu kalender Gregorian (tidak bergantung culture server).</summary>
+    public static string Format(DateOnly? date) => date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "tanpa batas";
 
     /// <summary>Mengarsipkan proyek; mengulang arsip tidak berbuat apa-apa.</summary>
     public void Archive()
@@ -226,6 +254,12 @@ public sealed partial class Project : AggregateRoot
         priority = default;
         return false;
     }
+}
+
+/// <summary>Tanggal jatuh tempo milestone paling awal dan paling akhir di satu proyek; <see cref="None"/> bila belum ada.</summary>
+public readonly record struct MilestoneSpan(DateOnly? Earliest, DateOnly? Latest)
+{
+    public static MilestoneSpan None => default;
 }
 
 public sealed record ProjectCreatedDomainEvent(long TenantId, Guid ProjectId, string Code, string Name, Guid OwnerId) : DomainEvent;

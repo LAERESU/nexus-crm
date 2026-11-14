@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using NexUS.BuildingBlocks.Common.Results;
 using NexUS.Project.Application.Abstractions;
+using NexUS.Project.Application.Milestones;
 using NexUS.Project.Application.Projects;
+using NexUS.Project.Domain.Milestones;
 using NexUS.Project.Domain.Projects;
 using ProjectEntity = NexUS.Project.Domain.Projects.Project;
 
@@ -14,6 +16,12 @@ public sealed class ProjectRepository(ProjectDbContext db) : IProjectRepository
 {
     public Task<ProjectEntity?> FindAsync(Guid publicId, CancellationToken ct) =>
         db.Projects.FirstOrDefaultAsync(p => p.PublicId == publicId, ct);
+
+    public async Task<long?> FindIdAsync(Guid publicId, CancellationToken ct)
+    {
+        var ids = await db.Projects.AsNoTracking().Where(p => p.PublicId == publicId).Select(p => p.Id).Take(1).ToListAsync(ct);
+        return ids.Count == 0 ? null : ids[0];
+    }
 
     public Task<ProjectEntity?> FindWithMembersAsync(Guid publicId, CancellationToken ct) =>
         db.Projects.Include(p => p.Members).FirstOrDefaultAsync(p => p.PublicId == publicId, ct);
@@ -120,4 +128,41 @@ public sealed class UserDirectory(ProjectDbContext db) : IUserDirectory
         var states = await db.UserRefs.AsNoTracking().Where(u => u.UserId == userId).Select(u => u.IsActive).ToListAsync(ct);
         return states.Count == 0 ? null : states[0];
     }
+}
+
+public sealed class MilestoneRepository(ProjectDbContext db) : IMilestoneRepository
+{
+    public Task<Milestone?> FindAsync(long projectId, Guid milestoneId, CancellationToken ct) =>
+        db.Milestones.FirstOrDefaultAsync(m => m.ProjectId == projectId && m.PublicId == milestoneId, ct);
+
+    public async Task<MilestoneSpan> GetDueDateRangeAsync(long projectId, CancellationToken ct)
+    {
+        // Dua query Take(1) memakai index (PROJECT_ID, DUE_DATE), tanpa membaca semua milestone.
+        var dates = db.Milestones.AsNoTracking().Where(m => m.ProjectId == projectId).Select(m => m.DueDate);
+        var earliest = await dates.OrderBy(d => d).Take(1).ToListAsync(ct);
+        if (earliest.Count == 0) return MilestoneSpan.None;
+
+        var latest = await dates.OrderByDescending(d => d).Take(1).ToListAsync(ct);
+        return new MilestoneSpan(earliest[0], latest[0]);
+    }
+
+    public async Task AddAsync(Milestone milestone, CancellationToken ct) => await db.Milestones.AddAsync(milestone, ct);
+}
+
+public sealed class MilestoneReadService(ProjectDbContext db) : IMilestoneReadService
+{
+    public async Task<PagedResult<MilestoneDto>> ListAsync(long projectId, Guid projectPublicId, int page, int size, CancellationToken ct)
+    {
+        var query = db.Milestones.AsNoTracking().Where(m => m.ProjectId == projectId);
+
+        var total = await query.LongCountAsync(ct);
+        var items = await query.OrderBy(m => m.DueDate).ThenBy(m => m.Name).ThenBy(m => m.Id)
+            .Skip((page - 1) * size).Take(size).ToListAsync(ct);
+
+        return new PagedResult<MilestoneDto>(items.Select(m => MilestoneDto.From(m, projectPublicId)).ToList(), page, size, total);
+    }
+
+    public async Task<MilestoneDto?> GetAsync(long projectId, Guid projectPublicId, Guid milestoneId, CancellationToken ct) =>
+        await db.Milestones.AsNoTracking().FirstOrDefaultAsync(m => m.ProjectId == projectId && m.PublicId == milestoneId, ct)
+            is { } milestone ? MilestoneDto.From(milestone, projectPublicId) : null;
 }

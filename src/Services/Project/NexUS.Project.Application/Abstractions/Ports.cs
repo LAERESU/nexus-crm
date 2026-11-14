@@ -1,5 +1,7 @@
 using NexUS.BuildingBlocks.Common.Results;
+using NexUS.Project.Application.Milestones;
 using NexUS.Project.Application.Projects;
+using NexUS.Project.Domain.Milestones;
 using NexUS.Project.Domain.Projects;
 using ProjectEntity = NexUS.Project.Domain.Projects.Project;
 
@@ -11,6 +13,9 @@ namespace NexUS.Project.Application.Abstractions;
 public interface IProjectRepository
 {
     Task<ProjectEntity?> FindAsync(Guid publicId, CancellationToken ct);
+
+    /// <summary>ID internal proyek (tanpa memuat entitas); null bila tidak ada.</summary>
+    Task<long?> FindIdAsync(Guid publicId, CancellationToken ct);
 
     /// <summary>Seperti <see cref="FindAsync"/> dengan anggota dimuat (untuk diubah).</summary>
     Task<ProjectEntity?> FindWithMembersAsync(Guid publicId, CancellationToken ct);
@@ -39,6 +44,25 @@ public interface IProjectReadService
 /// <param name="MemberUserId">Bila diisi, hanya proyek yang diikuti user ini.</param>
 public sealed record ProjectFilter(
     string? Search, string? Status, Guid? OwnerId, Guid? DepartmentId, Guid? MemberUserId, int Page, int Size);
+
+public interface IMilestoneRepository
+{
+    /// <summary>Milestone milik proyek <paramref name="projectId"/> (ID internal); null bila tidak ada di proyek itu.</summary>
+    Task<Milestone?> FindAsync(long projectId, Guid milestoneId, CancellationToken ct);
+
+    /// <summary>Tanggal jatuh tempo milestone paling awal dan paling akhir di proyek.</summary>
+    Task<MilestoneSpan> GetDueDateRangeAsync(long projectId, CancellationToken ct);
+
+    Task AddAsync(Milestone milestone, CancellationToken ct);
+}
+
+public interface IMilestoneReadService
+{
+    /// <param name="projectId">ID internal proyek.</param>
+    Task<PagedResult<MilestoneDto>> ListAsync(long projectId, Guid projectPublicId, int page, int size, CancellationToken ct);
+
+    Task<MilestoneDto?> GetAsync(long projectId, Guid projectPublicId, Guid milestoneId, CancellationToken ct);
+}
 
 /// <summary>Read model user (USER_REF) yang diisi dari event User Service.</summary>
 public interface IUserDirectory

@@ -30,6 +30,8 @@ public static class DependencyInjection
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IProjectReadService, ProjectReadService>();
         services.AddScoped<IProjectAccess, ProjectAccess>();
+        services.AddScoped<IMilestoneRepository, MilestoneRepository>();
+        services.AddScoped<IMilestoneReadService, MilestoneReadService>();
         services.AddScoped<IUserDirectory, UserDirectory>();
 
         // Read model user (USER_REF) dari event User Service; berhenti sendiri bila ConnectionStrings:RabbitMq kosong.

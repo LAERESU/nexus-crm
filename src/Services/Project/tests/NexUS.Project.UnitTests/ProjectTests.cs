@@ -62,7 +62,7 @@ public class ProjectTests
         NewProject(null, End).StartDate.Should().BeNull();
 
         var project = NewProject(Start, End);
-        FluentActions.Invoking(() => project.Update("Nama", null, ProjectStatus.Active, ProjectPriority.Medium, End, Start, null)).Should().Throw<DomainException>();
+        FluentActions.Invoking(() => project.Update("Nama", null, ProjectStatus.Active, ProjectPriority.Medium, End, Start, null, MilestoneSpan.None)).Should().Throw<DomainException>();
         project.Status.Should().Be(ProjectStatus.Planning, "perubahan yang ditolak tidak mengubah apa pun");
     }
 
@@ -73,7 +73,7 @@ public class ProjectTests
         project.PopDomainEvents();
         var department = Guid.NewGuid();
 
-        project.Update("Portal Baru", "Deskripsi", ProjectStatus.OnHold, ProjectPriority.Urgent, Start, End, department);
+        project.Update("Portal Baru", "Deskripsi", ProjectStatus.OnHold, ProjectPriority.Urgent, Start, End, department, MilestoneSpan.None);
 
         project.Name.Should().Be("Portal Baru");
         project.Description.Should().Be("Deskripsi");
@@ -85,7 +85,7 @@ public class ProjectTests
             .Which.Should().BeOfType<ProjectUpdatedDomainEvent>().Which.Status.Should().Be("ON_HOLD");
 
         // Menyimpan ulang nilai yang sama bukan perubahan: tidak ada event.
-        project.Update(" Portal Baru ", "Deskripsi", ProjectStatus.OnHold, ProjectPriority.Urgent, Start, End, department);
+        project.Update(" Portal Baru ", "Deskripsi", ProjectStatus.OnHold, ProjectPriority.Urgent, Start, End, department, MilestoneSpan.None);
         project.PopDomainEvents().Should().BeEmpty();
     }
 
@@ -95,7 +95,7 @@ public class ProjectTests
         var project = NewProject();
         project.PopDomainEvents();
 
-        FluentActions.Invoking(() => project.Update("Nama", null, ProjectStatus.Archived, ProjectPriority.Medium, null, null, null)).Should().Throw<DomainException>();
+        FluentActions.Invoking(() => project.Update("Nama", null, ProjectStatus.Archived, ProjectPriority.Medium, null, null, null, MilestoneSpan.None)).Should().Throw<DomainException>();
 
         project.Archive();
         project.Archive(); // mengulang tidak berbuat apa-apa
@@ -103,7 +103,7 @@ public class ProjectTests
         project.Status.Should().Be(ProjectStatus.Archived);
         project.IsDeleted.Should().BeFalse("arsip adalah status, bukan penghapusan baris");
         project.PopDomainEvents().Should().ContainSingle().Which.Should().BeOfType<ProjectArchivedDomainEvent>();
-        FluentActions.Invoking(() => project.Update("Nama", null, ProjectStatus.Active, ProjectPriority.Medium, null, null, null)).Should().Throw<DomainException>();
+        FluentActions.Invoking(() => project.Update("Nama", null, ProjectStatus.Active, ProjectPriority.Medium, null, null, null, MilestoneSpan.None)).Should().Throw<DomainException>();
     }
 
     [Theory]
