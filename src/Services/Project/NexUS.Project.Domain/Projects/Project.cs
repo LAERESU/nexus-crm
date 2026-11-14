@@ -94,6 +94,18 @@ public sealed partial class Project : AggregateRoot
             AddDomainEvent(new ProjectUpdatedDomainEvent(TenantId, PublicId, Code, Name, ToName(Status)));
     }
 
+    /// <summary>
+    /// Rentang tanggal proyek harus tetap mencakup semua milestone-nya (<paramref name="earliestMilestone"/> s.d.
+    /// <paramref name="latestMilestone"/>, null bila belum ada milestone).
+    /// </summary>
+    public void EnsureDatesCover(DateOnly? earliestMilestone, DateOnly? latestMilestone)
+    {
+        if ((StartDate is { } start && earliestMilestone is { } earliest && earliest < start)
+            || (EndDate is { } end && latestMilestone is { } latest && latest > end))
+            throw new DomainException(
+                $"Rentang tanggal proyek harus mencakup semua milestone ({earliestMilestone:yyyy-MM-dd} s.d. {latestMilestone:yyyy-MM-dd}).");
+    }
+
     /// <summary>Mengarsipkan proyek; mengulang arsip tidak berbuat apa-apa.</summary>
     public void Archive()
     {

@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using NexUS.BuildingBlocks.Common.Results;
 using NexUS.Project.Application.Abstractions;
+using NexUS.Project.Application.Milestones;
 using NexUS.Project.Application.Projects;
+using NexUS.Project.Domain.Milestones;
 using NexUS.Project.Domain.Projects;
 using ProjectEntity = NexUS.Project.Domain.Projects.Project;
 
@@ -119,5 +121,37 @@ public sealed class UserDirectory(ProjectDbContext db) : IUserDirectory
     {
         var states = await db.UserRefs.AsNoTracking().Where(u => u.UserId == userId).Select(u => u.IsActive).ToListAsync(ct);
         return states.Count == 0 ? null : states[0];
+    }
+}
+
+public sealed class MilestoneRepository(ProjectDbContext db) : IMilestoneRepository
+{
+    public Task<Milestone?> FindAsync(long projectId, Guid milestoneId, CancellationToken ct) =>
+        db.Milestones.FirstOrDefaultAsync(m => m.ProjectId == projectId && m.PublicId == milestoneId, ct);
+
+    public async Task<(DateOnly? Earliest, DateOnly? Latest)> GetDueDateRangeAsync(long projectId, CancellationToken ct)
+    {
+        // Jumlah milestone satu proyek kecil; min/max dihitung di memori agar tidak bergantung pada terjemahan konversi tanggal.
+        var dates = await db.Milestones.AsNoTracking().Where(m => m.ProjectId == projectId).Select(m => m.DueDate).ToListAsync(ct);
+        return dates.Count == 0 ? (null, null) : (dates.Min(), dates.Max());
+    }
+
+    public async Task AddAsync(Milestone milestone, CancellationToken ct) => await db.Milestones.AddAsync(milestone, ct);
+}
+
+public sealed class MilestoneReadService(ProjectDbContext db) : IMilestoneReadService
+{
+    public async Task<PagedResult<MilestoneDto>> ListAsync(Guid projectId, int page, int size, CancellationToken ct)
+    {
+        var query = from m in db.Milestones.AsNoTracking()
+                    join p in db.Projects.AsNoTracking() on m.ProjectId equals p.Id
+                    where p.PublicId == projectId
+                    select m;
+
+        var total = await query.LongCountAsync(ct);
+        var items = await query.OrderBy(m => m.DueDate).ThenBy(m => m.Name).ThenBy(m => m.Id)
+            .Skip((page - 1) * size).Take(size).ToListAsync(ct);
+
+        return new PagedResult<MilestoneDto>(items.Select(m => MilestoneDto.From(m, projectId)).ToList(), page, size, total);
     }
 }

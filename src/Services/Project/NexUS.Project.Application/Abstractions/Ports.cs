@@ -1,5 +1,7 @@
 using NexUS.BuildingBlocks.Common.Results;
+using NexUS.Project.Application.Milestones;
 using NexUS.Project.Application.Projects;
+using NexUS.Project.Domain.Milestones;
 using NexUS.Project.Domain.Projects;
 using ProjectEntity = NexUS.Project.Domain.Projects.Project;
 
@@ -39,6 +41,22 @@ public interface IProjectReadService
 /// <param name="MemberUserId">Bila diisi, hanya proyek yang diikuti user ini.</param>
 public sealed record ProjectFilter(
     string? Search, string? Status, Guid? OwnerId, Guid? DepartmentId, Guid? MemberUserId, int Page, int Size);
+
+public interface IMilestoneRepository
+{
+    /// <summary>Milestone milik proyek <paramref name="projectId"/> (ID internal); null bila tidak ada di proyek itu.</summary>
+    Task<Milestone?> FindAsync(long projectId, Guid milestoneId, CancellationToken ct);
+
+    /// <summary>Tanggal jatuh tempo milestone paling awal dan paling akhir di proyek; null bila belum ada milestone.</summary>
+    Task<(DateOnly? Earliest, DateOnly? Latest)> GetDueDateRangeAsync(long projectId, CancellationToken ct);
+
+    Task AddAsync(Milestone milestone, CancellationToken ct);
+}
+
+public interface IMilestoneReadService
+{
+    Task<PagedResult<MilestoneDto>> ListAsync(Guid projectId, int page, int size, CancellationToken ct);
+}
 
 /// <summary>Read model user (USER_REF) yang diisi dari event User Service.</summary>
 public interface IUserDirectory

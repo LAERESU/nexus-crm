@@ -4,6 +4,7 @@ using NexUS.BuildingBlocks.Common.Domain;
 using NexUS.BuildingBlocks.Common.Exceptions;
 using NexUS.BuildingBlocks.Messaging;
 using NexUS.Project.Application.Common;
+using NexUS.Project.Domain.Milestones;
 using NexUS.Project.Domain.Projects;
 using NexUS.Project.Domain.Users;
 using Oracle.ManagedDataAccess.Client;
@@ -26,6 +27,7 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
 
     public DbSet<ProjectEntity> Projects => Set<ProjectEntity>();
     public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+    public DbSet<Milestone> Milestones => Set<Milestone>();
     public DbSet<UserRef> UserRefs => Set<UserRef>();
     public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
     public DbSet<ProcessedEvent> ProcessedEvents => Set<ProcessedEvent>();
@@ -74,6 +76,24 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
                 role => ProjectMember.ToName(role),
                 value => Enum.Parse<ProjectRole>(value, true));
             e.Property(x => x.JoinedAt).HasColumnName("JOINED_AT");
+            e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
+        });
+
+        model.Entity<Milestone>(e =>
+        {
+            e.ToTable("MILESTONES");
+            MapEntity(e);
+            e.Ignore(x => x.DomainEvents);
+            e.Property(x => x.ProjectId).HasColumnName("PROJECT_ID");
+            e.Property(x => x.Name).HasColumnName("NAME").HasMaxLength(Milestone.NameMaxLength);
+            e.Property(x => x.Description).HasColumnName("DESCRIPTION").HasMaxLength(Milestone.DescriptionMaxLength);
+            e.Property(x => x.DueDate).HasColumnName("DUE_DATE").HasColumnType("DATE").HasConversion(
+                date => date.ToDateTime(TimeOnly.MinValue),
+                value => DateOnly.FromDateTime(value));
+            e.Property(x => x.Status).HasColumnName("STATUS").HasMaxLength(20).HasConversion(
+                status => Milestone.ToName(status),
+                value => Enum.Parse<MilestoneStatus>(value, true));
+            e.HasOne<ProjectEntity>().WithMany().HasForeignKey(x => x.ProjectId);
             e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
         });
 

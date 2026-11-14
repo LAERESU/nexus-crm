@@ -1,6 +1,3 @@
-using System.Globalization;
-using FluentValidation;
-using FluentValidation.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -79,18 +76,11 @@ public sealed class ProjectsController(ISender mediator) : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Header <c>If-Match</c> berisi <c>ROW_VERSION</c> (CONTEXT.md bagian 6); ETag di response memakai format yang sama.</summary>
-    private long RequireIfMatch()
-    {
-        var raw = Request.Headers.IfMatch.ToString().Trim().Trim('"');
-        if (long.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out var version)) return version;
-
-        throw new ValidationException([new ValidationFailure("If-Match", "Header If-Match berisi versi data (rowVersion) wajib diisi.")]);
-    }
+    private long RequireIfMatch() => IfMatchHeader.Require(Request);
 
     private ProjectDto WithEtag(ProjectDto project)
     {
-        Response.Headers.ETag = $"\"{project.RowVersion.ToString(CultureInfo.InvariantCulture)}\"";
+        IfMatchHeader.Write(Response, project.RowVersion);
         return project;
     }
 }
