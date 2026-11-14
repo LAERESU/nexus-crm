@@ -47,22 +47,10 @@ public class ProjectMemberEndpointTests(OracleProjectFixture fixture)
         return id;
     }
 
-    /// <summary>Publish bersifat mandatory: diulang sampai antrean consumer Project Service siap menerima.</summary>
     private async Task PublishAsync(IIntegrationEvent integrationEvent)
     {
-        var publisher = fixture.Factory.Services.GetRequiredService<IEventPublisher>();
-        for (var attempt = 1; ; attempt++)
-        {
-            try
-            {
-                await publisher.PublishAsync(integrationEvent);
-                return;
-            }
-            catch (Exception) when (attempt < 60)
-            {
-                await Task.Delay(500);
-            }
-        }
+        await fixture.WaitForQueueAsync($"project.{EventBusTopology.RoutingKey(integrationEvent.GetType())}");
+        await fixture.Factory.Services.GetRequiredService<IEventPublisher>().PublishAsync(integrationEvent);
     }
 
     private async Task WaitForUserRefAsync(Guid userId, Func<MemberBody, bool> condition, HttpClient client, Guid projectId)

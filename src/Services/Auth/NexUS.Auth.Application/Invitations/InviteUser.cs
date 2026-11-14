@@ -21,7 +21,8 @@ public sealed class InviteUserCommandHandler(
 
     public Task Handle(InviteUserCommand command, CancellationToken ct) =>
         // Satu transaksi: kredensial, catatan event, dan (lewat rollback) kegagalan kirim email. Bila email gagal,
-        // tidak ada yang tersimpan dan event dikirim ulang oleh broker.
+        // tidak ada yang tersimpan dan event diulang consumer (jeda bertambah sampai 60 detik, sekitar 16 menit; setelah itu
+        // dipindah ke auth.UserCreated.dead).
         unitOfWork.ExecuteInTransactionAsync(async token =>
         {
             if (await processedEvents.IsProcessedAsync(command.EventId, Consumer, token)) return;

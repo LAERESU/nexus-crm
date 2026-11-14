@@ -51,8 +51,9 @@ Referensi utama: `ARCHITECTURE.md` A.2, A.3, B.3, C.2 (PRJ_SCHEMA), D.4–D.6.
   4. Publish `ProjectCreated`, `ProjectUpdated`, `MemberAdded`, `MemberRemoved`, `ProjectArchived`.
   5. Terapkan juga ke User Service (event NX-018/019).
 - **Acceptance criteria:**
-  - [ ] Jika RabbitMQ mati saat proyek dibuat, data tetap tersimpan dan event terkirim setelah RabbitMQ hidup.
-  - [ ] Event yang sama dikonsumsi dua kali tidak menghasilkan efek ganda.
+  - [x] Jika RabbitMQ mati saat proyek dibuat, data tetap tersimpan dan event terkirim setelah RabbitMQ hidup.
+  - [x] Event yang sama dikonsumsi dua kali tidak menghasilkan efek ganda.
+- **Catatan:** relay dan consumer memakai `RabbitMQ.Client` (ADR-0010), bukan MassTransit. Event tanpa antrean penerima tetap tertunda di outbox per jenis (tidak menahan jenis lain) dan terkirim setelah consumer-nya ada; pesan yang gagal diproses diulang dengan jeda bertambah lalu dipindah ke `{antrean}.dead` setelah 20 percobaan; outbox, audit, dan consumer idempotent kini komponen bersama di BuildingBlocks.Messaging. Selain lima event di langkah 4 juga dikirim `MemberRoleChanged`; event milestone belum. User Service juga mengirim `RoleChanged`. Lihat ADR-0012.
 
 ---
 

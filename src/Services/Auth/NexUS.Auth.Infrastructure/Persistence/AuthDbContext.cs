@@ -76,18 +76,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options, TimeP
             e.HasOne<Credential>().WithMany().HasForeignKey(x => x.CredentialId);
         });
 
-        model.Entity<OutboxMessage>(e =>
-        {
-            e.ToTable("OUTBOX_MESSAGES");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("ID").ValueGeneratedNever();
-            e.Property(x => x.Type).HasColumnName("TYPE").HasMaxLength(500);
-            e.Property(x => x.Payload).HasColumnName("PAYLOAD").HasColumnType("CLOB");
-            e.Property(x => x.OccurredAt).HasColumnName("OCCURRED_AT");
-            e.Property(x => x.ProcessedAt).HasColumnName("PROCESSED_AT");
-            e.Property(x => x.RetryCount).HasColumnName("RETRY_COUNT");
-            e.Property(x => x.Error).HasColumnName("ERROR").HasMaxLength(2000);
-        });
+        model.MapOutboxMessages();
 
         model.MapProcessedEvents();
     }
@@ -120,25 +109,8 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options, TimeP
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        var now = timeProvider.GetUtcNow();
-        foreach (var entry in ChangeTracker.Entries<Entity>())
-        {
-            if (entry.State == EntityState.Added)
-            {
-                entry.Entity.CreatedAt = now;
-                entry.Entity.CreatedBy = SystemActor;
-            }
-            else if (entry.State == EntityState.Modified)
-            {
-                entry.Entity.UpdatedAt = now;
-                entry.Entity.UpdatedBy = SystemActor;
-                entry.Entity.RowVersion++;
-            }
-        }
-
-        // Outbox pattern: domain event disimpan dalam transaksi yang sama dengan perubahan data.
-        var events = ChangeTracker.Entries<AggregateRoot>().SelectMany(e => e.Entity.PopDomainEvents()).ToList();
-        Outbox.AddRange(events.Select(OutboxMessage.From));
+        // Kolom audit, ROW_VERSION, dan outbox (domain event dalam transaksi yang sama).
+        this.PrepareSave(timeProvider.GetUtcNow(), SystemActor);
 
         try
         {
