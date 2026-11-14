@@ -171,7 +171,7 @@ public sealed class UserDbContext(
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         // Kolom audit, ROW_VERSION, dan outbox (domain event dalam transaksi yang sama).
-        var events = this.PrepareSave(timeProvider.GetUtcNow(), SystemActor).Events;
+        var events = this.PrepareSave(timeProvider.GetUtcNow(), SystemActor);
 
         try
         {

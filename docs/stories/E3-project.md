@@ -53,7 +53,7 @@ Referensi utama: `ARCHITECTURE.md` A.2, A.3, B.3, C.2 (PRJ_SCHEMA), D.4–D.6.
 - **Acceptance criteria:**
   - [x] Jika RabbitMQ mati saat proyek dibuat, data tetap tersimpan dan event terkirim setelah RabbitMQ hidup.
   - [x] Event yang sama dikonsumsi dua kali tidak menghasilkan efek ganda.
-- **Catatan:** relay dan consumer memakai `RabbitMQ.Client` (ADR-0010), bukan MassTransit. Ditambah alternate exchange `nexus.unrouted` untuk event tanpa antrean penerima dan dead-letter `{antrean}.dead` setelah 5 percobaan; outbox, audit, dan consumer idempotent kini komponen bersama di BuildingBlocks.Messaging. Selain lima event di langkah 4 juga dikirim `MemberRoleChanged`; event milestone belum. User Service juga mengirim `RoleChanged`. RabbitMQ lokal lama perlu exchange `nexus.events` dihapus sekali. Lihat ADR-0012.
+- **Catatan:** relay dan consumer memakai `RabbitMQ.Client` (ADR-0010), bukan MassTransit. Event tanpa antrean penerima tetap tertunda di outbox per jenis (tidak menahan jenis lain) dan terkirim setelah consumer-nya ada; pesan yang gagal diproses diulang dengan jeda bertambah lalu dipindah ke `{antrean}.dead` setelah 20 percobaan; outbox, audit, dan consumer idempotent kini komponen bersama di BuildingBlocks.Messaging. Selain lima event di langkah 4 juga dikirim `MemberRoleChanged`; event milestone belum. User Service juga mengirim `RoleChanged`. Lihat ADR-0012.
 
 ---
 

@@ -56,7 +56,7 @@ public sealed class OracleAuthFixture : IAsyncLifetime
 
     /// <summary>
     /// Menunggu antrean consumer dideklarasikan (consumer berjalan di latar saat host start). Tanpa antrean, event yang
-    /// dipublikasikan diparkir alternate exchange, bukan dikirim ke consumer (ADR-0012).
+    /// dipublikasikan tetap tertunda di outbox atau ditolak publisher (ADR-0012).
     /// </summary>
     public async Task WaitForQueueAsync(string queue)
     {

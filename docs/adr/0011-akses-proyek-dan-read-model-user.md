@@ -24,7 +24,7 @@ Permission bawaan tidak cukup untuk membedakan "anggota" dari "admin/auditor": r
 ## Konsekuensi
 
 - User yang dibuat sebelum Project Service mulai mengonsumsi event tidak ada di `USER_REF` sampai profilnya berubah; namanya tampil kosong di daftar anggota. Belum ada mekanisme isi ulang (backfill).
-- Event yang dikirim sebelum Project Service pernah berjalan diparkir di `nexus.unrouted` dan tidak sampai ke `USER_REF` (ADR-0012); relay User Service tidak lagi tertahan.
+- Event yang dikirim sebelum Project Service pernah berjalan tetap tertunda di outbox User Service dan terkirim setelah antreannya ada, tanpa menahan jenis event lain (ADR-0012).
 - User yang dinonaktifkan tetap tercatat sebagai anggota proyek; hanya penambahannya ke proyek lain yang ditolak.
 - Pemegang permission berscope proyek/departemen tetap harus dijadikan manager proyek untuk bisa mengubahnya.
 - Daftar anggota memakai paging seperti endpoint list lain.

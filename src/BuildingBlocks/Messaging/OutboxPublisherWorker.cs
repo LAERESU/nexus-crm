@@ -34,6 +34,14 @@ public sealed class OutboxPublisherWorker<TContext>(
     public static readonly TimeSpan FailureDelay = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// Jenis event yang belum punya antrean penerima dilewati selama ini sebelum dicoba lagi. Barisnya tetap tertunda di
+    /// outbox (tidak hilang dan tidak menahan jenis event lain) dan terkirim setelah consumer-nya pernah berjalan.
+    /// </summary>
+    public static readonly TimeSpan UnroutableRecheck = TimeSpan.FromSeconds(30);
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset> _unroutableUntil = new(StringComparer.Ordinal);
+
+    /// <summary>
     /// Mengambil <see cref="BatchSize"/> baris tertua. Pengurutan di subquery dan ROWNUM di luarnya, karena ROWNUM
     /// dievaluasi sebelum ORDER BY; FETCH FIRST tidak dipakai karena Oracle menolaknya bersama FOR UPDATE (ORA-02014).
     /// Semua nilai dikirim sebagai bind variable; yang dirangkai hanya jumlah placeholder tipe.
@@ -94,15 +102,21 @@ public sealed class OutboxPublisherWorker<TContext>(
         var mapper = scope.ServiceProvider.GetRequiredService<IOutboxEventMapper>();
         var publisher = scope.ServiceProvider.GetRequiredService<IEventPublisher>();
 
-        if (mapper.PublishedTypes.Count == 0) return 0;
+        var now = DateTimeOffset.UtcNow;
+        var types = mapper.PublishedTypes.Where(t => !_unroutableUntil.TryGetValue(t, out var until) || until <= now).ToList();
+        if (types.Count == 0) return 0;
 
-        var (sql, parameters) = PendingQuery(mapper.PublishedTypes);
+        var (sql, parameters) = PendingQuery(types);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var pending = await db.Set<OutboxMessage>().FromSqlRaw(sql, parameters).ToListAsync(ct);
 
         Exception? publishFailure = null;
+        var unroutable = new HashSet<string>(StringComparer.Ordinal);
         foreach (var message in pending.OrderBy(m => m.OccurredAt))
         {
+            var domainType = message.Type.Split(',')[0];
+            if (unroutable.Contains(domainType)) continue;
+
             IIntegrationEvent? integrationEvent;
             try
             {
@@ -121,6 +135,15 @@ public sealed class OutboxPublisherWorker<TContext>(
                 try
                 {
                     await publisher.PublishAsync(integrationEvent, ct);
+                }
+                catch (UnroutableEventException ex)
+                {
+                    // Consumer jenis event ini belum pernah berjalan: tetap tertunda, jenis lain jalan terus.
+                    unroutable.Add(domainType);
+                    _unroutableUntil[domainType] = DateTimeOffset.UtcNow + UnroutableRecheck;
+                    logger.LogInformation("Belum ada antrean penerima {EventName}; event tertunda di outbox dan dicoba lagi dalam {Delay}",
+                        ex.EventName, UnroutableRecheck);
+                    continue;
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested)
                 {

@@ -9,16 +9,15 @@ namespace NexUS.BuildingBlocks.Messaging;
 /// saat diulang event itu dilewati.
 /// </summary>
 /// <typeparam name="TContext">DbContext service yang memetakan <see cref="ProcessedEvent"/> (lihat <c>MapProcessedEvents</c>).</typeparam>
-public abstract class IdempotentEventHandler<TEvent, TContext>(TContext db, TimeProvider timeProvider) : IIntegrationEventHandler<TEvent>
+public abstract class IdempotentEventHandler<TEvent, TContext>(TContext db, TimeProvider timeProvider, EventConsumerName<TEvent> consumer)
+    : IIntegrationEventHandler<TEvent>
     where TEvent : IIntegrationEvent
     where TContext : DbContext
 {
-    /// <summary>Awalan antrean service ini (mis. <c>project</c>); nama consumer = <c>{prefix}.{NamaEvent}</c>.</summary>
-    protected abstract string QueuePrefix { get; }
-
     protected TContext Db => db;
 
-    public string ConsumerName => $"{QueuePrefix}.{EventBusTopology.RoutingKey(typeof(TEvent))}";
+    /// <summary>Nama consumer di <c>PROCESSED_EVENTS</c>, sama dengan nama antreannya (dari <c>AddNexusEventConsumer</c>).</summary>
+    public string ConsumerName => consumer.Value;
 
     public async Task HandleAsync(TEvent integrationEvent, CancellationToken ct)
     {
@@ -33,3 +32,6 @@ public abstract class IdempotentEventHandler<TEvent, TContext>(TContext db, Time
     /// <summary>Menerapkan efek event ke <see cref="Db"/> tanpa menyimpan; penyimpanan dilakukan bersama catatan idempotensi.</summary>
     protected abstract Task ApplyAsync(TEvent integrationEvent, CancellationToken ct);
 }
+
+/// <summary>Nama consumer satu jenis event (<c>{service}.{NamaEvent}</c>), didaftarkan oleh <c>AddNexusEventConsumer</c>.</summary>
+public sealed record EventConsumerName<TEvent>(string Value) where TEvent : IIntegrationEvent;

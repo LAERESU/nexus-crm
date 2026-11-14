@@ -17,7 +17,8 @@ public sealed record UserDeactivated(Guid EventId, DateTimeOffset OccurredAt, lo
 
 /// <summary>
 /// Role atau penugasan role berubah (NX-028). <c>RoleId</c> diisi bila permission role berubah, <c>UserId</c> bila
-/// penugasan atau status user berubah. Cache permission di Redis sudah dihapus langsung oleh User Service (ADR-0009).
+/// penugasan atau status user berubah. <c>Reason</c>: <c>role_permissions_changed</c>, <c>user_roles_changed</c>, atau
+/// <c>user_status_changed</c>. Cache permission di Redis sudah dihapus langsung oleh User Service (ADR-0009).
 /// </summary>
 public sealed record RoleChanged(Guid EventId, DateTimeOffset OccurredAt, long TenantId, Guid? RoleId, Guid? UserId, string Reason)
     : IIntegrationEvent;

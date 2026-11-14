@@ -71,6 +71,7 @@ public class UserOutboxMapperTests
         var roleId = Guid.NewGuid();
         var changed = new RoleChangedDomainEvent(7, roleId, null, RoleChangeReason.RolePermissionsChanged);
         _mapper.Map(OutboxMessage.From(changed)).Should()
-            .Be(new RoleChanged(changed.EventId, changed.OccurredAt, 7, roleId, null, "RolePermissionsChanged"));
+            .Be(new RoleChanged(changed.EventId, changed.OccurredAt, 7, roleId, null, "role_permissions_changed"));
+        UserOutboxMapper.ReasonName(RoleChangeReason.UserStatusChanged).Should().Be("user_status_changed");
     }
 }

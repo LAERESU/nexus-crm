@@ -40,12 +40,16 @@ public static class MessagingServiceCollectionExtensions
         where THandler : class, IIntegrationEventHandler<TEvent>
     {
         services.AddScoped<IIntegrationEventHandler<TEvent>, THandler>();
+        // Nama consumer untuk PROCESSED_EVENTS diambil dari registrasi ini, sama dengan nama antreannya.
+        services.AddSingleton(new EventConsumerName<TEvent>($"{serviceName}.{EventBusTopology.RoutingKey(typeof(TEvent))}"));
+        services.AddOptions<EventConsumerOptions>().Configure<IConfiguration>(EventConsumerOptions.Read);
         AddConnection(services, serviceName);
 
         services.AddHostedService(sp => new EventConsumerService<TEvent>(
             sp.GetRequiredService<RabbitMqConnection>(),
             sp.GetRequiredService<IServiceScopeFactory>(),
             serviceName,
+            sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EventConsumerOptions>>().Value,
             sp.GetRequiredService<ILogger<EventConsumerService<TEvent>>>()));
         return services;
     }

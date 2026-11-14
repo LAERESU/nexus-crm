@@ -3,30 +3,25 @@ using NexUS.BuildingBlocks.Common.Domain;
 
 namespace NexUS.BuildingBlocks.Messaging;
 
-/// <summary>Hasil <see cref="DomainEventOutbox.PrepareSave"/>; panggil <see cref="Complete"/> setelah simpan berhasil.</summary>
-public sealed record PreparedSave(IReadOnlyList<IDomainEvent> Events, IReadOnlyList<AggregateRoot> ChildChangedRoots)
-{
-    public void Complete()
-    {
-        foreach (var root in ChildChangedRoots) root.AcceptChildChanges();
-    }
-}
-
 /// <summary>
 /// Outbox pattern (ARCHITECTURE.md D.4) yang dipakai semua DbContext service: kolom audit dan <c>ROW_VERSION</c> diisi,
 /// lalu domain event disimpan ke <c>OUTBOX_MESSAGES</c> dalam transaksi yang sama dengan perubahan data.
 /// </summary>
 public static class DomainEventOutbox
 {
-    /// <summary>Dipanggil di awal <c>SaveChangesAsync</c>, sebelum <c>base.SaveChangesAsync</c>.</summary>
+    /// <summary>Dipanggil di awal <c>SaveChangesAsync</c>, sebelum <c>base.SaveChangesAsync</c>; mengembalikan domain event yang disimpan.</summary>
     /// <param name="actor">Isi kolom CREATED_BY/UPDATED_BY.</param>
-    public static PreparedSave PrepareSave(this DbContext db, DateTimeOffset now, long actor)
+    public static IReadOnlyList<IDomainEvent> PrepareSave(this DbContext db, DateTimeOffset now, long actor)
     {
         // Perubahan entitas anak (mis. anggota proyek) ikut menaikkan ROW_VERSION aggregate-nya, sehingga perubahan anak
         // yang bersamaan tidak bisa sama-sama lolos: yang kedua bentrok versi (409).
         var childChanged = db.ChangeTracker.Entries<AggregateRoot>().Where(e => e.Entity.HasChildChanges()).ToList();
-        foreach (var root in childChanged.Where(e => e.State == EntityState.Unchanged))
-            root.State = EntityState.Modified;
+        foreach (var root in childChanged)
+        {
+            if (root.State == EntityState.Unchanged) root.State = EntityState.Modified;
+            // Tanda bisa langsung dibersihkan: bila simpan gagal, status Modified tetap tercatat di change tracker.
+            root.Entity.AcceptChildChanges();
+        }
 
         foreach (var entry in db.ChangeTracker.Entries<Entity>())
         {
@@ -46,7 +41,7 @@ public static class DomainEventOutbox
         var events = db.ChangeTracker.Entries<AggregateRoot>().SelectMany(e => e.Entity.PopDomainEvents()).ToList();
         db.Set<OutboxMessage>().AddRange(events.Select(OutboxMessage.From));
 
-        return new PreparedSave(events, childChanged.Select(e => e.Entity).ToList());
+        return events;
     }
 
     /// <summary>Pemetaan tabel <c>OUTBOX_MESSAGES</c> (dibuat migrasi baseline setiap schema).</summary>

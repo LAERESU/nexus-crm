@@ -152,12 +152,11 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
     {
         // Kolom audit, ROW_VERSION (termasuk aggregate yang anaknya berubah), dan outbox. Event dikirim ke RabbitMQ
         // oleh relay (OutboxPublisherWorker).
-        var prepared = this.PrepareSave(timeProvider.GetUtcNow(), SystemActor);
+        this.PrepareSave(timeProvider.GetUtcNow(), SystemActor);
 
         try
         {
             var saved = await base.SaveChangesAsync(cancellationToken);
-            prepared.Complete();
             return saved;
         }
         catch (DbUpdateConcurrencyException ex)

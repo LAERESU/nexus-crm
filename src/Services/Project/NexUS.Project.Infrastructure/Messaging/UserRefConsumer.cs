@@ -12,11 +12,9 @@ namespace NexUS.Project.Infrastructure.Messaging;
 /// tidak berurutan; <see cref="UserRef"/> mengabaikan event yang lebih lama daripada yang sudah diterapkan.
 /// Bentrok (baris yang sama dibuat consumer lain) melempar exception: pesan diulang oleh consumer.
 /// </summary>
-public abstract class UserRefHandler<TEvent>(ProjectDbContext db, TimeProvider timeProvider)
-    : IdempotentEventHandler<TEvent, ProjectDbContext>(db, timeProvider) where TEvent : IIntegrationEvent
+public abstract class UserRefHandler<TEvent>(ProjectDbContext db, TimeProvider timeProvider, EventConsumerName<TEvent> consumer)
+    : IdempotentEventHandler<TEvent, ProjectDbContext>(db, timeProvider, consumer) where TEvent : IIntegrationEvent
 {
-    protected override string QueuePrefix => DependencyInjection.ServiceName;
-
     protected async Task<UserRef> FindOrCreateAsync(long tenantId, Guid userId, CancellationToken ct)
     {
         // Consumer berjalan tanpa user/request, jadi filter tenant dilewati dan tenant diberikan eksplisit.
@@ -29,19 +27,22 @@ public abstract class UserRefHandler<TEvent>(ProjectDbContext db, TimeProvider t
     }
 }
 
-public sealed class UserCreatedRefHandler(ProjectDbContext db, TimeProvider timeProvider) : UserRefHandler<UserCreated>(db, timeProvider)
+public sealed class UserCreatedRefHandler(ProjectDbContext db, TimeProvider timeProvider, EventConsumerName<UserCreated> consumer)
+    : UserRefHandler<UserCreated>(db, timeProvider, consumer)
 {
     protected override async Task ApplyAsync(UserCreated e, CancellationToken ct) =>
         (await FindOrCreateAsync(e.TenantId, e.UserId, ct)).ApplyProfile(e.Email, e.FullName, isActive: true, e.OccurredAt);
 }
 
-public sealed class UserUpdatedRefHandler(ProjectDbContext db, TimeProvider timeProvider) : UserRefHandler<UserUpdated>(db, timeProvider)
+public sealed class UserUpdatedRefHandler(ProjectDbContext db, TimeProvider timeProvider, EventConsumerName<UserUpdated> consumer)
+    : UserRefHandler<UserUpdated>(db, timeProvider, consumer)
 {
     protected override async Task ApplyAsync(UserUpdated e, CancellationToken ct) =>
         (await FindOrCreateAsync(e.TenantId, e.UserId, ct)).ApplyProfile(e.Email, e.FullName, e.IsActive, e.OccurredAt);
 }
 
-public sealed class UserDeactivatedRefHandler(ProjectDbContext db, TimeProvider timeProvider) : UserRefHandler<UserDeactivated>(db, timeProvider)
+public sealed class UserDeactivatedRefHandler(ProjectDbContext db, TimeProvider timeProvider, EventConsumerName<UserDeactivated> consumer)
+    : UserRefHandler<UserDeactivated>(db, timeProvider, consumer)
 {
     protected override async Task ApplyAsync(UserDeactivated e, CancellationToken ct) =>
         (await FindOrCreateAsync(e.TenantId, e.UserId, ct)).Deactivate(e.OccurredAt);

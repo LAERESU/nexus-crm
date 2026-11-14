@@ -122,20 +122,37 @@ public class OutboxRelayTests(OracleProjectFixture fixture)
     }
 
     [Fact]
-    public async Task Event_tanpa_antrean_penerima_diparkir_dan_tidak_menahan_relay()
+    public async Task Event_tanpa_antrean_penerima_tetap_tertunda_tanpa_menahan_event_lain_lalu_terkirim_setelah_antreannya_ada()
     {
         var (connection, channel) = await OpenAsync();
         await using var _ = connection;
         await using var __ = channel;
+        var added = await BindAsync(channel, nameof(MemberAdded));
 
-        // Tidak ada antrean yang diikat ke ProjectCreated: event diparkir di nexus.unrouted, outbox tetap ditandai terkirim.
-        var project = await CreateProjectAsync();
+        // ProjectArchived belum punya antrean: arsipkan proyek, lalu tambahkan anggota di proyek lain.
+        var manager = fixture.ClientAs(A);
+        var archivedProject = await CreateProjectAsync();
+        var archive = new HttpRequestMessage(HttpMethod.Delete, $"/api/v1/projects/{archivedProject.Id}");
+        archive.Headers.TryAddWithoutValidation("If-Match", $"\"{archivedProject.RowVersion}\"");
+        (await manager.SendAsync(archive)).StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        await WaitForMessageAsync(channel, EventBusTopology.UnroutedQueue, m =>
-            m.BasicProperties.Type == nameof(ProjectCreated)
-            && JsonSerializer.Deserialize<ProjectCreated>(Encoding.UTF8.GetString(m.Body.Span), EventBusTopology.Json)!.ProjectId == project.Id);
-        for (var attempt = 0; attempt < 40 && await ProcessedAtAsync(project.Code) is DBNull; attempt++) await Task.Delay(250);
-        (await ProcessedAtAsync(project.Code)).Should().NotBe(DBNull.Value);
+        var other = await CreateProjectAsync();
+        (await manager.PostAsJsonAsync($"/api/v1/projects/{other.Id}/members", new { userId = Guid.NewGuid(), role = "member" }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // MemberAdded (yang punya antrean) terkirim walau ProjectArchived yang lebih dulu belum bisa dikirim.
+        await WaitForMessageAsync(channel, added, m =>
+            JsonSerializer.Deserialize<MemberAdded>(Encoding.UTF8.GetString(m.Body.Span), EventBusTopology.Json)!.ProjectId == other.Id);
+        Task<object?> ArchivedProcessedAt() => fixture.ScalarAsync(
+            "SELECT MAX(PROCESSED_AT) FROM OUTBOX_MESSAGES WHERE TYPE LIKE :type AND PAYLOAD LIKE :payload",
+            new OracleParameter("type", "%ProjectArchivedDomainEvent%"),
+            new OracleParameter("payload", $"%{archivedProject.Id}%"));
+        (await ArchivedProcessedAt()).Should().Be(DBNull.Value, "tidak ada antrean penerima: tetap tertunda, tidak dibuang");
+
+        // Setelah consumer-nya ada, event yang tertunda ikut terkirim (paling lambat setelah jeda pemeriksaan ulang).
+        var archivedQueue = await BindAsync(channel, nameof(ProjectArchived));
+        await WaitForMessageAsync(channel, archivedQueue, m =>
+            JsonSerializer.Deserialize<ProjectArchived>(Encoding.UTF8.GetString(m.Body.Span), EventBusTopology.Json)!.ProjectId == archivedProject.Id);
     }
 
     [Fact]
@@ -153,8 +170,8 @@ public class OutboxRelayTests(OracleProjectFixture fixture)
 
         var dead = await WaitForMessageAsync(channel, EventBusTopology.DeadLetterQueue(queue),
             m => m.BasicProperties.MessageId == poison.EventId.ToString("D"), seconds: 90);
-        Convert.ToInt32(dead.BasicProperties.Headers![EventBusTopology.AttemptsHeader]).Should().Be(5);
-        dead.BasicProperties.Headers.Should().ContainKey("x-nexus-last-error");
+        Convert.ToInt32(dead.BasicProperties.Headers![EventBusTopology.AttemptsHeader]).Should().Be(3, "MaxAttempts tes = 3");
+        dead.BasicProperties.Headers.Should().ContainKey(EventBusTopology.LastErrorHeader);
 
         Convert.ToInt32(await fixture.ScalarAsync(
             "SELECT COUNT(*) FROM USER_REF WHERE USER_ID = :usr",

@@ -65,7 +65,7 @@ public sealed class OracleProjectFixture : IAsyncLifetime
 
     /// <summary>
     /// Menunggu antrean consumer dideklarasikan (consumer berjalan di latar saat host start). Tanpa antrean, event yang
-    /// dipublikasikan diparkir alternate exchange, bukan dikirim ke consumer (ADR-0012).
+    /// dipublikasikan tetap tertunda di outbox atau ditolak publisher (ADR-0012).
     /// </summary>
     public async Task WaitForQueueAsync(string queue)
     {
@@ -114,6 +114,9 @@ public sealed class OracleProjectFixture : IAsyncLifetime
             {
                 ["ConnectionStrings:Oracle"] = ConnectionString,
                 ["Services:User:BaseUrl"] = "http://user.invalid",
+                // Pengulangan consumer dipersingkat agar tes dead-letter tidak menunggu 16 menit.
+                ["Messaging:Consumer:MaxAttempts"] = "3",
+                ["Messaging:Consumer:RetryDelaySeconds"] = "1",
                 ["ConnectionStrings:RabbitMq"] = $"amqp://nexus:nexus_test@{_rabbit.Hostname}:{_rabbit.GetMappedPublicPort(5672)}",
             }))
             .ConfigureServices(services =>
