@@ -56,6 +56,44 @@ public sealed class OracleProjectFixture : IAsyncLifetime
     /// <summary>Anggota tetap per tenant: hanya boleh membaca proyek yang diikutinya.</summary>
     public static Guid MemberId(long tenantId) => Guid.Parse($"b0000000-0000-0000-0000-{tenantId:D12}");
 
+    public string RabbitConnectionString => $"amqp://nexus:nexus_test@{_rabbit.Hostname}:{_rabbit.GetMappedPublicPort(5672)}";
+
+    /// <summary>Membekukan broker (koneksi tetap terbuka tetapi tidak dijawab), seperti RabbitMQ yang mati sementara.</summary>
+    public Task PauseBrokerAsync() => _rabbit.PauseAsync();
+
+    public Task UnpauseBrokerAsync() => _rabbit.UnpauseAsync();
+
+    /// <summary>
+    /// Menunggu antrean consumer dideklarasikan (consumer berjalan di latar saat host start). Tanpa antrean, event yang
+    /// dipublikasikan diparkir alternate exchange, bukan dikirim ke consumer (ADR-0012).
+    /// </summary>
+    public async Task WaitForQueueAsync(string queue)
+    {
+        var factory = new RabbitMQ.Client.ConnectionFactory { Uri = new Uri(RabbitConnectionString) };
+        await using var connection = await factory.CreateConnectionAsync();
+        for (var attempt = 0; attempt < 120; attempt++)
+        {
+            var channel = await connection.CreateChannelAsync();
+            try
+            {
+                await channel.QueueDeclarePassiveAsync(queue);
+                return;
+            }
+            catch (RabbitMQ.Client.Exceptions.OperationInterruptedException)
+            {
+                // Antrean belum ada; deklarasi pasif menutup channel ini.
+            }
+            finally
+            {
+                try { await channel.DisposeAsync(); } catch (Exception) { /* channel sudah tertutup */ }
+            }
+
+            await Task.Delay(250);
+        }
+
+        throw new TimeoutException($"Antrean {queue} tidak muncul.");
+    }
+
     public async Task InitializeAsync()
     {
         await Task.WhenAll(_oracle.StartAsync(), _rabbit.StartAsync());

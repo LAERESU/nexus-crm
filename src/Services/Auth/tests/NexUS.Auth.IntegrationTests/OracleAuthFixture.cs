@@ -52,6 +52,39 @@ public sealed class OracleAuthFixture : IAsyncLifetime
     public string ConnectionString { get; private set; } = default!;
     public string RedisConnectionString { get; private set; } = default!;
 
+    public string RabbitConnectionString => $"amqp://nexus:nexus_test@{_rabbit.Hostname}:{_rabbit.GetMappedPublicPort(5672)}";
+
+    /// <summary>
+    /// Menunggu antrean consumer dideklarasikan (consumer berjalan di latar saat host start). Tanpa antrean, event yang
+    /// dipublikasikan diparkir alternate exchange, bukan dikirim ke consumer (ADR-0012).
+    /// </summary>
+    public async Task WaitForQueueAsync(string queue)
+    {
+        var factory = new RabbitMQ.Client.ConnectionFactory { Uri = new Uri(RabbitConnectionString) };
+        await using var connection = await factory.CreateConnectionAsync();
+        for (var attempt = 0; attempt < 120; attempt++)
+        {
+            var channel = await connection.CreateChannelAsync();
+            try
+            {
+                await channel.QueueDeclarePassiveAsync(queue);
+                return;
+            }
+            catch (RabbitMQ.Client.Exceptions.OperationInterruptedException)
+            {
+                // Antrean belum ada; deklarasi pasif menutup channel ini.
+            }
+            finally
+            {
+                try { await channel.DisposeAsync(); } catch (Exception) { /* channel sudah tertutup */ }
+            }
+
+            await Task.Delay(250);
+        }
+
+        throw new TimeoutException($"Antrean {queue} tidak muncul.");
+    }
+
     public async Task InitializeAsync()
     {
         await Task.WhenAll(_oracle.StartAsync(), _redis.StartAsync(), _rabbit.StartAsync(), _mailpit.StartAsync());

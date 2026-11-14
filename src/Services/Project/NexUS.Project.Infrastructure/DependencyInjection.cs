@@ -35,9 +35,12 @@ public static class DependencyInjection
         services.AddScoped<IUserDirectory, UserDirectory>();
 
         // Read model user (USER_REF) dari event User Service; berhenti sendiri bila ConnectionStrings:RabbitMq kosong.
-        services.AddNexusEventConsumer<UserCreated, UserRefConsumer>(ServiceName);
-        services.AddNexusEventConsumer<UserUpdated, UserRefConsumer>(ServiceName);
-        services.AddNexusEventConsumer<UserDeactivated, UserRefConsumer>(ServiceName);
+        services.AddNexusEventConsumer<UserCreated, UserCreatedRefHandler>(ServiceName);
+        services.AddNexusEventConsumer<UserUpdated, UserUpdatedRefHandler>(ServiceName);
+        services.AddNexusEventConsumer<UserDeactivated, UserDeactivatedRefHandler>(ServiceName);
+
+        // Relay outbox -> RabbitMQ untuk event proyek (NX-028).
+        services.AddNexusOutboxPublisher<ProjectDbContext, ProjectOutboxMapper>(ServiceName);
 
         return services;
     }

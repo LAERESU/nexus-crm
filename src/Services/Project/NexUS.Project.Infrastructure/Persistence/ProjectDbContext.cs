@@ -112,18 +112,7 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
 
         model.MapProcessedEvents();
 
-        model.Entity<OutboxMessage>(e =>
-        {
-            e.ToTable("OUTBOX_MESSAGES");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("ID").ValueGeneratedNever();
-            e.Property(x => x.Type).HasColumnName("TYPE").HasMaxLength(500);
-            e.Property(x => x.Payload).HasColumnName("PAYLOAD").HasColumnType("CLOB");
-            e.Property(x => x.OccurredAt).HasColumnName("OCCURRED_AT");
-            e.Property(x => x.ProcessedAt).HasColumnName("PROCESSED_AT");
-            e.Property(x => x.RetryCount).HasColumnName("RETRY_COUNT");
-            e.Property(x => x.Error).HasColumnName("ERROR").HasMaxLength(2000);
-        });
+        model.MapOutboxMessages();
     }
 
     private static ProjectStatus ParseStatus(string value) =>
@@ -161,37 +150,14 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        // Perubahan entitas anak (mis. anggota proyek) ikut menaikkan ROW_VERSION aggregate-nya, sehingga dua perubahan
-        // anak yang bersamaan (mis. dua manager saling mengeluarkan) tidak bisa sama-sama lolos: yang kedua bentrok (409).
-        var withChildChanges = ChangeTracker.Entries<AggregateRoot>().Where(e => e.Entity.HasChildChanges()).ToList();
-        foreach (var root in withChildChanges.Where(e => e.State == EntityState.Unchanged))
-            root.State = EntityState.Modified;
-
-        var now = timeProvider.GetUtcNow();
-        foreach (var entry in ChangeTracker.Entries<Entity>())
-        {
-            if (entry.State == EntityState.Added)
-            {
-                entry.Entity.CreatedAt = now;
-                entry.Entity.CreatedBy = SystemActor;
-            }
-            else if (entry.State == EntityState.Modified)
-            {
-                entry.Entity.UpdatedAt = now;
-                entry.Entity.UpdatedBy = SystemActor;
-                entry.Entity.RowVersion++;
-            }
-        }
-
-        // Outbox pattern: domain event disimpan dalam transaksi yang sama dengan perubahan data. Pengirimnya ke
-        // RabbitMQ (relay) dipasang di NX-028.
-        var events = ChangeTracker.Entries<AggregateRoot>().SelectMany(e => e.Entity.PopDomainEvents()).ToList();
-        Outbox.AddRange(events.Select(OutboxMessage.From));
+        // Kolom audit, ROW_VERSION (termasuk aggregate yang anaknya berubah), dan outbox. Event dikirim ke RabbitMQ
+        // oleh relay (OutboxPublisherWorker).
+        var prepared = this.PrepareSave(timeProvider.GetUtcNow(), SystemActor);
 
         try
         {
             var saved = await base.SaveChangesAsync(cancellationToken);
-            foreach (var root in withChildChanges) root.Entity.AcceptChildChanges();
+            prepared.Complete();
             return saved;
         }
         catch (DbUpdateConcurrencyException ex)

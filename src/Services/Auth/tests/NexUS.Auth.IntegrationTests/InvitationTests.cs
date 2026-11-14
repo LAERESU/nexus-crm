@@ -42,22 +42,10 @@ public partial class InvitationTests(OracleAuthFixture fixture)
         return created;
     }
 
-    /// <summary>Publish bersifat mandatory: diulang sampai antrean consumer Auth siap menerima.</summary>
     private async Task PublishAsync(UserCreated created)
     {
-        var publisher = fixture.Factory.Services.GetRequiredService<IEventPublisher>();
-        for (var attempt = 1; ; attempt++)
-        {
-            try
-            {
-                await publisher.PublishAsync(created);
-                return;
-            }
-            catch (Exception) when (attempt < 60)
-            {
-                await Task.Delay(500);
-            }
-        }
+        await fixture.WaitForQueueAsync("auth.UserCreated");
+        await fixture.Factory.Services.GetRequiredService<IEventPublisher>().PublishAsync(created);
     }
 
     private async Task<List<MailSummary>> MailsToAsync(string email)

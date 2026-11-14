@@ -9,6 +9,8 @@ namespace NexUS.User.UnitTests;
 
 public class UserOutboxMapperTests
 {
+    private sealed record UnknownDomainEvent : NexUS.BuildingBlocks.Common.Domain.DomainEvent;
+
     private readonly UserOutboxMapper _mapper = new();
 
     [Fact]
@@ -55,6 +57,7 @@ public class UserOutboxMapperTests
         _mapper.PublishedTypes.Should().BeEquivalentTo(
         [
             typeof(UserCreatedDomainEvent).FullName, typeof(UserUpdatedDomainEvent).FullName, typeof(UserDeactivatedDomainEvent).FullName,
+            typeof(RoleChangedDomainEvent).FullName,
         ]);
         OutboxMessage.From(new UserCreatedDomainEvent(Guid.NewGuid(), 7, "a@b.c", "A")).Type
             .Should().StartWith(typeof(UserCreatedDomainEvent).FullName + ",");
@@ -63,8 +66,11 @@ public class UserOutboxMapperTests
     [Fact]
     public void Event_lain_tidak_dipublikasikan()
     {
-        var message = OutboxMessage.From(new RoleChangedDomainEvent(7, Guid.NewGuid(), null, RoleChangeReason.RolePermissionsChanged));
+        _mapper.Map(OutboxMessage.From(new UnknownDomainEvent())).Should().BeNull();
 
-        _mapper.Map(message).Should().BeNull();
+        var roleId = Guid.NewGuid();
+        var changed = new RoleChangedDomainEvent(7, roleId, null, RoleChangeReason.RolePermissionsChanged);
+        _mapper.Map(OutboxMessage.From(changed)).Should()
+            .Be(new RoleChanged(changed.EventId, changed.OccurredAt, 7, roleId, null, "RolePermissionsChanged"));
     }
 }
