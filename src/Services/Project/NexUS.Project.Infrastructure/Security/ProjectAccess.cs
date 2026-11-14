@@ -5,14 +5,20 @@ using NexUS.Project.Application.Abstractions;
 
 namespace NexUS.Project.Infrastructure.Security;
 
-/// <summary>Memeriksa scope penugasan role memakai permission user dari User Service (dengan cache, NX-020).</summary>
+/// <summary>
+/// Memeriksa scope penugasan role memakai permission user dari User Service (dengan cache, NX-020). Permission dibaca
+/// sekali per request (service ini scoped) walau diperiksa beberapa kali.
+/// </summary>
 public sealed class ProjectAccess(IPermissionService permissions, ICurrentUser currentUser) : IProjectAccess
 {
+    private IReadOnlyList<GrantedPermission>? _granted;
+
+    private async Task<IReadOnlyList<GrantedPermission>> GrantedAsync(CancellationToken ct) =>
+        _granted ??= await permissions.GetAsync(currentUser.TenantId, currentUser.UserId, ct);
+
     public async Task EnsureAsync(string permission, Guid? projectId, Guid? departmentId, CancellationToken ct)
     {
-        var granted = await permissions.GetAsync(currentUser.TenantId, currentUser.UserId, ct);
-
-        var allowed = granted.Any(g => g.Code == permission && g.ScopeType.ToLowerInvariant() switch
+        var allowed = (await GrantedAsync(ct)).Any(g => g.Code == permission && g.ScopeType.ToLowerInvariant() switch
         {
             "global" => true,
             "project" => projectId is not null && g.ScopeId == projectId,
@@ -23,7 +29,9 @@ public sealed class ProjectAccess(IPermissionService permissions, ICurrentUser c
         if (!allowed) throw new ForbiddenException("Izin Anda tidak mencakup proyek atau departemen ini.");
     }
 
-    public async Task<bool> CanSeeAllAsync(CancellationToken ct) =>
-        (await permissions.GetAsync(currentUser.TenantId, currentUser.UserId, ct)).Any(g =>
-            g.Code == ProjectPermissions.ReadAll && string.Equals(g.ScopeType, "global", StringComparison.OrdinalIgnoreCase));
+    public Task<bool> CanSeeAllAsync(CancellationToken ct) => HoldsGloballyAsync(ProjectPermissions.ReadAll, ct);
+
+    public async Task<bool> HoldsGloballyAsync(string permission, CancellationToken ct) =>
+        (await GrantedAsync(ct)).Any(g =>
+            g.Code == permission && string.Equals(g.ScopeType, "global", StringComparison.OrdinalIgnoreCase));
 }

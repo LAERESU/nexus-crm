@@ -19,6 +19,8 @@ public class ProjectMemberEndpointTests(OracleProjectFixture fixture)
 
     private sealed record Paged(List<ProjectBody> Items, long TotalCount);
 
+    private sealed record MemberPage(List<MemberBody> Items, int Page, int Size, long TotalCount);
+
     private sealed record MemberBody(Guid UserId, string? FullName, string? Email, string Role, DateTimeOffset JoinedAt, bool? IsActive);
 
     private async Task<ProjectBody> CreateProjectAsync(HttpClient client)
@@ -35,7 +37,7 @@ public class ProjectMemberEndpointTests(OracleProjectFixture fixture)
         client.PostAsJsonAsync(Members(projectId), new { userId, role });
 
     private static async Task<List<MemberBody>> ListAsync(HttpClient client, Guid projectId) =>
-        (await client.GetFromJsonAsync<List<MemberBody>>(Members(projectId)))!;
+        (await client.GetFromJsonAsync<MemberPage>(Members(projectId) + "?size=100"))!.Items;
 
     /// <summary>User baru dengan permission global tertentu (bawaan: hanya membaca proyek).</summary>
     private Guid NewUser(params string[] permissions)
@@ -181,6 +183,47 @@ public class ProjectMemberEndpointTests(OracleProjectFixture fixture)
         (await AddAsync(admin, project.Id, target)).StatusCode.Should().Be(HttpStatusCode.Created);
         (await admin.PutAsJsonAsync(Members(project.Id, target), new { role = "manager" })).StatusCode.Should().Be(HttpStatusCode.OK);
         (await admin.DeleteAsync(Members(project.Id, plainMemberId))).StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task Daftar_anggota_berpaging()
+    {
+        var manager = fixture.ClientAs(A);
+        var project = await CreateProjectAsync(manager);
+        foreach (var _ in Enumerable.Range(0, 3)) (await AddAsync(manager, project.Id, NewUser())).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var page = await manager.GetFromJsonAsync<MemberPage>(Members(project.Id) + "?page=2&size=3");
+
+        page!.TotalCount.Should().Be(4);
+        page.Size.Should().Be(3);
+        page.Items.Should().ContainSingle();
+        (await manager.GetAsync(Members(project.Id) + "?size=101")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Izin_baca_semua_proyek_tidak_membuka_operasi_tulis_bagi_permission_berscope()
+    {
+        var manager = fixture.ClientAs(A);
+        var department = Guid.NewGuid();
+        var response = await manager.PostAsJsonAsync("/api/v1/projects", new { code = $"D{Guid.NewGuid():N}"[..12], name = "Proyek Departemen", departmentId = department });
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var project = (await response.Content.ReadFromJsonAsync<ProjectBody>())!;
+
+        // Auditor (project.all.read) yang juga manajer berscope departemen, tetapi bukan manager proyek ini.
+        var auditor = Guid.NewGuid();
+        fixture.GrantScoped(A, auditor,
+            ("project.read", "global", null), ("project.all.read", "global", null),
+            ("project.update", "department", department), ("project.member.manage", "department", department));
+        var client = fixture.ClientAs(A, auditor);
+
+        (await client.GetAsync($"/api/v1/projects/{project.Id}")).StatusCode.Should().Be(HttpStatusCode.OK, "boleh membaca");
+        (await AddAsync(client, project.Id, NewUser())).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var update = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/projects/{project.Id}")
+        {
+            Content = JsonContent.Create(new { name = "Diubah", status = "active", priority = "medium", departmentId = department }),
+        };
+        update.Headers.TryAddWithoutValidation("If-Match", $"\"{project.RowVersion}\"");
+        (await client.SendAsync(update)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]

@@ -116,7 +116,7 @@ public sealed class User : AggregateRoot
 
 public sealed record UserCreatedDomainEvent(Guid UserId, long TenantId, string Email, string FullName) : DomainEvent;
 
-/// <param name="IsActive">Status user saat event terjadi; bawaan <c>true</c> untuk payload outbox lama yang belum memuatnya.</param>
-public sealed record UserUpdatedDomainEvent(Guid UserId, long TenantId, string Email, string FullName, bool IsActive = true) : DomainEvent;
+/// <param name="IsActive">Status user saat event terjadi; null pada payload outbox lama yang belum memuatnya (status tidak diketahui).</param>
+public sealed record UserUpdatedDomainEvent(Guid UserId, long TenantId, string Email, string FullName, bool? IsActive = null) : DomainEvent;
 
 public sealed record UserDeactivatedDomainEvent(Guid UserId, long TenantId) : DomainEvent;

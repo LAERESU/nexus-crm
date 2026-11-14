@@ -37,15 +37,16 @@ public class UserOutboxMapperTests
     }
 
     [Fact]
-    public void Payload_UserUpdated_lama_tanpa_IsActive_dianggap_aktif()
+    public void Payload_UserUpdated_lama_tanpa_IsActive_tidak_membawa_status()
     {
-        var message = OutboxMessage.From(new UserUpdatedDomainEvent(Guid.NewGuid(), 7, "a@b.c", "A"));
+        var message = OutboxMessage.From(new UserUpdatedDomainEvent(Guid.NewGuid(), 7, "a@b.c", "A", IsActive: true));
         message.Payload.Should().Contain("isActive");
         var legacy = System.Text.Json.JsonSerializer.Deserialize<UserUpdatedDomainEvent>(
             "{\"userId\":\"" + Guid.NewGuid() + "\",\"tenantId\":7,\"email\":\"a@b.c\",\"fullName\":\"A\"}",
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
 
-        legacy!.IsActive.Should().BeTrue();
+        legacy!.IsActive.Should().BeNull("status tidak diketahui; consumer tidak boleh mengaktifkan kembali");
+        _mapper.Map(OutboxMessage.From(legacy)).Should().BeOfType<UserUpdated>().Which.IsActive.Should().BeNull();
     }
 
     [Fact]

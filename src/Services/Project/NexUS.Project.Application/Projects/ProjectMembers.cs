@@ -1,6 +1,7 @@
 using FluentValidation;
 using MediatR;
 using NexUS.BuildingBlocks.Common.Exceptions;
+using NexUS.BuildingBlocks.Common.Results;
 using NexUS.Project.Application.Abstractions;
 using NexUS.Project.Application.Common;
 using NexUS.Project.Domain.Projects;
@@ -22,17 +23,27 @@ public static class ProjectRoleNames
     public static string ToApi(ProjectRole role) => ProjectMember.ToName(role).ToLowerInvariant();
 }
 
-public sealed record ListProjectMembersQuery(Guid ProjectId) : IRequest<IReadOnlyList<ProjectMemberDto>>;
+public sealed record ListProjectMembersQuery(Guid ProjectId, int Page = 1, int Size = PagedResult<ProjectMemberDto>.DefaultSize)
+    : IRequest<PagedResult<ProjectMemberDto>>;
 
-public sealed class ListProjectMembersQueryHandler(IProjectReadService readService, ProjectGuard guard)
-    : IRequestHandler<ListProjectMembersQuery, IReadOnlyList<ProjectMemberDto>>
+public sealed class ListProjectMembersQueryValidator : AbstractValidator<ListProjectMembersQuery>
 {
-    public async Task<IReadOnlyList<ProjectMemberDto>> Handle(ListProjectMembersQuery request, CancellationToken ct)
+    public ListProjectMembersQueryValidator()
     {
-        if (await readService.GetAsync(request.ProjectId, ct) is null) throw new NotFoundException("Proyek tidak ditemukan.");
+        RuleFor(x => x.Page).InclusiveBetween(1, 100_000);
+        RuleFor(x => x.Size).InclusiveBetween(1, PagedResult<ProjectMemberDto>.MaxSize);
+    }
+}
+
+public sealed class ListProjectMembersQueryHandler(IProjectRepository projects, IProjectReadService readService, ProjectGuard guard)
+    : IRequestHandler<ListProjectMembersQuery, PagedResult<ProjectMemberDto>>
+{
+    public async Task<PagedResult<ProjectMemberDto>> Handle(ListProjectMembersQuery request, CancellationToken ct)
+    {
+        if (await projects.FindAsync(request.ProjectId, ct) is null) throw new NotFoundException("Proyek tidak ditemukan.");
         await guard.EnsureCanReadAsync(request.ProjectId, ct);
 
-        return await readService.ListMembersAsync(request.ProjectId, ct);
+        return await readService.ListMembersAsync(request.ProjectId, request.Page, request.Size, ct);
     }
 }
 
@@ -114,6 +125,6 @@ internal static class MemberReader
 {
     /// <summary>Anggota dibaca ulang karena nama dan status aktifnya berasal dari read model user.</summary>
     public static async Task<ProjectMemberDto> GetAsync(IProjectReadService readService, Guid projectId, Guid userId, CancellationToken ct) =>
-        (await readService.ListMembersAsync(projectId, ct)).FirstOrDefault(m => m.UserId == userId)
+        await readService.GetMemberAsync(projectId, userId, ct)
         ?? throw new InvalidOperationException("Anggota yang baru disimpan tidak terbaca.");
 }

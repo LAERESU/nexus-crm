@@ -6,10 +6,12 @@ CREATE TABLE USER_REF (
     PUBLIC_ID        RAW(16)                   DEFAULT SYS_GUID() NOT NULL,
     TENANT_ID        NUMBER(19)                NOT NULL,
     USER_ID          RAW(16)                   NOT NULL,  -- ID publik user di User Service
-    EMAIL            VARCHAR2(320),                       -- kosong bila event pertama yang tiba adalah UserDeactivated
+    EMAIL            VARCHAR2(320),                       -- kosong sampai event profil pertama tiba
     FULL_NAME        VARCHAR2(200),
     IS_ACTIVE        NUMBER(1)   DEFAULT 1     NOT NULL,
-    LAST_EVENT_AT    TIMESTAMP WITH TIME ZONE  NOT NULL,  -- event yang lebih lama dari ini diabaikan
+    -- Event bisa tiba tidak berurutan: profil dan status masing-masing mengabaikan event yang lebih lama dari ini.
+    PROFILE_EVENT_AT TIMESTAMP WITH TIME ZONE,
+    STATUS_EVENT_AT  TIMESTAMP WITH TIME ZONE,
     CREATED_AT       TIMESTAMP WITH TIME ZONE  NOT NULL,
     CREATED_BY       NUMBER(19)                NOT NULL,
     UPDATED_AT       TIMESTAMP WITH TIME ZONE,

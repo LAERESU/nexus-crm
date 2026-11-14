@@ -110,6 +110,7 @@ public sealed partial class Project : AggregateRoot
 
         var member = new ProjectMember(TenantId, userId, role, now);
         _members.Add(member);
+        MarkChildrenChanged();
         AddDomainEvent(new ProjectMemberAddedDomainEvent(TenantId, PublicId, userId, ProjectMember.ToName(role)));
         return member;
     }
@@ -123,6 +124,7 @@ public sealed partial class Project : AggregateRoot
 
         if (member.Role == ProjectRole.Manager) EnsureNotLastManager();
         member.ChangeRole(role);
+        MarkChildrenChanged();
         AddDomainEvent(new ProjectMemberRoleChangedDomainEvent(TenantId, PublicId, userId, ProjectMember.ToName(role)));
         return member;
     }
@@ -135,6 +137,7 @@ public sealed partial class Project : AggregateRoot
 
         if (member.Role == ProjectRole.Manager) EnsureNotLastManager();
         member.MarkDeleted();
+        MarkChildrenChanged();
         AddDomainEvent(new ProjectMemberRemovedDomainEvent(TenantId, PublicId, userId));
         return true;
     }

@@ -30,7 +30,9 @@ public interface IProjectReadService
     Task<PagedResult<ProjectDto>> ListAsync(ProjectFilter filter, CancellationToken ct);
 
     /// <summary>Anggota proyek beserta nama dari read model user (bila sudah dikenal), urut peran lalu nama.</summary>
-    Task<IReadOnlyList<ProjectMemberDto>> ListMembersAsync(Guid projectId, CancellationToken ct);
+    Task<PagedResult<ProjectMemberDto>> ListMembersAsync(Guid projectId, int page, int size, CancellationToken ct);
+
+    Task<ProjectMemberDto?> GetMemberAsync(Guid projectId, Guid userId, CancellationToken ct);
 }
 
 /// <param name="Status">Nama status API; null berarti semua kecuali yang diarsipkan.</param>
@@ -67,4 +69,7 @@ public interface IProjectAccess
 
     /// <summary>User memegang <see cref="ProjectPermissions.ReadAll"/> secara global.</summary>
     Task<bool> CanSeeAllAsync(CancellationToken ct);
+
+    /// <summary>User memegang <paramref name="permission"/> dengan scope global (bukan hanya proyek/departemen).</summary>
+    Task<bool> HoldsGloballyAsync(string permission, CancellationToken ct);
 }

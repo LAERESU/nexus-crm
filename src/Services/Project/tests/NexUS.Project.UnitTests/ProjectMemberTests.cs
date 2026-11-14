@@ -93,23 +93,47 @@ public class ProjectMemberTests
     [InlineData(" VIEWER ", true)]
     [InlineData("owner", false)]
     [InlineData("1", false)]
+    [InlineData("manager,member", false)]
+    [InlineData("viewer, manager", false)]
     [InlineData(null, false)]
     public void Nama_peran_dikenali_tanpa_membedakan_huruf(string? name, bool expected) =>
         ProjectRoleNames.TryParse(name, out _).Should().Be(expected);
 
     [Fact]
-    public void UserRef_mengabaikan_event_yang_lebih_lama()
+    public void Perubahan_anggota_menandai_aggregate_berubah()
+    {
+        var project = NewProject();
+        project.HasChildChanges().Should().BeFalse();
+
+        project.AddMember(Guid.NewGuid(), ProjectRole.Member, Now);
+
+        project.HasChildChanges().Should().BeTrue();
+        project.AcceptChildChanges();
+        project.HasChildChanges().Should().BeFalse();
+        project.ChangeMemberRole(Owner, ProjectRole.Manager);
+        project.HasChildChanges().Should().BeFalse("peran tidak berubah");
+    }
+
+    [Fact]
+    public void UserRef_profil_dan_status_masing_masing_mengabaikan_event_yang_lebih_lama()
     {
         var user = UserRef.Create(7, Guid.NewGuid());
 
-        user.ApplyProfile("a@b.c", "Nama Baru", true, Now.AddMinutes(5)).Should().BeTrue();
-        user.ApplyProfile("lama@b.c", "Nama Lama", true, Now).Should().BeFalse();
-        user.Deactivate(Now.AddMinutes(1)).Should().BeFalse();
-        user.Should().Match<UserRef>(u => u.FullName == "Nama Baru" && u.Email == "a@b.c" && u.IsActive);
+        // UserDeactivated tiba sebelum UserCreated: profil tetap terisi, status nonaktif tetap.
+        user.Deactivate(Now.AddMinutes(1)).Should().BeTrue();
+        user.ApplyProfile("a@b.c", "Nama", isActive: true, Now).Should().BeTrue();
+        user.Should().Match<UserRef>(u => u.FullName == "Nama" && u.Email == "a@b.c" && !u.IsActive);
 
-        user.Deactivate(Now.AddMinutes(6)).Should().BeTrue();
-        user.IsActive.Should().BeFalse();
-        user.ApplyProfile("a@b.c", "Nama Baru", true, Now.AddMinutes(7)).Should().BeTrue("diaktifkan kembali");
+        user.ApplyProfile("lama@b.c", "Lama", true, Now.AddSeconds(-1)).Should().BeFalse();
+        user.FullName.Should().Be("Nama");
+
+        // Payload lama tanpa status: profil diperbarui, status tidak berubah.
+        user.ApplyProfile("a@b.c", "Baru", isActive: null, Now.AddMinutes(2)).Should().BeTrue();
+        user.Should().Match<UserRef>(u => u.FullName == "Baru" && !u.IsActive);
+
+        user.ApplyProfile("a@b.c", "Baru", isActive: true, Now.AddMinutes(3)).Should().BeTrue("diaktifkan kembali");
+        user.IsActive.Should().BeTrue();
+        user.Deactivate(Now.AddMinutes(2)).Should().BeFalse();
         user.IsActive.Should().BeTrue();
     }
 }

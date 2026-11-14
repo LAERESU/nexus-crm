@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NexUS.BuildingBlocks.Common.Results;
 using NexUS.Project.Application.Projects;
 
 namespace NexUS.Project.Api.Controllers;
@@ -19,14 +20,16 @@ public sealed record ChangeProjectMemberRoleRequest(string Role);
 [Route("api/v1/projects/{projectId:guid}/members")]
 public sealed class ProjectMembersController(ISender mediator) : ControllerBase
 {
-    /// <summary>Daftar anggota (tidak dipaging: jumlah anggota satu proyek terbatas), urut peran lalu nama.</summary>
+    /// <summary>Daftar anggota dengan paging, urut peran lalu nama.</summary>
     [HttpGet]
     [Authorize(Policy = Policies.ProjectRead)]
-    [ProducesResponseType<IReadOnlyList<ProjectMemberDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<PagedResult<ProjectMemberDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public Task<IReadOnlyList<ProjectMemberDto>> List(Guid projectId, CancellationToken ct) =>
-        mediator.Send(new ListProjectMembersQuery(projectId), ct);
+    public Task<PagedResult<ProjectMemberDto>> List(
+        Guid projectId, [FromQuery] int page = 1, [FromQuery] int size = PagedResult<ProjectMemberDto>.DefaultSize,
+        CancellationToken ct = default) =>
+        mediator.Send(new ListProjectMembersQuery(projectId, page, size), ct);
 
     /// <summary>Menambah anggota. User yang sudah anggota atau diketahui nonaktif ditolak (422).</summary>
     [HttpPost]

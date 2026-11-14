@@ -89,17 +89,8 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options, TimeP
             e.Property(x => x.Error).HasColumnName("ERROR").HasMaxLength(2000);
         });
 
-        MapProcessedEvents(model);
+        model.MapProcessedEvents();
     }
-
-    private static void MapProcessedEvents(ModelBuilder model) => model.Entity<ProcessedEvent>(e =>
-    {
-        e.ToTable("PROCESSED_EVENTS");
-        e.HasKey(x => new { x.EventId, x.Consumer });
-        e.Property(x => x.EventId).HasColumnName("EVENT_ID");
-        e.Property(x => x.Consumer).HasColumnName("CONSUMER").HasMaxLength(200);
-        e.Property(x => x.ProcessedAt).HasColumnName("PROCESSED_AT");
-    });
 
     /// <summary>Kolom wajib CONTEXT.md bagian 5; soft delete difilter otomatis.</summary>
     private static void MapEntity<T>(EntityTypeBuilder<T> e) where T : Entity

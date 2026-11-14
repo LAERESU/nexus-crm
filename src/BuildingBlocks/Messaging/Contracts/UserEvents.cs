@@ -6,9 +6,10 @@ public sealed record UserCreated(Guid EventId, DateTimeOffset OccurredAt, long T
 
 /// <summary>
 /// Profil user berubah atau user diaktifkan kembali. Service lain memperbarui read model user miliknya (NX-026).
+/// <c>IsActive</c> null bila event berasal dari outbox sebelum status disertakan; consumer tidak mengubah status.
 /// </summary>
 public sealed record UserUpdated(
-    Guid EventId, DateTimeOffset OccurredAt, long TenantId, Guid UserId, string Email, string FullName, bool IsActive)
+    Guid EventId, DateTimeOffset OccurredAt, long TenantId, Guid UserId, string Email, string FullName, bool? IsActive)
     : IIntegrationEvent;
 
 /// <summary>User dinonaktifkan. Service lain menandai read model user miliknya sebagai nonaktif (NX-026).</summary>

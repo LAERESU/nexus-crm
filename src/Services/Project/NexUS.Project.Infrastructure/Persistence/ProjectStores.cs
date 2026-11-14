@@ -69,21 +69,48 @@ public sealed class ProjectReadService(ProjectDbContext db) : IProjectReadServic
         return new PagedResult<ProjectDto>(items.Select(ProjectDto.From).ToList(), page, size, total);
     }
 
-    public async Task<IReadOnlyList<ProjectMemberDto>> ListMembersAsync(Guid projectId, CancellationToken ct)
+    public async Task<PagedResult<ProjectMemberDto>> ListMembersAsync(Guid projectId, int page, int size, CancellationToken ct)
     {
-        var rows = await (from m in db.ProjectMembers.AsNoTracking()
-                          join p in db.Projects.AsNoTracking() on m.ProjectId equals p.Id
-                          join u in db.UserRefs.AsNoTracking() on m.UserId equals u.UserId into known
-                          from u in known.DefaultIfEmpty()
-                          where p.PublicId == projectId
-                          select new { m.UserId, m.Role, m.JoinedAt, FullName = u != null ? u.FullName : null, Email = u != null ? u.Email : null, IsActive = u != null ? (bool?)u.IsActive : null })
-            .ToListAsync(ct);
+        var query = MemberRows(projectId);
+        var total = await query.LongCountAsync(ct);
+        // PROJECT_ROLE berisi MANAGER/MEMBER/VIEWER: urut abjadnya sama dengan urut peran.
+        var rows = await query.OrderBy(r => r.Role).ThenBy(r => r.FullName).ThenBy(r => r.UserId)
+            .Skip((page - 1) * size).Take(size).ToListAsync(ct);
 
-        return rows
-            .OrderBy(r => r.Role).ThenBy(r => r.FullName ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.UserId)
-            .Select(r => new ProjectMemberDto(r.UserId, r.FullName, r.Email, ProjectRoleNames.ToApi(r.Role), r.JoinedAt, r.IsActive))
-            .ToList();
+        return new PagedResult<ProjectMemberDto>(rows.Select(ToDto).ToList(), page, size, total);
     }
+
+    public async Task<ProjectMemberDto?> GetMemberAsync(Guid projectId, Guid userId, CancellationToken ct) =>
+        await MemberRows(projectId).Where(r => r.UserId == userId).FirstOrDefaultAsync(ct) is { } row ? ToDto(row) : null;
+
+    private sealed class MemberRow
+    {
+        public Guid UserId { get; init; }
+        public ProjectRole Role { get; init; }
+        public DateTimeOffset JoinedAt { get; init; }
+        public string? FullName { get; init; }
+        public string? Email { get; init; }
+        public bool? IsActive { get; init; }
+    }
+
+    private IQueryable<MemberRow> MemberRows(Guid projectId) =>
+        from m in db.ProjectMembers.AsNoTracking()
+        join p in db.Projects.AsNoTracking() on m.ProjectId equals p.Id
+        join u in db.UserRefs.AsNoTracking() on m.UserId equals u.UserId into known
+        from u in known.DefaultIfEmpty()
+        where p.PublicId == projectId
+        select new MemberRow
+        {
+            UserId = m.UserId,
+            Role = m.Role,
+            JoinedAt = m.JoinedAt,
+            FullName = u != null ? u.FullName : null,
+            Email = u != null ? u.Email : null,
+            IsActive = u != null ? (bool?)u.IsActive : null,
+        };
+
+    private static ProjectMemberDto ToDto(MemberRow r) =>
+        new(r.UserId, r.FullName, r.Email, ProjectRoleNames.ToApi(r.Role), r.JoinedAt, r.IsActive);
 }
 
 public sealed class UserDirectory(ProjectDbContext db) : IUserDirectory

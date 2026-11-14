@@ -36,8 +36,19 @@ public sealed class ProjectMember : Entity
 
     internal void ChangeRole(ProjectRole role) => Role = role;
 
-    public static bool TryParseRole(string? name, out ProjectRole role) =>
-        Enum.TryParse(name?.Trim(), ignoreCase: true, out role) && Enum.IsDefined(role) && !int.TryParse(name, out _);
+    /// <summary>Hanya nama peran utuh (tanpa angka atau gabungan seperti <c>manager,member</c>).</summary>
+    public static bool TryParseRole(string? name, out ProjectRole role)
+    {
+        foreach (var candidate in Enum.GetValues<ProjectRole>())
+        {
+            if (!string.Equals(ToName(candidate), name?.Trim(), StringComparison.OrdinalIgnoreCase)) continue;
+            role = candidate;
+            return true;
+        }
+
+        role = default;
+        return false;
+    }
 
     /// <summary>Nama peran di kolom PROJECT_ROLE (huruf besar).</summary>
     public static string ToName(ProjectRole role) => role.ToString().ToUpperInvariant();
