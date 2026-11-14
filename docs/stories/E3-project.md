@@ -38,7 +38,7 @@ Referensi utama: `ARCHITECTURE.md` A.2, A.3, B.3, C.2 (PRJ_SCHEMA), D.4–D.6.
 - **Langkah:** tabel `MILESTONES`, endpoint list/create/update, validasi tanggal di dalam rentang proyek.
 - **Acceptance criteria:**
   - [x] Milestone di luar rentang tanggal proyek ditolak (422).
-- **Catatan:** status milestone `open`/`completed`; batas rentang yang kosong tidak membatasi. Rentang tanggal proyek juga tidak bisa diubah sampai mengecualikan milestone yang ada (422). Membaca butuh keanggotaan proyek; membuat/mengubah butuh `project.update` dan peran MANAGER (ADR-0011). Menghapus milestone belum ada (tidak termasuk langkah story).
+- **Catatan:** status milestone `open`/`completed`; batas rentang yang kosong tidak membatasi. Rentang tanggal proyek juga tidak bisa diubah sampai mengecualikan milestone yang ada (422). Membaca butuh keanggotaan proyek; membuat/mengubah butuh `project.update` dan peran MANAGER (ADR-0011). Membuat milestone atau mengubah tanggalnya menaikkan versi proyek, sehingga perubahan rentang proyek yang bersamaan bentrok (409). Menghapus milestone belum ada (tidak termasuk langkah story).
 
 ---
 

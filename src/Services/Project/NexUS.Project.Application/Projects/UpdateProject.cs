@@ -48,9 +48,12 @@ public sealed class UpdateProjectCommandHandler(
 
         // Versi diperiksa lebih dulu: klien dengan data basi mendapat 409, bukan pesan aturan bisnis atas data lama.
         unitOfWork.ExpectRowVersion(project, request.ExpectedRowVersion);
-        project.Update(request.Name, request.Description, status, priority, request.StartDate, request.EndDate, request.DepartmentId);
-        var (earliest, latest) = await milestones.GetDueDateRangeAsync(project.Id, ct);
-        project.EnsureDatesCover(earliest, latest);
+        // Milestone hanya perlu dibaca bila rentang tanggal menyempit; aturan cakupannya ada di Domain.
+        var span = project.NarrowsDates(request.StartDate, request.EndDate)
+            ? await milestones.GetDueDateRangeAsync(project.Id, ct)
+            : MilestoneSpan.None;
+        project.Update(
+            request.Name, request.Description, status, priority, request.StartDate, request.EndDate, request.DepartmentId, span);
         await unitOfWork.SaveChangesAsync(ct);
 
         return ProjectDto.From(project);

@@ -72,6 +72,8 @@ public class MilestoneEndpointTests(OracleProjectFixture fixture)
         created.StatusCode.Should().Be(HttpStatusCode.Created);
         created.Headers.ETag!.Tag.Should().Be("\"0\"");
         var milestone = (await created.Content.ReadFromJsonAsync<MilestoneBody>())!;
+        created.Headers.Location!.ToString().Should().EndWith(Url(project.Id, milestone.Id));
+        (await manager.GetFromJsonAsync<MilestoneBody>(Url(project.Id, milestone.Id)))!.Name.Should().Be("Rilis Akhir");
         milestone.Should().Match<MilestoneBody>(m =>
             m.ProjectId == project.Id && m.Status == "open" && m.DueDate == new DateOnly(2026, 12, 20) && m.Description == "Catatan");
         (await CreateAsync(manager, project.Id, "2026-12-05", "Rilis Beta")).StatusCode.Should().Be(HttpStatusCode.Created);
@@ -128,6 +130,22 @@ public class MilestoneEndpointTests(OracleProjectFixture fixture)
             .Should().Be(HttpStatusCode.UnprocessableEntity);
         (await manager.SendAsync(Put(url, current.RowVersion, Body("2026-12-20", "2026-12-20")))).StatusCode
             .Should().Be(HttpStatusCode.OK, "rentang masih mencakup milestone");
+    }
+
+    [Fact]
+    public async Task Membuat_milestone_menaikkan_versi_proyek_sehingga_perubahan_rentang_yang_bersamaan_bentrok()
+    {
+        var manager = fixture.ClientAs(A);
+        var project = await CreateProjectAsync(manager);
+        var url = $"/api/v1/projects/{project.Id}";
+
+        // Klien yang membaca proyek sebelum milestone dibuat lalu menyempitkan rentangnya: versinya sudah usang (409).
+        (await CreateAsync(manager, project.Id, "2026-12-20")).StatusCode.Should().Be(HttpStatusCode.Created);
+        var after = (await manager.GetFromJsonAsync<ProjectBody>(url))!;
+        after.RowVersion.Should().Be(project.RowVersion + 1);
+
+        var narrow = new { name = "Proyek Milestone", status = "active", priority = "medium", startDate = "2026-12-01", endDate = "2026-12-15" };
+        (await manager.SendAsync(Put(url, project.RowVersion, narrow))).StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     [Fact]

@@ -85,12 +85,49 @@ public class MilestoneTests
     public void Rentang_proyek_harus_mencakup_milestone_yang_ada()
     {
         var project = NewProject(Start, End);
+        var span = new MilestoneSpan(Start.AddDays(5), End.AddDays(-5));
 
-        project.EnsureDatesCover(null, null);
-        project.EnsureDatesCover(Start, End);
-        FluentActions.Invoking(() => project.EnsureDatesCover(Start.AddDays(-1), End)).Should().Throw<DomainException>();
-        FluentActions.Invoking(() => project.EnsureDatesCover(Start, End.AddDays(1))).Should().Throw<DomainException>();
-        NewProject().EnsureDatesCover(new DateOnly(2020, 1, 1), new DateOnly(2040, 1, 1));
+        project.NarrowsDates(Start, End).Should().BeFalse();
+        project.NarrowsDates(Start.AddDays(1), End).Should().BeTrue();
+        project.NarrowsDates(Start, End.AddDays(-1)).Should().BeTrue();
+        project.NarrowsDates(null, null).Should().BeFalse("mengosongkan batas melebarkan rentang");
+        NewProject().NarrowsDates(Start, null).Should().BeTrue("batas baru pada rentang tanpa batas");
+
+        project.Update("Portal", null, ProjectStatus.Active, ProjectPriority.Medium, Start.AddDays(5), End.AddDays(-5), null, span);
+        FluentActions.Invoking(() => project.Update("Portal", null, ProjectStatus.Active, ProjectPriority.Medium, Start.AddDays(6), End, null, span))
+            .Should().Throw<DomainException>().WithMessage("*2026-12-06 s.d. 2026-12-26*");
+        project.StartDate.Should().Be(Start.AddDays(5), "perubahan yang ditolak tidak mengubah apa pun");
+    }
+
+    [Fact]
+    public void Membuat_milestone_atau_mengubah_tanggalnya_menandai_proyek_berubah()
+    {
+        var project = NewProject(Start, End);
+        var milestone = Milestone.Create(project, "M", null, Start);
+        project.HasChildChanges().Should().BeTrue();
+
+        project.AcceptChildChanges();
+        milestone.Update(project, "Nama Baru", null, Start, MilestoneStatus.Completed);
+        project.HasChildChanges().Should().BeFalse("tanggal tidak berubah");
+
+        milestone.Update(project, "Nama Baru", null, End, MilestoneStatus.Completed);
+        project.HasChildChanges().Should().BeTrue();
+    }
+
+    [Fact]
+    public void Tanggal_di_pesan_tidak_bergantung_culture()
+    {
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("th-TH");
+            FluentActions.Invoking(() => Milestone.Create(NewProject(Start, End), "M", null, End.AddDays(1)))
+                .Should().Throw<DomainException>().WithMessage("*2026-12-01 s.d. 2026-12-31*");
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+        }
     }
 
     [Theory]

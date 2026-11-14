@@ -14,6 +14,9 @@ public interface IProjectRepository
 {
     Task<ProjectEntity?> FindAsync(Guid publicId, CancellationToken ct);
 
+    /// <summary>ID internal proyek (tanpa memuat entitas); null bila tidak ada.</summary>
+    Task<long?> FindIdAsync(Guid publicId, CancellationToken ct);
+
     /// <summary>Seperti <see cref="FindAsync"/> dengan anggota dimuat (untuk diubah).</summary>
     Task<ProjectEntity?> FindWithMembersAsync(Guid publicId, CancellationToken ct);
 
@@ -47,15 +50,18 @@ public interface IMilestoneRepository
     /// <summary>Milestone milik proyek <paramref name="projectId"/> (ID internal); null bila tidak ada di proyek itu.</summary>
     Task<Milestone?> FindAsync(long projectId, Guid milestoneId, CancellationToken ct);
 
-    /// <summary>Tanggal jatuh tempo milestone paling awal dan paling akhir di proyek; null bila belum ada milestone.</summary>
-    Task<(DateOnly? Earliest, DateOnly? Latest)> GetDueDateRangeAsync(long projectId, CancellationToken ct);
+    /// <summary>Tanggal jatuh tempo milestone paling awal dan paling akhir di proyek.</summary>
+    Task<MilestoneSpan> GetDueDateRangeAsync(long projectId, CancellationToken ct);
 
     Task AddAsync(Milestone milestone, CancellationToken ct);
 }
 
 public interface IMilestoneReadService
 {
-    Task<PagedResult<MilestoneDto>> ListAsync(Guid projectId, int page, int size, CancellationToken ct);
+    /// <param name="projectId">ID internal proyek.</param>
+    Task<PagedResult<MilestoneDto>> ListAsync(long projectId, Guid projectPublicId, int page, int size, CancellationToken ct);
+
+    Task<MilestoneDto?> GetAsync(long projectId, Guid projectPublicId, Guid milestoneId, CancellationToken ct);
 }
 
 /// <summary>Read model user (USER_REF) yang diisi dari event User Service.</summary>

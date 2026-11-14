@@ -23,5 +23,7 @@ CREATE TABLE MILESTONES (
     CONSTRAINT CK_MILESTONES_IS_DELETED CHECK (IS_DELETED IN (0, 1))
 );
 
--- Index FK diawali kolom FK; urut tanggal jatuh tempo untuk daftar milestone per proyek.
+-- Index FK (diawali PROJECT_ID, juga dipakai mencari tanggal jatuh tempo paling awal/akhir per proyek) dan index
+-- query utama daftar milestone yang diawali TENANT_ID (CONTEXT.md bagian 5).
 CREATE INDEX IX_MILESTONES_PROJECT_DUE ON MILESTONES (PROJECT_ID, DUE_DATE);
+CREATE INDEX IX_MILESTONES_TNT_PROJECT_DUE ON MILESTONES (TENANT_ID, PROJECT_ID, DUE_DATE);

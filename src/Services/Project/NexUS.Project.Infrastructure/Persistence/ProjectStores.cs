@@ -17,6 +17,12 @@ public sealed class ProjectRepository(ProjectDbContext db) : IProjectRepository
     public Task<ProjectEntity?> FindAsync(Guid publicId, CancellationToken ct) =>
         db.Projects.FirstOrDefaultAsync(p => p.PublicId == publicId, ct);
 
+    public async Task<long?> FindIdAsync(Guid publicId, CancellationToken ct)
+    {
+        var ids = await db.Projects.AsNoTracking().Where(p => p.PublicId == publicId).Select(p => p.Id).Take(1).ToListAsync(ct);
+        return ids.Count == 0 ? null : ids[0];
+    }
+
     public Task<ProjectEntity?> FindWithMembersAsync(Guid publicId, CancellationToken ct) =>
         db.Projects.Include(p => p.Members).FirstOrDefaultAsync(p => p.PublicId == publicId, ct);
 
@@ -129,11 +135,15 @@ public sealed class MilestoneRepository(ProjectDbContext db) : IMilestoneReposit
     public Task<Milestone?> FindAsync(long projectId, Guid milestoneId, CancellationToken ct) =>
         db.Milestones.FirstOrDefaultAsync(m => m.ProjectId == projectId && m.PublicId == milestoneId, ct);
 
-    public async Task<(DateOnly? Earliest, DateOnly? Latest)> GetDueDateRangeAsync(long projectId, CancellationToken ct)
+    public async Task<MilestoneSpan> GetDueDateRangeAsync(long projectId, CancellationToken ct)
     {
-        // Jumlah milestone satu proyek kecil; min/max dihitung di memori agar tidak bergantung pada terjemahan konversi tanggal.
-        var dates = await db.Milestones.AsNoTracking().Where(m => m.ProjectId == projectId).Select(m => m.DueDate).ToListAsync(ct);
-        return dates.Count == 0 ? (null, null) : (dates.Min(), dates.Max());
+        // Dua query Take(1) memakai index (PROJECT_ID, DUE_DATE), tanpa membaca semua milestone.
+        var dates = db.Milestones.AsNoTracking().Where(m => m.ProjectId == projectId).Select(m => m.DueDate);
+        var earliest = await dates.OrderBy(d => d).Take(1).ToListAsync(ct);
+        if (earliest.Count == 0) return MilestoneSpan.None;
+
+        var latest = await dates.OrderByDescending(d => d).Take(1).ToListAsync(ct);
+        return new MilestoneSpan(earliest[0], latest[0]);
     }
 
     public async Task AddAsync(Milestone milestone, CancellationToken ct) => await db.Milestones.AddAsync(milestone, ct);
@@ -141,17 +151,18 @@ public sealed class MilestoneRepository(ProjectDbContext db) : IMilestoneReposit
 
 public sealed class MilestoneReadService(ProjectDbContext db) : IMilestoneReadService
 {
-    public async Task<PagedResult<MilestoneDto>> ListAsync(Guid projectId, int page, int size, CancellationToken ct)
+    public async Task<PagedResult<MilestoneDto>> ListAsync(long projectId, Guid projectPublicId, int page, int size, CancellationToken ct)
     {
-        var query = from m in db.Milestones.AsNoTracking()
-                    join p in db.Projects.AsNoTracking() on m.ProjectId equals p.Id
-                    where p.PublicId == projectId
-                    select m;
+        var query = db.Milestones.AsNoTracking().Where(m => m.ProjectId == projectId);
 
         var total = await query.LongCountAsync(ct);
         var items = await query.OrderBy(m => m.DueDate).ThenBy(m => m.Name).ThenBy(m => m.Id)
             .Skip((page - 1) * size).Take(size).ToListAsync(ct);
 
-        return new PagedResult<MilestoneDto>(items.Select(m => MilestoneDto.From(m, projectId)).ToList(), page, size, total);
+        return new PagedResult<MilestoneDto>(items.Select(m => MilestoneDto.From(m, projectPublicId)).ToList(), page, size, total);
     }
+
+    public async Task<MilestoneDto?> GetAsync(long projectId, Guid projectPublicId, Guid milestoneId, CancellationToken ct) =>
+        await db.Milestones.AsNoTracking().FirstOrDefaultAsync(m => m.ProjectId == projectId && m.PublicId == milestoneId, ct)
+            is { } milestone ? MilestoneDto.From(milestone, projectPublicId) : null;
 }

@@ -34,6 +34,7 @@ public sealed class Milestone : AggregateRoot
     {
         var milestone = new Milestone { TenantId = project.TenantId, ProjectId = project.Id, Status = MilestoneStatus.Open };
         milestone.Apply(project, name, description, dueDate);
+        project.RegisterMilestoneChange();
         milestone.AddDomainEvent(new MilestoneCreatedDomainEvent(
             project.TenantId, project.PublicId, milestone.PublicId, milestone.Name, milestone.DueDate));
         return milestone;
@@ -46,6 +47,7 @@ public sealed class Milestone : AggregateRoot
 
         var before = (Name, Description, DueDate, Status);
         Apply(project, name, description, dueDate);
+        if (DueDate != before.DueDate) project.RegisterMilestoneChange();
         Status = status;
 
         if (before != (Name, Description, DueDate, Status))
@@ -74,10 +76,8 @@ public sealed class Milestone : AggregateRoot
     {
         if ((project.StartDate is { } start && dueDate < start) || (project.EndDate is { } end && dueDate > end))
             throw new DomainException(
-                $"Tanggal milestone harus di dalam rentang tanggal proyek ({Format(project.StartDate)} s.d. {Format(project.EndDate)}).");
+                $"Tanggal milestone harus di dalam rentang tanggal proyek ({ProjectEntity.Format(project.StartDate)} s.d. {ProjectEntity.Format(project.EndDate)}).");
     }
-
-    private static string Format(DateOnly? date) => date?.ToString("yyyy-MM-dd") ?? "tanpa batas";
 
     /// <summary>Nama status di kolom STATUS (huruf besar).</summary>
     public static string ToName(MilestoneStatus status) => status.ToString().ToUpperInvariant();

@@ -31,6 +31,18 @@ public sealed class MilestonesController(ISender mediator) : ControllerBase
         CancellationToken ct = default) =>
         mediator.Send(new ListMilestonesQuery(projectId, page, size), ct);
 
+    [HttpGet("{milestoneId:guid}")]
+    [Authorize(Policy = Policies.ProjectRead)]
+    [ProducesResponseType<MilestoneDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<MilestoneDto> Get(Guid projectId, Guid milestoneId, CancellationToken ct)
+    {
+        var milestone = await mediator.Send(new GetMilestoneQuery(projectId, milestoneId), ct);
+        IfMatchHeader.Write(Response, milestone.RowVersion);
+        return milestone;
+    }
+
     /// <summary>Membuat milestone berstatus <c>open</c>. Tanggal di luar rentang proyek ditolak (422).</summary>
     [HttpPost]
     [Authorize(Policy = Policies.ProjectUpdate)]
@@ -41,7 +53,7 @@ public sealed class MilestonesController(ISender mediator) : ControllerBase
     {
         var milestone = await mediator.Send(new CreateMilestoneCommand(projectId, request.Name, request.Description, request.DueDate), ct);
         IfMatchHeader.Write(Response, milestone.RowVersion);
-        return CreatedAtAction(nameof(List), new { projectId }, milestone);
+        return CreatedAtAction(nameof(Get), new { projectId, milestoneId = milestone.Id }, milestone);
     }
 
     /// <summary>Mengubah milestone. Wajib mengirim header <c>If-Match</c>; tanggal di luar rentang proyek ditolak (422).</summary>

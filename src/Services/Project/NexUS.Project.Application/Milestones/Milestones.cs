@@ -28,6 +28,19 @@ public static class MilestoneStatusNames
     public static string ToApi(MilestoneStatus status) => Milestone.ToName(status).ToLowerInvariant();
 }
 
+/// <summary>Aturan field milestone yang sama untuk buat dan ubah.</summary>
+internal static class MilestoneRules
+{
+    public static IRuleBuilderOptions<T, string> MilestoneName<T>(this IRuleBuilder<T, string> rule) =>
+        rule.NotEmpty().MaximumLength(Milestone.NameMaxLength);
+
+    public static IRuleBuilderOptions<T, string?> MilestoneDescription<T>(this IRuleBuilder<T, string?> rule) =>
+        rule.MaximumLength(Milestone.DescriptionMaxLength);
+
+    public static IRuleBuilderOptions<T, DateOnly> MilestoneDueDate<T>(this IRuleBuilder<T, DateOnly> rule) =>
+        rule.NotEmpty().WithMessage("Tanggal jatuh tempo wajib diisi.");
+}
+
 public sealed record ListMilestonesQuery(Guid ProjectId, int Page = 1, int Size = PagedResult<MilestoneDto>.DefaultSize)
     : IRequest<PagedResult<MilestoneDto>>;
 
@@ -45,10 +58,25 @@ public sealed class ListMilestonesQueryHandler(IProjectRepository projects, IMil
 {
     public async Task<PagedResult<MilestoneDto>> Handle(ListMilestonesQuery request, CancellationToken ct)
     {
-        if (await projects.FindAsync(request.ProjectId, ct) is null) throw new NotFoundException("Proyek tidak ditemukan.");
+        var projectId = await projects.FindIdAsync(request.ProjectId, ct) ?? throw new NotFoundException("Proyek tidak ditemukan.");
         await guard.EnsureCanReadAsync(request.ProjectId, ct);
 
-        return await milestones.ListAsync(request.ProjectId, request.Page, request.Size, ct);
+        return await milestones.ListAsync(projectId, request.ProjectId, request.Page, request.Size, ct);
+    }
+}
+
+public sealed record GetMilestoneQuery(Guid ProjectId, Guid MilestoneId) : IRequest<MilestoneDto>;
+
+public sealed class GetMilestoneQueryHandler(IProjectRepository projects, IMilestoneReadService milestones, ProjectGuard guard)
+    : IRequestHandler<GetMilestoneQuery, MilestoneDto>
+{
+    public async Task<MilestoneDto> Handle(GetMilestoneQuery request, CancellationToken ct)
+    {
+        var projectId = await projects.FindIdAsync(request.ProjectId, ct) ?? throw new NotFoundException("Proyek tidak ditemukan.");
+        await guard.EnsureCanReadAsync(request.ProjectId, ct);
+
+        return await milestones.GetAsync(projectId, request.ProjectId, request.MilestoneId, ct)
+            ?? throw new NotFoundException("Milestone tidak ditemukan.");
     }
 }
 
@@ -58,9 +86,9 @@ public sealed class CreateMilestoneCommandValidator : AbstractValidator<CreateMi
 {
     public CreateMilestoneCommandValidator()
     {
-        RuleFor(x => x.Name).NotEmpty().MaximumLength(Milestone.NameMaxLength);
-        RuleFor(x => x.Description).MaximumLength(Milestone.DescriptionMaxLength);
-        RuleFor(x => x.DueDate).NotEmpty().WithMessage("Tanggal jatuh tempo wajib diisi.");
+        RuleFor(x => x.Name).MilestoneName();
+        RuleFor(x => x.Description).MilestoneDescription();
+        RuleFor(x => x.DueDate).MilestoneDueDate();
     }
 }
 
@@ -89,9 +117,9 @@ public sealed class UpdateMilestoneCommandValidator : AbstractValidator<UpdateMi
 {
     public UpdateMilestoneCommandValidator()
     {
-        RuleFor(x => x.Name).NotEmpty().MaximumLength(Milestone.NameMaxLength);
-        RuleFor(x => x.Description).MaximumLength(Milestone.DescriptionMaxLength);
-        RuleFor(x => x.DueDate).NotEmpty().WithMessage("Tanggal jatuh tempo wajib diisi.");
+        RuleFor(x => x.Name).MilestoneName();
+        RuleFor(x => x.Description).MilestoneDescription();
+        RuleFor(x => x.DueDate).MilestoneDueDate();
         RuleFor(x => x.Status).Must(s => MilestoneStatusNames.TryParse(s, out _))
             .WithMessage($"Status harus salah satu dari: {MilestoneStatusNames.Allowed}.");
         RuleFor(x => x.ExpectedRowVersion).GreaterThanOrEqualTo(0);
