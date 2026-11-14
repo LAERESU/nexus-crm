@@ -5,6 +5,7 @@ using NexUS.BuildingBlocks.Common.Exceptions;
 using NexUS.BuildingBlocks.Messaging;
 using NexUS.Project.Application.Common;
 using NexUS.Project.Domain.Projects;
+using NexUS.Project.Domain.Users;
 using Oracle.ManagedDataAccess.Client;
 using ProjectEntity = NexUS.Project.Domain.Projects.Project;
 
@@ -18,13 +19,16 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
 
     private const int OracleUniqueViolation = 1; // ORA-00001
     private const string ProjectCodeIndex = "UX_PROJECTS_TNT_CODE";
+    private const string ProjectMemberIndex = "UX_PROJECT_MEMBERS_PROJECT_USER";
 
     // Dibaca saat query dijalankan (bukan saat model dibuat), sehingga filter mengikuti user pada request ini.
     private long CurrentTenantId => currentUser.TenantId;
 
     public DbSet<ProjectEntity> Projects => Set<ProjectEntity>();
     public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+    public DbSet<UserRef> UserRefs => Set<UserRef>();
     public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
+    public DbSet<ProcessedEvent> ProcessedEvents => Set<ProcessedEvent>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -72,6 +76,21 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
             e.Property(x => x.JoinedAt).HasColumnName("JOINED_AT");
             e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
         });
+
+        model.Entity<UserRef>(e =>
+        {
+            e.ToTable("USER_REF");
+            MapEntity(e);
+            e.Property(x => x.UserId).HasColumnName("USER_ID");
+            e.Property(x => x.Email).HasColumnName("EMAIL").HasMaxLength(320);
+            e.Property(x => x.FullName).HasColumnName("FULL_NAME").HasMaxLength(200);
+            e.Property(x => x.IsActive).HasColumnName("IS_ACTIVE").HasColumnType("NUMBER(1)");
+            e.Property(x => x.ProfileEventAt).HasColumnName("PROFILE_EVENT_AT");
+            e.Property(x => x.StatusEventAt).HasColumnName("STATUS_EVENT_AT");
+            e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
+        });
+
+        model.MapProcessedEvents();
 
         model.Entity<OutboxMessage>(e =>
         {
@@ -122,6 +141,12 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        // Perubahan entitas anak (mis. anggota proyek) ikut menaikkan ROW_VERSION aggregate-nya, sehingga dua perubahan
+        // anak yang bersamaan (mis. dua manager saling mengeluarkan) tidak bisa sama-sama lolos: yang kedua bentrok (409).
+        var withChildChanges = ChangeTracker.Entries<AggregateRoot>().Where(e => e.Entity.HasChildChanges()).ToList();
+        foreach (var root in withChildChanges.Where(e => e.State == EntityState.Unchanged))
+            root.State = EntityState.Modified;
+
         var now = timeProvider.GetUtcNow();
         foreach (var entry in ChangeTracker.Entries<Entity>())
         {
@@ -145,11 +170,19 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
 
         try
         {
-            return await base.SaveChangesAsync(cancellationToken);
+            var saved = await base.SaveChangesAsync(cancellationToken);
+            foreach (var root in withChildChanges) root.Entity.AcceptChildChanges();
+            return saved;
         }
         catch (DbUpdateConcurrencyException ex)
         {
             throw new ConcurrencyException($"Data diubah oleh proses lain: {ex.Entries.Count} entitas bentrok.");
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is OracleException { Number: OracleUniqueViolation } member
+            && member.Message.Contains(ProjectMemberIndex, StringComparison.OrdinalIgnoreCase))
+        {
+            // Dua permintaan bersamaan menambahkan user yang sama.
+            throw new DomainException("User sudah menjadi anggota proyek ini.");
         }
         catch (DbUpdateException ex) when (ex.InnerException is OracleException { Number: OracleUniqueViolation } oracle
             && oracle.Message.Contains(ProjectCodeIndex, StringComparison.OrdinalIgnoreCase))

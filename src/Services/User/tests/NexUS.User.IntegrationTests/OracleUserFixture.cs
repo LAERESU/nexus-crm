@@ -107,6 +107,12 @@ public sealed class OracleUserFixture : IAsyncLifetime
         await NexUS.BuildingBlocks.Messaging.EventBusTopology.DeclareExchangeAsync(channel, default);
         await channel.QueueDeclareAsync(UserCreatedQueue, durable: true, exclusive: false, autoDelete: false);
         await channel.QueueBindAsync(UserCreatedQueue, NexUS.BuildingBlocks.Messaging.EventBusTopology.Exchange, "UserCreated");
+        // Event user lain juga dipublikasikan (NX-026); tanpa antrean penerima relay akan tertahan.
+        foreach (var name in new[] { "UserUpdated", "UserDeactivated" })
+        {
+            await channel.QueueDeclareAsync($"test.{name}", durable: true, exclusive: false, autoDelete: false);
+            await channel.QueueBindAsync($"test.{name}", NexUS.BuildingBlocks.Messaging.EventBusTopology.Exchange, name);
+        }
     }
 
     /// <summary>User admin tetap per tenant; memegang role TENANT_ADMIN secara global.</summary>

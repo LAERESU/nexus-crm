@@ -23,7 +23,7 @@ public sealed record UpdateProjectRequest(
 public sealed class ProjectsController(ISender mediator) : ControllerBase
 {
     /// <summary>
-    /// Daftar proyek tenant ini dengan pencarian (nama/kode), filter status, pemilik, dan departemen, serta paging.
+    /// Daftar proyek yang diikuti user (semua proyek tenant bagi pemegang <c>project.all.read</c>) dengan pencarian (nama/kode), filter status, pemilik, dan departemen, serta paging.
     /// Tanpa <c>status</c>, proyek yang diarsipkan tidak ikut; <c>status=archived</c> menampilkan arsip.
     /// </summary>
     [HttpGet]
@@ -38,6 +38,7 @@ public sealed class ProjectsController(ISender mediator) : ControllerBase
     [HttpGet("{id:guid}")]
     [Authorize(Policy = Policies.ProjectRead)]
     [ProducesResponseType<ProjectDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ProjectDto> Get(Guid id, CancellationToken ct) => WithEtag(await mediator.Send(new GetProjectQuery(id), ct));
 

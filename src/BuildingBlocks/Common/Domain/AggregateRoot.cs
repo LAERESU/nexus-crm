@@ -24,6 +24,18 @@ public abstract class AggregateRoot : Entity
 
     protected void AddDomainEvent(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
 
+    private bool _childrenChanged;
+
+    /// <summary>
+    /// Menandai bahwa entitas anak aggregate ini (mis. anggota proyek) berubah, sehingga versi aggregate ikut naik saat
+    /// disimpan dan perubahan anak yang bersamaan bentrok versi (409).
+    /// </summary>
+    protected void MarkChildrenChanged() => _childrenChanged = true;
+
+    public bool HasChildChanges() => _childrenChanged;
+
+    public void AcceptChildChanges() => _childrenChanged = false;
+
     public IReadOnlyList<IDomainEvent> PopDomainEvents()
     {
         var events = _domainEvents.ToList();

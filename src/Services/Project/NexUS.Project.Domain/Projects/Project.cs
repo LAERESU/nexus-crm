@@ -47,7 +47,8 @@ public sealed partial class Project : AggregateRoot
     /// <summary>ID publik departemen (milik User Service); null bila proyek tidak terikat departemen.</summary>
     public Guid? DepartmentId { get; private set; }
 
-    public IReadOnlyCollection<ProjectMember> Members => _members;
+    /// <summary>Anggota aktif; hanya terisi bila proyek dimuat beserta anggotanya.</summary>
+    public IReadOnlyCollection<ProjectMember> Members => _members.Where(m => !m.IsDeleted).ToList();
 
     private Project() { } // untuk EF Core
 
@@ -100,6 +101,58 @@ public sealed partial class Project : AggregateRoot
 
         Status = ProjectStatus.Archived;
         AddDomainEvent(new ProjectArchivedDomainEvent(TenantId, PublicId));
+    }
+
+    public ProjectMember AddMember(Guid userId, ProjectRole role, DateTimeOffset now)
+    {
+        EnsureMembersEditable();
+        if (FindMember(userId) is not null) throw new DomainException("User sudah menjadi anggota proyek ini.");
+
+        var member = new ProjectMember(TenantId, userId, role, now);
+        _members.Add(member);
+        MarkChildrenChanged();
+        AddDomainEvent(new ProjectMemberAddedDomainEvent(TenantId, PublicId, userId, ProjectMember.ToName(role)));
+        return member;
+    }
+
+    /// <summary>Mengganti peran anggota. Mengembalikan null bila user bukan anggota.</summary>
+    public ProjectMember? ChangeMemberRole(Guid userId, ProjectRole role)
+    {
+        EnsureMembersEditable();
+        if (FindMember(userId) is not { } member) return null;
+        if (member.Role == role) return member;
+
+        if (member.Role == ProjectRole.Manager) EnsureNotLastManager();
+        member.ChangeRole(role);
+        MarkChildrenChanged();
+        AddDomainEvent(new ProjectMemberRoleChangedDomainEvent(TenantId, PublicId, userId, ProjectMember.ToName(role)));
+        return member;
+    }
+
+    /// <summary>Mengeluarkan anggota. Mengembalikan false bila user bukan anggota.</summary>
+    public bool RemoveMember(Guid userId)
+    {
+        EnsureMembersEditable();
+        if (FindMember(userId) is not { } member) return false;
+
+        if (member.Role == ProjectRole.Manager) EnsureNotLastManager();
+        member.MarkDeleted();
+        MarkChildrenChanged();
+        AddDomainEvent(new ProjectMemberRemovedDomainEvent(TenantId, PublicId, userId));
+        return true;
+    }
+
+    public ProjectMember? FindMember(Guid userId) => _members.FirstOrDefault(m => !m.IsDeleted && m.UserId == userId);
+
+    private void EnsureMembersEditable()
+    {
+        if (Status == ProjectStatus.Archived) throw new DomainException("Anggota proyek yang diarsipkan tidak bisa diubah.");
+    }
+
+    private void EnsureNotLastManager()
+    {
+        if (_members.Count(m => !m.IsDeleted && m.Role == ProjectRole.Manager) <= 1)
+            throw new DomainException("Proyek harus punya minimal satu manager; tunjuk manager lain lebih dulu.");
     }
 
     private void SetDetails(
@@ -180,3 +233,9 @@ public sealed record ProjectCreatedDomainEvent(long TenantId, Guid ProjectId, st
 public sealed record ProjectUpdatedDomainEvent(long TenantId, Guid ProjectId, string Code, string Name, string Status) : DomainEvent;
 
 public sealed record ProjectArchivedDomainEvent(long TenantId, Guid ProjectId) : DomainEvent;
+
+public sealed record ProjectMemberAddedDomainEvent(long TenantId, Guid ProjectId, Guid UserId, string Role) : DomainEvent;
+
+public sealed record ProjectMemberRoleChangedDomainEvent(long TenantId, Guid ProjectId, Guid UserId, string Role) : DomainEvent;
+
+public sealed record ProjectMemberRemovedDomainEvent(long TenantId, Guid ProjectId, Guid UserId) : DomainEvent;

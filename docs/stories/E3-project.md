@@ -27,8 +27,9 @@ Referensi utama: `ARCHITECTURE.md` A.2, A.3, B.3, C.2 (PRJ_SCHEMA), D.4–D.6.
   2. Endpoint tambah/hapus/ubah peran anggota; hanya `MANAGER` proyek atau admin tenant yang boleh.
   3. Pemeriksaan kepemilikan objek: hanya anggota yang bisa membaca proyek (kecuali admin/auditor).
 - **Acceptance criteria:**
-  - [ ] Bukan anggota → 403 saat membuka detail proyek.
-  - [ ] Manager terakhir tidak bisa dihapus dari proyek.
+  - [x] Bukan anggota → 403 saat membuka detail proyek.
+  - [x] Manager terakhir tidak bisa dihapus dari proyek.
+- **Catatan:** "admin/auditor" dikenali lewat permission baru `project.all.read`; mengubah proyek dan anggota butuh peran `MANAGER` di proyek itu (atau `project.all.read`). User Service kini mempublikasikan `UserUpdated` dan `UserDeactivated`. User yang belum ada di `USER_REF` tetap bisa dijadikan anggota (nama kosong sampai event-nya tiba). Lihat ADR-0011.
 
 ---
 
