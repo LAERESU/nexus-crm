@@ -9,7 +9,7 @@ import { InviteUserModal } from '@/features/users/components/InviteUserModal'
 import { UserStatusButton } from '@/features/users/components/UserStatusButton'
 import { useDepartments, useUsers } from '@/features/users/hooks/useUsers'
 import { parseProblem, problemMessage } from '@/shared/api/problemDetails'
-import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
+import { usePagedSearch } from '@/shared/hooks/usePagedSearch'
 
 const DEFAULT_PAGE_SIZE = 20
 
@@ -20,39 +20,27 @@ interface Filters {
 
 export default function UserListPage() {
   const canManage = usePermission('user.manage')
-  const [searchText, setSearchText] = useState('')
+  const paging = usePagedSearch(DEFAULT_PAGE_SIZE)
   const [filters, setFilters] = useState<Filters>({})
-  // Halaman berlaku untuk kata kunci saat halaman itu dipilih; kata kunci baru selalu mulai dari halaman 1,
-  // tanpa request antara dengan pasangan halaman/kata kunci yang tidak cocok.
-  const [paging, setPaging] = useState({ page: 1, forSearch: '' })
-  const [size, setSize] = useState(DEFAULT_PAGE_SIZE)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
 
-  const search = useDebouncedValue(searchText.trim())
-  const page = paging.forSearch === search ? paging.page : 1
-  const goToPage = (next: number) => setPaging({ page: next, forSearch: search })
-
   const users = useUsers({
-    search: search || undefined,
+    search: paging.search,
     status: filters.status,
     departmentId: filters.departmentId,
-    page,
-    size,
+    page: paging.page,
+    size: paging.size,
   })
   const departments = useDepartments()
   const departmentItems = departments.data?.items ?? []
   const items = users.data?.items ?? []
-  const totalCount = users.data?.totalCount ?? 0
-
   // Data menyusut (user dinonaktifkan di bawah filter, diubah admin lain): mundur ke halaman terakhir yang ada.
-  const lastPage = Math.max(1, Math.ceil(totalCount / size))
-  if (users.data && !users.isPlaceholderData && items.length === 0 && page > lastPage)
-    goToPage(lastPage)
+  paging.clampToLastPage(users.data, users.isPlaceholderData)
 
   const changeFilters = (change: Partial<Filters>) => {
     setFilters((current) => ({ ...current, ...change }))
-    goToPage(1)
+    paging.goToPage(1)
   }
 
   // Baris terbaru dari daftar (rowVersion segar setelah dimuat ulang); snapshot dipakai bila barisnya tidak lagi tampil.
@@ -109,8 +97,8 @@ export default function UserListPage() {
           allowClear
           maxLength={200}
           style={{ width: 280 }}
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
+          value={paging.searchText}
+          onChange={(e) => paging.setSearchText(e.target.value)}
         />
         <Select<UserStatus>
           aria-label="Filter status"
@@ -173,17 +161,13 @@ export default function UserListPage() {
         loading={users.isFetching}
         scroll={{ x: true }}
         pagination={{
-          current: page,
-          pageSize: size,
-          total: totalCount,
+          current: paging.page,
+          pageSize: paging.size,
+          total: users.data?.totalCount ?? 0,
           showSizeChanger: true,
           pageSizeOptions: [10, 20, 50, 100],
           showTotal: (total) => `${total} user`,
-          onChange: (nextPage, nextSize) => {
-            // Ganti ukuran halaman kembali ke halaman pertama.
-            goToPage(nextSize === size ? nextPage : 1)
-            setSize(nextSize)
-          },
+          onChange: paging.changePage,
         }}
       />
 

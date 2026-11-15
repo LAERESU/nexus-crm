@@ -3,8 +3,12 @@ import { Alert, Button, Flex, Form, Input, Select } from 'antd'
 import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { projectPriorityLabels, projectStatusLabels } from '@/features/projects/api/projectsApi'
-import type { EditableProjectStatus, ProjectPriority } from '@/features/projects/api/projectsApi'
+import {
+  editableProjectStatuses,
+  projectPriorities,
+  projectPriorityLabels,
+  projectStatusLabels,
+} from '@/features/projects/api/projectsApi'
 import type { Department } from '@/features/users/api/usersApi'
 import { applyServerErrors } from '@/shared/api/problemDetails'
 
@@ -22,8 +26,8 @@ const projectSchema = z
       ),
     name: z.string().trim().min(1, 'Nama wajib diisi').max(200, 'Nama maksimal 200 karakter'),
     description: z.string().trim().max(2000, 'Deskripsi maksimal 2000 karakter'),
-    status: z.enum(['planning', 'active', 'on_hold', 'completed']),
-    priority: z.enum(['low', 'medium', 'high', 'urgent']),
+    status: z.enum(editableProjectStatuses),
+    priority: z.enum(projectPriorities),
     startDate: z.string(),
     endDate: z.string(),
     departmentId: z.string().nullable(),
@@ -46,11 +50,12 @@ const fields = [
   'departmentId',
 ] as const
 
-const statusOptions = (Object.keys(projectStatusLabels) as EditableProjectStatus[])
-  .filter((s) => s !== ('archived' as string))
-  .map((value) => ({ value, label: projectStatusLabels[value] }))
+const statusOptions = editableProjectStatuses.map((value) => ({
+  value,
+  label: projectStatusLabels[value],
+}))
 
-const priorityOptions = (Object.keys(projectPriorityLabels) as ProjectPriority[]).map((value) => ({
+const priorityOptions = projectPriorities.map((value) => ({
   value,
   label: projectPriorityLabels[value],
 }))

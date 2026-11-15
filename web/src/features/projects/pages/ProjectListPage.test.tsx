@@ -36,13 +36,21 @@ interface Recorded {
   ifMatch?: unknown
 }
 
-/** Backend tiruan yang menyimpan daftar proyek, seperti server sungguhan. */
+/** Perubahan oleh orang lain langsung di backend tiruan (tanpa lewat halaman). */
+let changeBehind: (change: Partial<Project>) => void = () => {}
+
+/** Backend tiruan yang menyimpan daftar proyek, seperti server sungguhan (If-Match diperiksa). */
 function backend({
   conflictOnUpdate = false,
   createStatus = 201,
   createBody = {} as unknown,
 } = {}) {
   let projects = [portal()]
+  changeBehind = (change) => {
+    projects = projects.map((p) =>
+      p.id === 'p-1' ? { ...p, ...change, rowVersion: p.rowVersion + 1 } : p,
+    )
+  }
   const requests: Recorded[] = []
   httpClient.defaults.adapter = async (config) => {
     const data = typeof config.data === 'string' ? JSON.parse(config.data) : undefined
@@ -74,13 +82,10 @@ function backend({
       return respond(config, 201, created)
     }
     if (config.method === 'put') {
-      if (conflictOnUpdate) {
-        // Orang lain sudah mengubah proyek ini.
-        projects = projects.map((p) =>
-          p.id === 'p-1' ? { ...p, name: 'Diubah Orang Lain', rowVersion: 4 } : p,
-        )
+      if (conflictOnUpdate) changeBehind({ name: 'Diubah Orang Lain' }) // orang lain mengubah tepat sebelum simpan
+      const current = projects.find((p) => p.id === 'p-1')!
+      if (config.headers.get('If-Match') !== `"${current.rowVersion}"`)
         return respond(config, 409, { title: 'Konflik versi data' })
-      }
       projects = projects.map((p) =>
         p.id === 'p-1' ? { ...p, ...data, rowVersion: p.rowVersion + 1 } : p,
       )
@@ -108,8 +113,11 @@ function grant(...codes: string[]) {
   )
 }
 
+let lastQueryClient: QueryClient
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  lastQueryClient = queryClient
   render(
     <QueryClientProvider client={queryClient}>
       <AntdApp>
@@ -227,6 +235,34 @@ describe('ProjectListPage', () => {
     expect(
       await screen.findByText('Diubah Orang Lain', { selector: 'td' }, slow),
     ).toBeInTheDocument()
+  })
+
+  it('pemuatan ulang daftar di latar belakang tidak mengganti isian dan tidak menimpa perubahan orang lain', async () => {
+    const requests = backend()
+    renderPage()
+    const user = userEvent.setup()
+    await screen.findByText('Portal Karyawan', {}, slow)
+
+    await user.click(screen.getByRole('button', { name: 'Ubah' }))
+    const drawer = await screen.findByRole('dialog', {}, slow)
+    const name = within(drawer).getByLabelText(/^Nama/)
+    await user.clear(name)
+    await user.type(name, 'Nama Saya')
+
+    // Orang lain mengubah proyek, lalu daftar dimuat ulang di latar belakang (mis. koneksi pulih).
+    changeBehind({ name: 'Diubah Orang Lain' })
+    await lastQueryClient.invalidateQueries()
+    expect(
+      await screen.findByText('Diubah Orang Lain', { selector: 'td' }, slow),
+    ).toBeInTheDocument()
+    expect(within(drawer).getByLabelText(/^Nama/)).toHaveValue('Nama Saya')
+
+    // Simpan memakai versi yang dilihat pengguna, sehingga server menolak (409), bukan menimpa diam-diam.
+    await user.click(within(drawer).getByRole('button', { name: 'Simpan' }))
+    expect(
+      await within(drawer).findByText(/Data telah diubah orang lain/, {}, slow),
+    ).toBeInTheDocument()
+    expect(requests.find((r) => r.method === 'put')?.ifMatch).toBe('"3"')
   })
 
   it('mengarsipkan proyek meminta konfirmasi lalu mengirim DELETE dengan If-Match', async () => {

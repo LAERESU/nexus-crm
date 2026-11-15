@@ -12,7 +12,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
-    // Import pertama Ant Design + halaman lazy di jsdom bisa melewati 5 detik saat semua file berjalan paralel.
+    // Tes UI Ant Design (banyak interaksi di jsdom) bisa melewati 5 detik saat semua file berjalan paralel di mesin
+    // yang sedang sibuk; tes yang benar-benar macet tetap gagal, hanya 10 detik lebih lambat.
     testTimeout: 15_000,
   },
 })

@@ -14,12 +14,12 @@ import {
   Typography,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { usePermission } from '@/features/auth/hooks/usePermission'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import {
-  CONFLICT_MESSAGE,
   projectPriorityLabels,
+  projectStatuses,
   projectStatusLabels,
 } from '@/features/projects/api/projectsApi'
 import type { Project, ProjectPriority, ProjectStatus } from '@/features/projects/api/projectsApi'
@@ -27,9 +27,10 @@ import { ProjectFormDrawer } from '@/features/projects/components/ProjectFormDra
 import { useArchiveProject, useProjects } from '@/features/projects/hooks/useProjects'
 import { useDepartments } from '@/features/users/hooks/useUsers'
 import { parseProblem, problemMessage } from '@/shared/api/problemDetails'
-import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
+import { usePagedSearch } from '@/shared/hooks/usePagedSearch'
 
-const DEFAULT_PAGE_SIZE = 20
+const ARCHIVE_CONFLICT_MESSAGE =
+  'Proyek sudah diubah orang lain, jadi belum diarsipkan. Daftar dimuat ulang; periksa lalu coba lagi.'
 
 const statusColors: Record<ProjectStatus, string> = {
   planning: 'blue',
@@ -52,62 +53,54 @@ interface Filters {
   mine: boolean
 }
 
-/** Drawer: null tertutup, 'new' membuat proyek, selain itu ID proyek yang diubah. */
-type DrawerTarget = null | 'new' | string
+/** Drawer: null tertutup, 'new' membuat proyek, selain itu snapshot proyek yang diubah. */
+type DrawerTarget = null | 'new' | Project
 
 export default function ProjectListPage() {
   const { message } = App.useApp()
   const canCreate = usePermission('project.create')
   const canUpdate = usePermission('project.update')
-  // Daftar departemen dari User Service butuh user.read; tanpa itu filter departemen disembunyikan.
+  // Daftar departemen dari User Service butuh user.read; tanpa itu filter dan kolom departemen disembunyikan.
   const canReadDepartments = usePermission('user.read')
   const userId = useAuthStore((s) => s.user?.id)
 
-  const [searchText, setSearchText] = useState('')
+  const paging = usePagedSearch()
   const [filters, setFilters] = useState<Filters>({ mine: false })
-  const [paging, setPaging] = useState({ page: 1, forSearch: '' })
-  const [size, setSize] = useState(DEFAULT_PAGE_SIZE)
   const [drawer, setDrawer] = useState<DrawerTarget>(null)
 
-  const search = useDebouncedValue(searchText.trim())
-  const page = paging.forSearch === search ? paging.page : 1
-  const goToPage = (next: number) => setPaging({ page: next, forSearch: search })
-
   const projects = useProjects({
-    search: search || undefined,
+    search: paging.search,
     status: filters.status,
     departmentId: filters.departmentId,
-    ownerId: filters.mine ? userId : undefined,
-    page,
-    size,
+    ownerId: filters.mine && userId ? userId : undefined,
+    page: paging.page,
+    size: paging.size,
   })
   const departments = useDepartments(canReadDepartments)
   const archive = useArchiveProject()
-  const departmentItems = departments.data?.items ?? []
-  const departmentName = (id: string | null) =>
-    (id && departmentItems.find((d) => d.id === id)?.name) || '-'
+  const departmentItems = useMemo(() => departments.data?.items ?? [], [departments.data])
+  const departmentNames = useMemo(
+    () => new Map(departmentItems.map((d) => [d.id, d.name])),
+    [departmentItems],
+  )
   const items = projects.data?.items ?? []
-  const totalCount = projects.data?.totalCount ?? 0
-
-  // Data menyusut (proyek diarsipkan di bawah filter, diubah orang lain): mundur ke halaman terakhir yang ada.
-  const lastPage = Math.max(1, Math.ceil(totalCount / size))
-  if (projects.data && !projects.isPlaceholderData && items.length === 0 && page > lastPage)
-    goToPage(lastPage)
+  paging.clampToLastPage(projects.data, projects.isPlaceholderData)
 
   const changeFilters = (change: Partial<Filters>) => {
     setFilters((current) => ({ ...current, ...change }))
-    goToPage(1)
+    paging.goToPage(1)
   }
 
-  // Baris terbaru dari daftar (rowVersion segar setelah dimuat ulang, termasuk setelah 409).
-  const editing = drawer && drawer !== 'new' ? (items.find((p) => p.id === drawer) ?? null) : null
+  // Baris terbaru dari daftar (rowVersion segar setelah dimuat ulang); snapshot dipakai bila barisnya tidak lagi tampil.
+  const editing =
+    drawer && drawer !== 'new' ? (items.find((p) => p.id === drawer.id) ?? drawer) : null
 
   const archiveProject = (project: Project) =>
     archive.mutate(project, {
       onSuccess: () => message.success(`Proyek ${project.code} diarsipkan.`),
       onError: (error) => {
         const problem = parseProblem(error)
-        message.error(problem.status === 409 ? CONFLICT_MESSAGE : problemMessage(problem))
+        message.error(problem.status === 409 ? ARCHIVE_CONFLICT_MESSAGE : problemMessage(problem))
       },
     })
 
@@ -134,16 +127,14 @@ export default function ProjectListPage() {
       render: (_, p) =>
         p.startDate || p.endDate ? `${p.startDate ?? '…'} s.d. ${p.endDate ?? '…'}` : '-',
     },
-    ...(canReadDepartments
-      ? [
-          {
-            title: 'Departemen',
-            dataIndex: 'departmentId',
-            render: (value: string | null) => departmentName(value),
-          },
-        ]
-      : []),
   ]
+  if (canReadDepartments)
+    columns.push({
+      title: 'Departemen',
+      dataIndex: 'departmentId',
+      render: (value: string | null) =>
+        value ? (departmentNames.get(value) ?? (departments.isError ? '?' : '-')) : '-',
+    })
   if (canUpdate)
     columns.push({
       title: 'Aksi',
@@ -151,7 +142,7 @@ export default function ProjectListPage() {
       render: (_, project) =>
         project.status === 'archived' ? null : (
           <Space>
-            <Button size="small" onClick={() => setDrawer(project.id)}>
+            <Button size="small" onClick={() => setDrawer(project)}>
               Ubah
             </Button>
             <Popconfirm
@@ -195,8 +186,8 @@ export default function ProjectListPage() {
           allowClear
           maxLength={200}
           style={{ width: 260 }}
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
+          value={paging.searchText}
+          onChange={(e) => paging.setSearchText(e.target.value)}
         />
         <Select<ProjectStatus>
           aria-label="Filter status"
@@ -205,10 +196,7 @@ export default function ProjectListPage() {
           style={{ width: 220 }}
           value={filters.status}
           onChange={(status) => changeFilters({ status })}
-          options={(Object.keys(projectStatusLabels) as ProjectStatus[]).map((value) => ({
-            value,
-            label: projectStatusLabels[value],
-          }))}
+          options={projectStatuses.map((value) => ({ value, label: projectStatusLabels[value] }))}
         />
         {canReadDepartments && (
           <Select<string>
@@ -226,12 +214,26 @@ export default function ProjectListPage() {
         )}
         <Checkbox
           checked={filters.mine}
+          disabled={!userId}
           onChange={(e) => changeFilters({ mine: e.target.checked })}
         >
           Hanya milik saya
         </Checkbox>
       </Flex>
 
+      {departments.isError && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Daftar departemen gagal dimuat."
+          action={
+            <Button size="small" onClick={() => departments.refetch()}>
+              Coba lagi
+            </Button>
+          }
+        />
+      )}
       {projects.isError && (
         <Alert
           type="error"
@@ -254,22 +256,19 @@ export default function ProjectListPage() {
         loading={projects.isFetching}
         scroll={{ x: true }}
         pagination={{
-          current: page,
-          pageSize: size,
-          total: totalCount,
+          current: paging.page,
+          pageSize: paging.size,
+          total: projects.data?.totalCount ?? 0,
           showSizeChanger: true,
           pageSizeOptions: [10, 20, 50, 100],
           showTotal: (total) => `${total} proyek`,
-          onChange: (nextPage, nextSize) => {
-            goToPage(nextSize === size ? nextPage : 1)
-            setSize(nextSize)
-          },
+          onChange: paging.changePage,
         }}
       />
 
-      {(canCreate || canUpdate) && (
+      {drawer !== null && (
         <ProjectFormDrawer
-          open={drawer === 'new' || editing !== null}
+          key={drawer === 'new' ? 'new' : drawer.id}
           project={editing}
           departments={departmentItems}
           onClose={() => setDrawer(null)}

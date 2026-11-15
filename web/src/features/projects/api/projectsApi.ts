@@ -2,11 +2,14 @@ import { httpClient } from '@/shared/api/httpClient'
 import { ifMatch } from '@/shared/api/ifMatch'
 import type { PagedResult } from '@/shared/types/paging'
 
-export type ProjectStatus = 'planning' | 'active' | 'on_hold' | 'completed' | 'archived'
-export type ProjectPriority = 'low' | 'medium' | 'high' | 'urgent'
+/** Status yang bisa dipilih di form; `archived` hanya lewat aksi arsip. Satu sumber untuk tipe, skema form, dan pilihan. */
+export const editableProjectStatuses = ['planning', 'active', 'on_hold', 'completed'] as const
+export const projectStatuses = [...editableProjectStatuses, 'archived'] as const
+export const projectPriorities = ['low', 'medium', 'high', 'urgent'] as const
 
-/** Status yang bisa dipilih di form; `archived` hanya lewat aksi arsip. */
-export type EditableProjectStatus = Exclude<ProjectStatus, 'archived'>
+export type EditableProjectStatus = (typeof editableProjectStatuses)[number]
+export type ProjectStatus = (typeof projectStatuses)[number]
+export type ProjectPriority = (typeof projectPriorities)[number]
 
 export interface Project {
   id: string
