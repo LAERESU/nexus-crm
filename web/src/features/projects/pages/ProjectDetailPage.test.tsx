@@ -45,10 +45,16 @@ interface Recorded {
 }
 
 /** Backend tiruan yang menyimpan anggota dan milestone, seperti server sungguhan. */
-function backend({ detailStatus = 200, milestoneStatus = 201 } = {}) {
+function backend({
+  detailStatus = 200,
+  milestoneStatus = 201,
+  milestonesListStatus = 200,
+  extraMembers = 0,
+} = {}) {
   let members = [
     member('u-manager', 'Maya Manager', 'manager'),
     member('u-staf', 'Sari Staf', 'member'),
+    ...Array.from({ length: extraMembers }, (_, i) => member(`u-${i}`, `Anggota ${i}`, 'viewer')),
   ]
   let milestones: Milestone[] = [
     {
@@ -88,13 +94,16 @@ function backend({ detailStatus = 200, milestoneStatus = 201 } = {}) {
       members = members.filter((m) => m.userId !== url.split('/').pop())
       return respond(config, 204)
     }
-    if (url === '/projects/p-1/members')
+    if (url === '/projects/p-1/members') {
+      // Paging seperti server: maksimal 100 per halaman.
+      const { page = 1, size = 100 } = (config.params ?? {}) as { page?: number; size?: number }
       return respond(config, 200, {
-        items: members,
-        page: 1,
-        size: 100,
+        items: members.slice((page - 1) * size, page * size),
+        page,
+        size,
         totalCount: members.length,
       })
+    }
     if (url === '/projects/p-1/milestones' && config.method === 'post') {
       if (milestoneStatus !== 201)
         return respond(config, milestoneStatus, {
@@ -111,6 +120,8 @@ function backend({ detailStatus = 200, milestoneStatus = 201 } = {}) {
       milestones = [...milestones, created]
       return respond(config, 201, created)
     }
+    if (url === '/projects/p-1/milestones' && milestonesListStatus !== 200)
+      return respond(config, milestonesListStatus)
     if (url === '/projects/p-1/milestones')
       return respond(config, 200, {
         items: milestones,
@@ -271,6 +282,32 @@ describe('ProjectDetailPage', () => {
       slow,
     )
     expect(await screen.findByRole('button', { name: 'Buka lagi' }, slow)).toBeInTheDocument()
+  })
+
+  it('milestone yang gagal dimuat tampil sebagai error, bukan daftar kosong', async () => {
+    signIn('u-manager', ...managerPermissions)
+    backend({ milestonesListStatus: 500 })
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('tab', { name: 'Milestone' }, slow))
+
+    expect(await screen.findByRole('button', { name: 'Coba lagi' }, slow)).toBeInTheDocument()
+    expect(screen.queryByText('Belum ada milestone')).not.toBeInTheDocument()
+  })
+
+  it('anggota lebih dari 100 dimuat semua halaman', async () => {
+    signIn('u-149', ...managerPermissions)
+    const requests = backend({ extraMembers: 160 })
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('tab', { name: /Anggota \(162\)/ }, slow))
+    expect(
+      requests.filter((r) => r.url === '/projects/p-1/members' && r.method === 'get'),
+    ).toHaveLength(2)
+    // u-149 (di halaman kedua) berperan viewer: dikenali sebagai anggota, tetapi bukan manager.
+    expect(screen.getByText('Hanya manager proyek yang bisa mengubah anggota.')).toBeInTheDocument()
   })
 
   it('bukan anggota melihat pesan 403 dan tautan kembali ke daftar', async () => {

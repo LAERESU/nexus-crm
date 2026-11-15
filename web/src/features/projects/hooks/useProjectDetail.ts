@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AxiosError } from 'axios'
 import { projectDetailApi, projectKeys } from '@/features/projects/api/projectsApi'
 import type {
   Milestone,
@@ -7,11 +6,13 @@ import type {
   MilestoneStatus,
   ProjectRole,
 } from '@/features/projects/api/projectsApi'
+import { parseProblem } from '@/shared/api/problemDetails'
 
 /** 403/404 tidak diulang: jawabannya tidak akan berubah. */
-const retryUnlessDenied = (failureCount: number, error: unknown) =>
-  !(error instanceof AxiosError && [403, 404].includes(error.response?.status ?? 0)) &&
-  failureCount < 1
+const retryUnlessDenied = (failureCount: number, error: unknown) => {
+  const status = parseProblem(error).status
+  return status !== 403 && status !== 404 && failureCount < 1
+}
 
 export function useProject(id: string) {
   return useQuery({
@@ -41,53 +42,57 @@ export function useMilestones(id: string, enabled: boolean) {
 
 /**
  * Perubahan anggota atau milestone menaikkan versi proyek (ROW_VERSION), jadi detail, anggota, milestone, dan daftar
- * proyek dimuat ulang. Tidak ditunggu: mutasi selesai begitu server menjawab.
+ * proyek dimuat ulang. Mengembalikan promise pemuatan ulang detail (anggota dan milestone ikut, karena kuncinya di
+ * bawah kunci detail), agar pemanggil bisa menunggunya sebelum memberi tahu "data terbaru sudah dimuat".
  */
-function useInvalidateProject(id: string) {
+export function useReloadProject(id: string) {
   const queryClient = useQueryClient()
   return () => {
-    void queryClient.invalidateQueries({ queryKey: projectKeys.detail(id) })
     void queryClient.invalidateQueries({ queryKey: projectKeys.lists() })
+    return queryClient.invalidateQueries({ queryKey: projectKeys.detail(id) })
   }
 }
 
+// Setiap baris memakai instance mutasinya sendiri (komponen per baris), sehingga callback dan status memuat dua aksi
+// yang tumpang tindih tidak saling menimpa.
+
 export function useAddMember(id: string) {
-  const invalidate = useInvalidateProject(id)
+  const reload = useReloadProject(id)
   return useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: ProjectRole }) =>
       projectDetailApi.addMember(id, userId, role),
-    onSettled: invalidate,
+    onSettled: () => void reload(),
   })
 }
 
 export function useChangeMemberRole(id: string) {
-  const invalidate = useInvalidateProject(id)
+  const reload = useReloadProject(id)
   return useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: ProjectRole }) =>
       projectDetailApi.changeMemberRole(id, userId, role),
-    onSettled: invalidate,
+    onSettled: () => void reload(),
   })
 }
 
 export function useRemoveMember(id: string) {
-  const invalidate = useInvalidateProject(id)
+  const reload = useReloadProject(id)
   return useMutation({
     mutationFn: (userId: string) => projectDetailApi.removeMember(id, userId),
-    onSettled: invalidate,
+    onSettled: () => void reload(),
   })
 }
 
 export function useCreateMilestone(id: string) {
-  const invalidate = useInvalidateProject(id)
+  const reload = useReloadProject(id)
   return useMutation({
     mutationFn: (request: MilestoneRequest) => projectDetailApi.createMilestone(id, request),
-    onSettled: invalidate,
+    onSettled: () => void reload(),
   })
 }
 
-/** Daftar dimuat ulang juga saat gagal: pada 409 milestone yang tampil sudah usang. */
+/** Pemuatan ulang ditunggu: pada 409, pemanggil memberi tahu pengguna setelah data terbaru benar-benar tiba. */
 export function useUpdateMilestone(id: string) {
-  const invalidate = useInvalidateProject(id)
+  const reload = useReloadProject(id)
   return useMutation({
     mutationFn: ({ milestone, status }: { milestone: Milestone; status: MilestoneStatus }) =>
       projectDetailApi.updateMilestone(milestone, {
@@ -96,6 +101,6 @@ export function useUpdateMilestone(id: string) {
         dueDate: milestone.dueDate,
         status,
       }),
-    onSettled: invalidate,
+    onSettled: () => reload(),
   })
 }

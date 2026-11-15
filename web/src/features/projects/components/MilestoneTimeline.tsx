@@ -24,8 +24,46 @@ interface MilestoneTimelineProps {
   project: Project
   milestones: Milestone[]
   loading: boolean
+  /** Gagal memuat milestone: ditampilkan sebagai error dengan tombol coba lagi, bukan daftar kosong. */
+  error: unknown
+  onRetry: () => void
   /** Manager proyek ini (atau admin tenant) dengan `project.update`. */
   canManage: boolean
+}
+
+/** Tombol selesai/buka lagi satu milestone, dengan mutasinya sendiri. */
+function ToggleMilestoneButton({
+  projectId,
+  milestone,
+}: {
+  projectId: string
+  milestone: Milestone
+}) {
+  const { message } = App.useApp()
+  const update = useUpdateMilestone(projectId)
+
+  const toggle = async () => {
+    try {
+      // mutateAsync baru selesai setelah pemuatan ulang (onSettled) tiba.
+      await update.mutateAsync({
+        milestone,
+        status: milestone.status === 'open' ? 'completed' : 'open',
+      })
+    } catch (error) {
+      const problem = parseProblem(error)
+      message.error(
+        problem.status === 409
+          ? 'Milestone sudah diubah orang lain. Data terbaru sudah dimuat; coba lagi.'
+          : problemMessage(problem),
+      )
+    }
+  }
+
+  return (
+    <Button size="small" loading={update.isPending} onClick={() => void toggle()}>
+      {milestone.status === 'open' ? 'Tandai selesai' : 'Buka lagi'}
+    </Button>
+  )
 }
 
 const milestoneSchema = z.object({
@@ -41,27 +79,12 @@ export function MilestoneTimeline({
   project,
   milestones,
   loading,
+  error,
+  onRetry,
   canManage,
 }: MilestoneTimelineProps) {
-  const { message } = App.useApp()
-  const update = useUpdateMilestone(project.id)
   const [creating, setCreating] = useState(false)
   const editable = canManage && project.status !== 'archived'
-
-  const toggle = (milestone: Milestone) =>
-    update.mutate(
-      { milestone, status: milestone.status === 'open' ? 'completed' : 'open' },
-      {
-        onError: (error) => {
-          const problem = parseProblem(error)
-          message.error(
-            problem.status === 409
-              ? 'Milestone sudah diubah orang lain. Data terbaru sudah dimuat; coba lagi.'
-              : problemMessage(problem),
-          )
-        },
-      },
-    )
 
   const range =
     project.startDate || project.endDate
@@ -77,7 +100,19 @@ export function MilestoneTimeline({
           </Button>
         </Flex>
       )}
-      {!loading && milestones.length === 0 ? (
+      {error ? (
+        <Alert
+          type="error"
+          showIcon
+          role="alert"
+          message={problemMessage(parseProblem(error))}
+          action={
+            <Button size="small" onClick={onRetry}>
+              Coba lagi
+            </Button>
+          }
+        />
+      ) : !loading && milestones.length === 0 ? (
         <Empty description="Belum ada milestone" />
       ) : (
         <Timeline
@@ -97,15 +132,7 @@ export function MilestoneTimeline({
                   </div>
                   {m.description && <Typography.Paragraph>{m.description}</Typography.Paragraph>}
                 </div>
-                {editable && (
-                  <Button
-                    size="small"
-                    loading={update.isPending && update.variables.milestone.id === m.id}
-                    onClick={() => toggle(m)}
-                  >
-                    {m.status === 'open' ? 'Tandai selesai' : 'Buka lagi'}
-                  </Button>
-                )}
+                {editable && <ToggleMilestoneButton projectId={project.id} milestone={m} />}
               </Flex>
             ),
           }))}

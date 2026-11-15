@@ -112,16 +112,30 @@ export interface MilestoneRequest {
   dueDate: string
 }
 
-/** Anggota dan milestone satu proyek dimuat sebagai satu halaman berukuran maksimum. */
-const ALL = { page: 1, size: MAX_PAGE_SIZE }
+/** Batas aman jumlah halaman yang dimuat untuk satu daftar (100 halaman x 100 baris). */
+const MAX_PAGES = 100
+
+/**
+ * Memuat semua halaman sebuah daftar (anggota/milestone satu proyek): pemeriksaan peran, pemilik, dan "sudah anggota"
+ * butuh daftar lengkap, bukan hanya 100 baris pertama.
+ */
+async function fetchAll<T>(url: string): Promise<T[]> {
+  const items: T[] = []
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const { data } = await httpClient.get<PagedResult<T>>(url, {
+      params: { page, size: MAX_PAGE_SIZE },
+    })
+    items.push(...data.items)
+    if (data.items.length < MAX_PAGE_SIZE || items.length >= data.totalCount) break
+  }
+  return items
+}
 
 export const projectDetailApi = {
   get: (id: string) => httpClient.get<Project>(`/projects/${id}`).then((r) => r.data),
 
-  members: (id: string) =>
-    httpClient
-      .get<PagedResult<ProjectMember>>(`/projects/${id}/members`, { params: ALL })
-      .then((r) => r.data),
+  /** Semua anggota proyek (semua halaman). */
+  members: (id: string) => fetchAll<ProjectMember>(`/projects/${id}/members`),
 
   addMember: (id: string, userId: string, role: ProjectRole) =>
     httpClient.post<ProjectMember>(`/projects/${id}/members`, { userId, role }).then((r) => r.data),
@@ -134,10 +148,8 @@ export const projectDetailApi = {
   removeMember: (id: string, userId: string) =>
     httpClient.delete<void>(`/projects/${id}/members/${userId}`).then(() => undefined),
 
-  milestones: (id: string) =>
-    httpClient
-      .get<PagedResult<Milestone>>(`/projects/${id}/milestones`, { params: ALL })
-      .then((r) => r.data),
+  /** Semua milestone proyek (semua halaman), urut tanggal jatuh tempo. */
+  milestones: (id: string) => fetchAll<Milestone>(`/projects/${id}/milestones`),
 
   createMilestone: (id: string, request: MilestoneRequest) =>
     httpClient.post<Milestone>(`/projects/${id}/milestones`, request).then((r) => r.data),

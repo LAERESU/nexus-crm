@@ -12,7 +12,6 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { AxiosError } from 'axios'
 import { Link, useParams } from 'react-router-dom'
 import { usePermission } from '@/features/auth/hooks/usePermission'
 import { useAuthStore } from '@/features/auth/store/authStore'
@@ -31,9 +30,6 @@ import {
 } from '@/features/projects/hooks/useProjectDetail'
 import { useDepartments } from '@/features/users/hooks/useUsers'
 import { parseProblem, problemMessage } from '@/shared/api/problemDetails'
-
-const statusOf = (error: unknown) =>
-  error instanceof AxiosError ? error.response?.status : undefined
 
 function Summary({
   project,
@@ -87,13 +83,14 @@ export default function ProjectDetailPage() {
   const departments = useDepartments(canReadDepartments && !!project.data?.departmentId)
 
   // Tampilan saja; backend tetap memeriksa peran MANAGER (atau admin tenant) di setiap perubahan.
-  const memberItems = members.data?.items ?? []
+  const memberItems = members.data ?? []
   const isManager = memberItems.some((m) => m.userId === userId && m.role === 'manager')
   const canManageProject = isManager || seesAll
 
   if (project.isPending) return <Spin size="large" aria-label="Memuat proyek" />
-  if (project.isError) {
-    const status = statusOf(project.error)
+  // Gagal memuat ulang di latar belakang tidak mengganti halaman yang sudah tampil (data lama tetap dipakai).
+  if (!project.data) {
+    const status = parseProblem(project.error).status
     return (
       <Result
         status={status === 403 ? '403' : status === 404 ? '404' : 'error'}
@@ -117,6 +114,8 @@ export default function ProjectDetailPage() {
   }
 
   const data = project.data
+  // Hak kelola belum diketahui selama daftar anggota belum berhasil dimuat.
+  const manageUnknown = !members.isSuccess
   const departmentName =
     (data.departmentId && departments.data?.items.find((d) => d.id === data.departmentId)?.name) ||
     '-'
@@ -138,7 +137,12 @@ export default function ProjectDetailPage() {
           type="error"
           showIcon
           style={{ marginBottom: 16 }}
-          message={problemMessage(parseProblem(members.error))}
+          message={`Anggota gagal dimuat: ${problemMessage(parseProblem(members.error))}`}
+          action={
+            <Button size="small" onClick={() => void members.refetch()}>
+              Coba lagi
+            </Button>
+          }
         />
       )}
       <Tabs
@@ -152,13 +156,14 @@ export default function ProjectDetailPage() {
           },
           {
             key: 'members',
-            label: `Anggota (${members.data?.totalCount ?? '…'})`,
+            label: `Anggota (${members.data?.length ?? '…'})`,
             children: (
               <ProjectMembersTab
                 projectId={id}
                 members={memberItems}
                 loading={members.isFetching}
                 canManage={canManageMembers && canManageProject}
+                manageUnknown={manageUnknown}
                 readOnly={data.status === 'archived'}
               />
             ),
@@ -169,8 +174,10 @@ export default function ProjectDetailPage() {
             children: (
               <MilestoneTimeline
                 project={data}
-                milestones={milestones.data?.items ?? []}
+                milestones={milestones.data ?? []}
                 loading={milestones.isFetching}
+                error={milestones.isError && !milestones.data ? milestones.error : null}
+                onRetry={() => void milestones.refetch()}
                 canManage={canUpdate && canManageProject}
               />
             ),
