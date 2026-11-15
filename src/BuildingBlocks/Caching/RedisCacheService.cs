@@ -25,6 +25,12 @@ public sealed class RedisCacheService(
             logger.LogWarning(ex, "Redis GET gagal untuk {CacheKey}", key);
             return default;
         }
+        catch (JsonException ex)
+        {
+            // Isi cache berformat lama/berbeda dianggap miss, bukan error request (Redis hanya cache).
+            logger.LogWarning(ex, "Isi cache {CacheKey} tidak dapat dibaca; dianggap miss", key);
+            return default;
+        }
     }
 
     public async Task SetAsync<T>(string key, T value, TimeSpan? ttl = null, CancellationToken ct = default)
@@ -58,8 +64,13 @@ public sealed class RedisCacheService(
         string key, Func<CancellationToken, Task<T>> factory, TimeSpan? ttl = null, CancellationToken ct = default)
     {
         var cached = await GetAsync<T>(key, ct);
-        if (cached is not null) return cached;
+        if (cached is not null)
+        {
+            logger.LogDebug("Cache hit {CacheKey}", key);
+            return cached;
+        }
 
+        logger.LogDebug("Cache miss {CacheKey}", key);
         var fresh = await factory(ct);
         if (fresh is not null) await SetAsync(key, fresh, ttl, ct);
         return fresh;
