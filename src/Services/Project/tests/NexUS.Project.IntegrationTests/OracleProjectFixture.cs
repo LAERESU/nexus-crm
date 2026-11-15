@@ -42,7 +42,15 @@ public sealed class OracleProjectFixture : IAsyncLifetime
         .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"))
         .Build();
 
+    private readonly IContainer _redis = new ContainerBuilder("redis:7-alpine")
+        .WithPortBinding(6379, assignRandomHostPort: true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Ready to accept connections"))
+        .Build();
+
     private readonly FakePermissionSource _permissions = new();
+
+    /// <summary>Redis sungguhan untuk cache proyek (NX-029).</summary>
+    public StackExchange.Redis.IConnectionMultiplexer Redis { get; private set; } = default!;
 
     public WebApplicationFactory<Program> Factory { get; private set; } = default!;
     public string ConnectionString { get; private set; } = default!;
@@ -96,7 +104,9 @@ public sealed class OracleProjectFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_oracle.StartAsync(), _rabbit.StartAsync());
+        await Task.WhenAll(_oracle.StartAsync(), _rabbit.StartAsync(), _redis.StartAsync());
+        var redisConnection = $"{_redis.Hostname}:{_redis.GetMappedPublicPort(6379)},abortConnect=false";
+        Redis = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(redisConnection);
         ConnectionString =
             $"User Id=PRJ_SCHEMA;Password={SchemaPassword};Data Source={_oracle.Hostname}:{_oracle.GetMappedPublicPort(1521)}/FREEPDB1";
         await ApplyMigrationsAsync();
@@ -113,6 +123,7 @@ public sealed class OracleProjectFixture : IAsyncLifetime
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Oracle"] = ConnectionString,
+                ["ConnectionStrings:Redis"] = $"{_redis.Hostname}:{_redis.GetMappedPublicPort(6379)},abortConnect=false",
                 ["Services:User:BaseUrl"] = "http://user.invalid",
                 // Pengulangan consumer dipersingkat agar tes dead-letter tidak menunggu 16 menit.
                 ["Messaging:Consumer:MaxAttempts"] = "3",
@@ -139,6 +150,8 @@ public sealed class OracleProjectFixture : IAsyncLifetime
         if (Factory is not null) await Factory.DisposeAsync();
         await _oracle.DisposeAsync();
         await _rabbit.DisposeAsync();
+        Redis?.Dispose();
+        await _redis.DisposeAsync();
     }
 
     /// <summary>Menetapkan permission (scope global) seorang user, seperti jawaban User Service.</summary>

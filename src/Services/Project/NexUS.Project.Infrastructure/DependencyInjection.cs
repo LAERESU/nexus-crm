@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using NexUS.BuildingBlocks.Caching;
 using NexUS.BuildingBlocks.Messaging;
 using NexUS.BuildingBlocks.Messaging.Contracts;
 using NexUS.Project.Application.Abstractions;
@@ -26,6 +27,9 @@ public static class DependencyInjection
             configuration.GetConnectionString("Oracle"),
             oracle => oracle.UseOracleSQLCompatibility(OracleSQLCompatibility.DatabaseVersion23)));
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ProjectDbContext>());
+
+        // Cache-aside detail dan keanggotaan proyek (NX-029); tanpa Redis di Development, cache dimatikan.
+        services.AddNexusCaching(configuration);
 
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IProjectReadService, ProjectReadService>();

@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.Extensions.Logging;
+using NexUS.BuildingBlocks.Caching;
+using NexUS.Project.Infrastructure.Caching;
 using NexUS.BuildingBlocks.Common.Domain;
 using NexUS.BuildingBlocks.Common.Exceptions;
 using NexUS.BuildingBlocks.Messaging;
@@ -12,7 +15,9 @@ using ProjectEntity = NexUS.Project.Domain.Projects.Project;
 
 namespace NexUS.Project.Infrastructure.Persistence;
 
-public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options, TimeProvider timeProvider, ICurrentUser currentUser)
+public sealed class ProjectDbContext(
+    DbContextOptions<ProjectDbContext> options, TimeProvider timeProvider, ICurrentUser currentUser, ICacheService cache,
+    ILogger<ProjectDbContext> logger)
     : DbContext(options), IUnitOfWork
 {
     /// <summary>Pelaku sistem untuk kolom CREATED_BY/UPDATED_BY; ID internal user tidak dikenal service ini.</summary>
@@ -154,9 +159,16 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
         // oleh relay (OutboxPublisherWorker).
         this.PrepareSave(timeProvider.GetUtcNow(), SystemActor);
 
+        // Proyek yang berubah (termasuk karena anggota atau milestone-nya berubah: versinya ikut naik) dicatat sebelum
+        // simpan, lalu cache-nya dihapus setelah commit.
+        var changedProjects = ChangeTracker.Entries<ProjectEntity>()
+            .Where(e => e.State is EntityState.Modified or EntityState.Deleted)
+            .Select(e => (e.Entity.TenantId, e.Entity.PublicId)).Distinct().ToList();
+
         try
         {
             var saved = await base.SaveChangesAsync(cancellationToken);
+            await InvalidateCacheAsync(changedProjects);
             return saved;
         }
         catch (DbUpdateConcurrencyException ex)
@@ -175,6 +187,26 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
             // Dua permintaan bersamaan lolos pemeriksaan di handler; index unik di database yang memutuskan.
             // Pelanggaran constraint unik lain bukan kesalahan klien dan diteruskan sebagai error server.
             throw new DomainException("Kode proyek sudah dipakai di tenant ini.");
+        }
+    }
+
+    /// <summary>
+    /// Best effort: kegagalan Redis tidak membatalkan perubahan yang sudah tersimpan; data basi paling lama sampai TTL
+    /// (<see cref="ProjectCacheKeys.Ttl"/>).
+    /// </summary>
+    private async Task InvalidateCacheAsync(IReadOnlyCollection<(long TenantId, Guid ProjectId)> projects)
+    {
+        foreach (var (tenantId, projectId) in projects)
+        {
+            try
+            {
+                await cache.RemoveAsync(ProjectCacheKeys.Project(tenantId, projectId));
+                await cache.RemoveAsync(ProjectCacheKeys.Members(tenantId, projectId));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Cache proyek {ProjectId} tidak dapat dihapus; perubahan baru terlihat setelah TTL", projectId);
+            }
         }
     }
 }

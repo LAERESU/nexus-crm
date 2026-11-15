@@ -58,8 +58,13 @@ public sealed class RedisCacheService(
         string key, Func<CancellationToken, Task<T>> factory, TimeSpan? ttl = null, CancellationToken ct = default)
     {
         var cached = await GetAsync<T>(key, ct);
-        if (cached is not null) return cached;
+        if (cached is not null)
+        {
+            logger.LogDebug("Cache hit {CacheKey}", key);
+            return cached;
+        }
 
+        logger.LogDebug("Cache miss {CacheKey}", key);
         var fresh = await factory(ct);
         if (fresh is not null) await SetAsync(key, fresh, ttl, ct);
         return fresh;
