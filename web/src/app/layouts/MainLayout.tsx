@@ -31,7 +31,9 @@ function buildMenu(can: (permission: string) => boolean): MenuItem[] {
 
   const items: MenuItem[] = [
     { key: '/', icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
-    { key: '/projects', icon: <AppstoreOutlined />, label: 'Proyek', disabled: true },
+    can('project.read')
+      ? { key: '/projects', icon: <AppstoreOutlined />, label: <Link to="/projects">Proyek</Link> }
+      : { key: '/projects', icon: <AppstoreOutlined />, label: 'Proyek', disabled: true },
     { key: '/tasks/my', icon: <CheckSquareOutlined />, label: 'Tugas', disabled: true },
     { key: '/sops', icon: <FileTextOutlined />, label: 'SOP', disabled: true },
   ]

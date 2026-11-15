@@ -10,6 +10,7 @@ import {
   ForbiddenPage,
   LoginPage,
   NotFoundPage,
+  ProjectListPage,
   RoleManagementPage,
   UserListPage,
 } from '@/app/lazyPages'
@@ -34,6 +35,10 @@ export const routes = [
         element: <MainLayout />,
         children: [
           { index: true, element: withSuspense(<DashboardPage />) },
+          {
+            element: <RequireAuth permission="project.read" />,
+            children: [{ path: 'projects', element: withSuspense(<ProjectListPage />) }],
+          },
           {
             element: <RequireAuth permission="user.read" />,
             children: [{ path: 'admin/users', element: withSuspense(<UserListPage />) }],

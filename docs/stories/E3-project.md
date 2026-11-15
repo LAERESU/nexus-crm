@@ -71,8 +71,9 @@ Referensi utama: `ARCHITECTURE.md` A.2, A.3, B.3, C.2 (PRJ_SCHEMA), D.4–D.6.
 - **Sprint:** 4 · **SP:** 5 · **Bergantung pada:** NX-024, NX-025
 - **Langkah:** `features/projects`: `ProjectListPage` (tabel, filter, search, paging), `ProjectForm` di drawer (create/edit), aksi arsip dengan konfirmasi.
 - **Acceptance criteria:**
-  - [ ] Membuat proyek baru langsung muncul di daftar tanpa reload (invalidasi query).
-  - [ ] Konflik 409 menampilkan pesan "data telah diubah orang lain" dan memuat ulang data.
+  - [x] Membuat proyek baru langsung muncul di daftar tanpa reload (invalidasi query).
+  - [x] Konflik 409 menampilkan pesan "data telah diubah orang lain" dan memuat ulang data.
+- **Catatan:** halaman di `/projects` (butuh `project.read`); filter status (termasuk arsip), departemen (hanya bila punya `user.read`), "milik saya", dan pencarian. Pada 409, form dimuat ulang dengan versi terbaru (isian pengguna diganti data terbaru). Nama pemilik belum ditampilkan (API hanya mengirim ID). Tombol ubah/arsip tampil bagi pemegang `project.update`; backend tetap menolak bila bukan manager proyek.
 
 ---
 
