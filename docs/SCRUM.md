@@ -14,7 +14,7 @@
 | Tanggal mulai sprint | 2026-11-13 |
 | Tanggal selesai sprint | 2026-11-27 |
 | Sprint goal | Proyek & anggota berjalan |
-| Progres keseluruhan | 28 / 64 story selesai (44%) |
+| Progres keseluruhan | 29 / 64 story selesai (45%) |
 | Hambatan aktif | NX-008 ditunda: butuh cluster Kubernetes dan keputusan D3 |
 
 Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 🔍 Review · ✅ Done · 🟥 Blocked
@@ -76,7 +76,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | E0 | Fondasi & DevOps | 1 | 10 | 9 | 90% |
 | E1 | Auth & Gateway | 1 | 7 | 7 | 100% |
 | E2 | User & RBAC | 2 | 7 | 7 | 100% |
-| E3 | Project Management | 2 | 7 | 5 | 71% |
+| E3 | Project Management | 2 | 7 | 6 | 86% |
 | E4 | Task Management | 2 | 9 | 0 | 0% |
 | E5 | Dashboard | 2 | 3 | 0 | 0% |
 | E6 | SOP Builder | 3 | 11 | 0 | 0% |
@@ -134,7 +134,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | NX-027 | Milestone proyek | 3 | 4 | ✅ |
 | NX-028 | Outbox pattern + publish event proyek | 5 | 4 | ✅ |
 | NX-029 | Cache proyek & anggota di Redis | 3 | 4 | ✅ |
-| NX-030 | Halaman daftar proyek + form proyek | 5 | 4 | 🔍 |
+| NX-030 | Halaman daftar proyek + form proyek | 5 | 4 | ✅ |
 | NX-031 | Halaman detail proyek (tab ringkasan, anggota, milestone) | 5 | 4 | ⬜ |
 
 ### E4 · Task Management
