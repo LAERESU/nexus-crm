@@ -63,7 +63,7 @@ Referensi utama: `ARCHITECTURE.md` A.2, A.3, B.3, C.2 (PRJ_SCHEMA), D.4–D.6.
 - **Acceptance criteria:**
   - [x] Request detail kedua dilayani dari cache (terlihat di log/metrik).
   - [x] Perubahan data langsung terlihat (cache terhapus).
-- **Catatan:** `:members` berisi keanggotaan (user dan peran) untuk pemeriksaan akses, TTL 10 menit; daftar anggota berpaging (dengan nama dari `USER_REF`) tidak di-cache. Cache dihapus setelah commit untuk setiap proyek yang berubah, termasuk saat anggota atau milestone-nya berubah (versi proyek ikut naik). Cache hit/miss tercatat di log Debug; metrik belum ada. Race cache-aside (pembacaan lama menimpa key yang baru dihapus) tetap mungkin, dibatasi TTL.
+- **Catatan:** `:members` berisi keanggotaan (user dan peran) untuk pemeriksaan akses, TTL 10 menit; daftar anggota berpaging (dengan nama dari `USER_REF`) tidak di-cache. Cache diinvalidasi setelah commit untuk setiap proyek yang berubah, termasuk saat anggota atau milestone-nya berubah (versi proyek ikut naik); invalidasi menulis tombstone 5 detik dan pengisian memakai `SET NX`, sehingga pembacaan lama tidak menulis ulang data basi. Kunci tidak ikut `Cache:KeyPrefix`. Cache hit/miss tercatat di log Debug; metrik belum ada.
 
 ---
 
