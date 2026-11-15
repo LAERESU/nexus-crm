@@ -1,7 +1,7 @@
 # NexUS — Scrum & Pelacak Progres
 
 > File ini dipakai untuk melihat **sudah sampai mana pengembangan**. Langkah rinci setiap story ada di `docs/stories/`. Perbarui status story setiap hari, dan isi bagian Sprint Log di akhir setiap sprint.
-> Terakhir diperbarui: 2026-11-14
+> Terakhir diperbarui: 2026-11-15
 
 ---
 
@@ -14,7 +14,7 @@
 | Tanggal mulai sprint | 2026-11-13 |
 | Tanggal selesai sprint | 2026-11-27 |
 | Sprint goal | Proyek & anggota berjalan |
-| Progres keseluruhan | 29 / 64 story selesai (45%) |
+| Progres keseluruhan | 30 / 64 story selesai (47%) |
 | Hambatan aktif | NX-008 ditunda: butuh cluster Kubernetes dan keputusan D3 |
 
 Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 🔍 Review · ✅ Done · 🟥 Blocked
@@ -76,7 +76,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | E0 | Fondasi & DevOps | 1 | 10 | 9 | 90% |
 | E1 | Auth & Gateway | 1 | 7 | 7 | 100% |
 | E2 | User & RBAC | 2 | 7 | 7 | 100% |
-| E3 | Project Management | 2 | 7 | 6 | 86% |
+| E3 | Project Management | 2 | 7 | 7 | 100% |
 | E4 | Task Management | 2 | 9 | 0 | 0% |
 | E5 | Dashboard | 2 | 3 | 0 | 0% |
 | E6 | SOP Builder | 3 | 11 | 0 | 0% |
@@ -135,7 +135,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | NX-028 | Outbox pattern + publish event proyek | 5 | 4 | ✅ |
 | NX-029 | Cache proyek & anggota di Redis | 3 | 4 | ✅ |
 | NX-030 | Halaman daftar proyek + form proyek | 5 | 4 | ✅ |
-| NX-031 | Halaman detail proyek (tab ringkasan, anggota, milestone) | 5 | 4 | 🔍 |
+| NX-031 | Halaman detail proyek (tab ringkasan, anggota, milestone) | 5 | 4 | ✅ |
 
 ### E4 · Task Management
 
@@ -203,7 +203,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | 1 | Fondasi | Template service, docker-compose, CI hijau | NX-002–007, NX-009 | ✅ |
 | 2 | Fondasi | Login end-to-end via Gateway, deploy otomatis ke dev | NX-010–017 (NX-008 ditunda) | ✅ |
 | 3 | Layanan inti | User & RBAC berjalan | NX-018–024 | ✅ |
-| 4 | Layanan inti | Proyek & anggota berjalan | NX-025–031 | 🟨 |
+| 4 | Layanan inti | Proyek & anggota berjalan | NX-025–031 | ✅ |
 | 5 | Layanan inti | Tugas, kanban, dashboard dasar | NX-032–042 | ⬜ |
 | 6 | SOP Builder | Editor SOP + notifikasi in-app | NX-044–048, NX-055–056 | ⬜ |
 | 7 | SOP Builder | Versioning, approval, publish, email | NX-049–052, NX-057 | ⬜ |
@@ -237,6 +237,25 @@ Salin template di bawah untuk setiap sprint yang selesai, terbaru di atas.
 **Retro — pertahankan:** ...
 **Retro — perbaiki (action item + PIC):** ...
 -->
+
+### Sprint 4 — 2026-11-13 s.d. 2026-11-15 (selesai lebih awal)
+
+**Sprint goal:** Proyek & anggota berjalan
+**Tercapai?** Ya (teruji lokal; halaman web proyek belum diuji di browser terhadap backend sungguhan)
+
+| Metrik | Nilai |
+| --- | --- |
+| SP direncanakan | 34 |
+| SP selesai | 34 |
+| Story selesai | 7 (NX-025–031) |
+| Story dibawa ke sprint berikutnya | 0 |
+
+**Selesai:** NX-025, NX-026, NX-027, NX-028, NX-029, NX-030, NX-031 (plus perbaikan NX-021: halaman aktivasi akun)
+**Belum selesai (alasan):** —
+**Hambatan:** GitHub Actions masih tidak berjalan (billing); batas pemakaian model sempat menghentikan code review; memori mesin pengembang sempit sehingga tes integrasi lambat dan sempat macet.
+**Hasil review (catatan PO):** —
+**Retro — pertahankan:** code review per PR menemukan masalah desain nyata sebelum merge (relay outbox yang tertahan, race cache-aside, penimpaan diam-diam di form proyek).
+**Retro — perbaiki (action item + PIC):** uji halaman proyek dan anggota di browser terhadap stack lokal; tambah pembersihan outbox dan alat proses ulang dead-letter; backend mengirim peran pengguna bersama data proyek.
 
 ### Sprint 3 — 2026-11-09 s.d. 2026-11-13 (selesai lebih awal)
 
@@ -304,3 +323,4 @@ Salin template di bawah untuk setiap sprint yang selesai, terbaru di atas.
 | 1 | 31 | 31 | Semua story selesai |
 | 2 | 43 | 35 | NX-008 ditunda (butuh cluster) |
 | 3 | 37 | 37 | Semua story selesai; CI tidak berjalan (billing) |
+| 4 | 34 | 34 | Semua story selesai; CI tidak berjalan (billing) |
