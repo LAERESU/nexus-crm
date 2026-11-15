@@ -49,7 +49,8 @@ public static class DefaultRoleCatalog
         new("TENANT_ADMIN", "Admin Tenant", "Mengelola user, role, anggota proyek, dan kategori SOP; membaca semua modul",
             [.. ReadPermissions, "user.manage", "role.manage", "project.member.manage", "sop.category.manage"]),
         new("PROJECT_MANAGER", "Manajer Proyek", "Mengelola proyek, anggota, dan tugas",
-            ["project.read", "project.create", "project.update", "project.member.manage",
+            // user.read: memilih anggota proyek dari daftar user (NX-031).
+            ["user.read", "project.read", "project.create", "project.update", "project.member.manage",
              "task.read", "task.create", "task.update", "task.delete", "sop.read", "dashboard.read"]),
         new("MEMBER", "Anggota", "Bekerja pada proyek dan tugas, membaca SOP",
             ["user.read", "project.read", "task.read", "task.create", "task.update", "sop.read", "dashboard.read"]),

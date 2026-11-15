@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App as AntdApp } from 'antd'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import type { Project } from '@/features/projects/api/projectsApi'
@@ -121,7 +122,9 @@ function renderPage() {
   render(
     <QueryClientProvider client={queryClient}>
       <AntdApp>
-        <ProjectListPage />
+        <MemoryRouter>
+          <ProjectListPage />
+        </MemoryRouter>
       </AntdApp>
     </QueryClientProvider>,
   )
@@ -233,7 +236,7 @@ describe('ProjectListPage', () => {
       slow,
     )
     expect(
-      await screen.findByText('Diubah Orang Lain', { selector: 'td' }, slow),
+      await screen.findByText('Diubah Orang Lain', { selector: 'a' }, slow),
     ).toBeInTheDocument()
   })
 
@@ -253,7 +256,7 @@ describe('ProjectListPage', () => {
     changeBehind({ name: 'Diubah Orang Lain' })
     await lastQueryClient.invalidateQueries()
     expect(
-      await screen.findByText('Diubah Orang Lain', { selector: 'td' }, slow),
+      await screen.findByText('Diubah Orang Lain', { selector: 'a' }, slow),
     ).toBeInTheDocument()
     expect(within(drawer).getByLabelText(/^Nama/)).toHaveValue('Nama Saya')
 

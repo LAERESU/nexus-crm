@@ -10,6 +10,7 @@ import {
   ForbiddenPage,
   LoginPage,
   NotFoundPage,
+  ProjectDetailPage,
   ProjectListPage,
   RoleManagementPage,
   UserListPage,
@@ -37,7 +38,10 @@ export const routes = [
           { index: true, element: withSuspense(<DashboardPage />) },
           {
             element: <RequireAuth permission="project.read" />,
-            children: [{ path: 'projects', element: withSuspense(<ProjectListPage />) }],
+            children: [
+              { path: 'projects', element: withSuspense(<ProjectListPage />) },
+              { path: 'projects/:id', element: withSuspense(<ProjectDetailPage />) },
+            ],
           },
           {
             element: <RequireAuth permission="user.read" />,
