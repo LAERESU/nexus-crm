@@ -7,6 +7,7 @@ using NexUS.BuildingBlocks.Messaging;
 using NexUS.BuildingBlocks.Messaging.Contracts;
 using NexUS.Project.Application.Abstractions;
 using NexUS.Project.Application.Common;
+using NexUS.Project.Infrastructure.Caching;
 using NexUS.Project.Infrastructure.Messaging;
 using NexUS.Project.Infrastructure.Persistence;
 using NexUS.Project.Infrastructure.Security;
@@ -23,13 +24,18 @@ public static class DependencyInjection
     {
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddDbContext<ProjectDbContext>(options => options.UseOracle(
-            configuration.GetConnectionString("Oracle"),
-            oracle => oracle.UseOracleSQLCompatibility(OracleSQLCompatibility.DatabaseVersion23)));
+        services.AddDbContext<ProjectDbContext>((sp, options) => options
+            .UseOracle(
+                configuration.GetConnectionString("Oracle"),
+                oracle => oracle.UseOracleSQLCompatibility(OracleSQLCompatibility.DatabaseVersion23))
+            .AddInterceptors(sp.GetRequiredService<ProjectCacheInvalidator>()));
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ProjectDbContext>());
 
-        // Cache-aside detail dan keanggotaan proyek (NX-029); tanpa Redis di Development, cache dimatikan.
+        // Cache-aside detail dan keanggotaan proyek (NX-029); tanpa Redis di Development, cache dimatikan. Koneksi Redis
+        // baru dibuat saat cache pertama kali dipakai.
         services.AddNexusCaching(configuration);
+        services.AddSingleton<ProjectCache>();
+        services.AddSingleton<ProjectCacheInvalidator>();
 
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IProjectReadService, ProjectReadService>();

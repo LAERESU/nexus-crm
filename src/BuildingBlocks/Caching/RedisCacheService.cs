@@ -25,6 +25,12 @@ public sealed class RedisCacheService(
             logger.LogWarning(ex, "Redis GET gagal untuk {CacheKey}", key);
             return default;
         }
+        catch (JsonException ex)
+        {
+            // Isi cache berformat lama/berbeda dianggap miss, bukan error request (Redis hanya cache).
+            logger.LogWarning(ex, "Isi cache {CacheKey} tidak dapat dibaca; dianggap miss", key);
+            return default;
+        }
     }
 
     public async Task SetAsync<T>(string key, T value, TimeSpan? ttl = null, CancellationToken ct = default)

@@ -1,6 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using NexUS.BuildingBlocks.Caching;
 using NexUS.BuildingBlocks.Common.Domain;
 using NexUS.Project.Infrastructure.Caching;
 using NexUS.BuildingBlocks.Common.Results;
@@ -16,7 +14,7 @@ namespace NexUS.Project.Infrastructure.Persistence;
 // Filter TENANT_ID dipasang sebagai global query filter di ProjectDbContext, sehingga semua query di sini
 // otomatis dibatasi ke tenant user yang sedang login.
 
-public sealed class ProjectRepository(ProjectDbContext db, ICacheService cache, ICurrentUser currentUser) : IProjectRepository
+public sealed class ProjectRepository(ProjectDbContext db, ProjectCache cache, ICurrentUser currentUser) : IProjectRepository
 {
     public Task<ProjectEntity?> FindAsync(Guid publicId, CancellationToken ct) =>
         db.Projects.FirstOrDefaultAsync(p => p.PublicId == publicId, ct);
@@ -30,21 +28,26 @@ public sealed class ProjectRepository(ProjectDbContext db, ICacheService cache, 
     public Task<ProjectEntity?> FindWithMembersAsync(Guid publicId, CancellationToken ct) =>
         db.Projects.Include(p => p.Members).FirstOrDefaultAsync(p => p.PublicId == publicId, ct);
 
-    /// <summary>Lewat cache keanggotaan <c>tnt:{t}:project:{id}:members</c> (10 menit), karena dipakai di setiap pemeriksaan akses.</summary>
+    /// <summary>
+    /// Lewat cache keanggotaan <c>tnt:{t}:project:{id}:members</c> (10 menit), karena dipakai di setiap pemeriksaan akses.
+    /// Tanpa Redis, langsung satu baris dari database.
+    /// </summary>
     public async Task<ProjectRole?> GetMemberRoleAsync(Guid projectId, Guid userId, CancellationToken ct)
     {
+        if (!cache.IsEnabled)
+        {
+            var roles = await MemberQuery(projectId).Where(m => m.UserId == userId).Select(m => m.Role).Take(1).ToListAsync(ct);
+            return roles.Count == 0 ? null : roles[0];
+        }
+
         var key = ProjectCacheKeys.Members(currentUser.TenantId, projectId);
-        var members = await cache.GetAsync<List<CachedMember>>(key, ct);
+        var members = await cache.GetAsync<List<CachedMember>>(key);
         if (members is null)
         {
-            members = await (from m in db.ProjectMembers.AsNoTracking()
-                             join p in db.Projects.AsNoTracking() on m.ProjectId equals p.Id
-                             where p.PublicId == projectId
-                             select new { m.UserId, m.Role }).ToListAsync(ct) is var rows
-                ? rows.Select(r => new CachedMember(r.UserId, ProjectMember.ToName(r.Role))).ToList()
-                : [];
+            var rows = await MemberQuery(projectId).Select(m => new { m.UserId, m.Role }).ToListAsync(ct);
+            members = rows.Select(r => new CachedMember(r.UserId, ProjectMember.ToName(r.Role))).ToList();
             // Proyek selalu punya minimal satu manager; daftar kosong berarti proyek tidak ada dan tidak di-cache.
-            if (members.Count > 0) await cache.SetAsync(key, members, ProjectCacheKeys.Ttl, ct);
+            if (members.Count > 0) await cache.TrySetAsync(key, members, ProjectCacheKeys.Ttl);
         }
 
         return members.FirstOrDefault(m => m.UserId == userId) is { } member && ProjectMember.TryParseRole(member.Role, out var role)
@@ -52,29 +55,30 @@ public sealed class ProjectRepository(ProjectDbContext db, ICacheService cache, 
             : null;
     }
 
+    private IQueryable<ProjectMember> MemberQuery(Guid projectId) =>
+        from m in db.ProjectMembers.AsNoTracking()
+        join p in db.Projects.AsNoTracking() on m.ProjectId equals p.Id
+        where p.PublicId == projectId
+        select m;
+
     public Task<bool> CodeExistsAsync(string normalizedCode, CancellationToken ct) =>
         db.Projects.AnyAsync(p => p.Code == normalizedCode, ct);
 
     public async Task AddAsync(ProjectEntity project, CancellationToken ct) => await db.Projects.AddAsync(project, ct);
 }
 
-public sealed class ProjectReadService(
-    ProjectDbContext db, ICacheService cache, ICurrentUser currentUser, ILogger<ProjectReadService> logger) : IProjectReadService
+public sealed class ProjectReadService(ProjectDbContext db, ProjectCache cache, ICurrentUser currentUser) : IProjectReadService
 {
     /// <summary>Cache-aside <c>tnt:{t}:project:{id}</c> (10 menit); proyek yang tidak ada tidak di-cache.</summary>
     public async Task<ProjectDto?> GetAsync(Guid publicId, CancellationToken ct)
     {
         var key = ProjectCacheKeys.Project(currentUser.TenantId, publicId);
-        if (await cache.GetAsync<ProjectDto>(key, ct) is { } cached)
-        {
-            logger.LogDebug("Detail proyek {ProjectId} dari cache", publicId);
-            return cached;
-        }
+        if (await cache.GetAsync<ProjectDto>(key) is { } cached) return cached;
 
         if (await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.PublicId == publicId, ct) is not { } project) return null;
 
         var dto = ProjectDto.From(project);
-        await cache.SetAsync(key, dto, ProjectCacheKeys.Ttl, ct);
+        await cache.TrySetAsync(key, dto, ProjectCacheKeys.Ttl);
         return dto;
     }
 

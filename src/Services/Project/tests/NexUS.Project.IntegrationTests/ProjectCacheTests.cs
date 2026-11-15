@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Oracle.ManagedDataAccess.Client;
 
 namespace NexUS.Project.IntegrationTests;
@@ -100,6 +101,36 @@ public class ProjectCacheTests(OracleProjectFixture fixture)
 
         (await manager.DeleteAsync($"{url}/members/{userId}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await user.GetAsync(url)).StatusCode.Should().Be(HttpStatusCode.Forbidden, "cache keanggotaan dihapus saat anggota dikeluarkan");
+    }
+
+    [Fact]
+    public async Task Pembacaan_lama_tidak_bisa_menulis_ulang_cache_setelah_invalidasi()
+    {
+        var cache = fixture.Factory.Services.GetRequiredService<NexUS.Project.Infrastructure.Caching.ProjectCache>();
+        var key = ProjectKey(Guid.NewGuid());
+
+        // Urutan race: perubahan meng-invalidasi kunci, lalu pembacaan lambat (data lama) mencoba mengisi cache.
+        await cache.InvalidateAsync([key]);
+        await cache.TrySetAsync(key, new { name = "lama" }, TimeSpan.FromMinutes(10));
+
+        (await cache.GetAsync<System.Text.Json.Nodes.JsonObject>(key)).Should().BeNull("tombstone menolak pengisian data lama");
+        (await fixture.Redis.GetDatabase().KeyTimeToLiveAsync(key)).Should().BeLessThanOrEqualTo(
+            NexUS.Project.Infrastructure.Caching.ProjectCache.TombstoneTtl);
+    }
+
+    [Fact]
+    public async Task Isi_cache_yang_tidak_bisa_dibaca_dianggap_miss()
+    {
+        var client = fixture.ClientAs(A);
+        var project = await CreateAsync(client);
+        var db = fixture.Redis.GetDatabase();
+        await db.StringSetAsync(ProjectKey(project.Id), "{rusak");
+        await db.StringSetAsync(MembersKey(project.Id), "[{\"userId\":123}]");
+
+        var response = await client.GetAsync($"/api/v1/projects/{project.Id}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "cache rusak tidak boleh membuat request gagal");
+        (await response.Content.ReadFromJsonAsync<ProjectBody>())!.Name.Should().Be("Proyek Cache");
     }
 
     [Fact]

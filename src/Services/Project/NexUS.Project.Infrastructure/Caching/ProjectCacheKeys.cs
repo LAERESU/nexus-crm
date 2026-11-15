@@ -3,8 +3,9 @@ using NexUS.BuildingBlocks.Caching;
 namespace NexUS.Project.Infrastructure.Caching;
 
 /// <summary>
-/// Kunci cache Project Service (ARCHITECTURE.md B.3), tanpa <c>Cache:KeyPrefix</c> agar service lain (Task Service)
-/// bisa membaca kunci yang sama. Nilainya dihapus setiap kali proyek atau anggotanya berubah.
+/// Kunci cache Project Service (ARCHITECTURE.md B.3). Ditulis lewat <see cref="ProjectCache"/> (tanpa
+/// <c>Cache:KeyPrefix</c>) agar service lain (Task Service) bisa membaca kunci yang sama. Nilainya diinvalidasi setiap
+/// kali proyek, anggota, atau milestone-nya berubah.
 /// </summary>
 public static class ProjectCacheKeys
 {

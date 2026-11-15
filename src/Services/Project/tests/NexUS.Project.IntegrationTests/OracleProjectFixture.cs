@@ -123,6 +123,8 @@ public sealed class OracleProjectFixture : IAsyncLifetime
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Oracle"] = ConnectionString,
+                // Prefix cache umum diisi untuk membuktikan kunci cache proyek tidak ikut berawalan prefix (tetap tnt:{t}:).
+                ["Cache:KeyPrefix"] = "prj:",
                 ["ConnectionStrings:Redis"] = $"{_redis.Hostname}:{_redis.GetMappedPublicPort(6379)},abortConnect=false",
                 ["Services:User:BaseUrl"] = "http://user.invalid",
                 // Pengulangan consumer dipersingkat agar tes dead-letter tidak menunggu 16 menit.
