@@ -6,4 +6,5 @@ export const NotFoundPage = lazy(() => import('@/features/errors/pages/NotFoundP
 export const UserListPage = lazy(() => import('@/features/users/pages/UserListPage'))
 export const RoleManagementPage = lazy(() => import('@/features/roles/pages/RoleManagementPage'))
 export const ActivatePage = lazy(() => import('@/features/auth/pages/ActivatePage'))
+export const ProjectListPage = lazy(() => import('@/features/projects/pages/ProjectListPage'))
 export const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'))

@@ -17,10 +17,12 @@ export function useUsers(params: UserListParams) {
   })
 }
 
-export function useDepartments() {
+/** @param enabled false bila user tidak boleh membaca departemen (butuh `user.read`). */
+export function useDepartments(enabled = true) {
   return useQuery({
     queryKey: userKeys.departments(),
     queryFn: usersApi.departments,
+    enabled,
     staleTime: 5 * 60_000,
   })
 }

@@ -1,4 +1,6 @@
 import '@testing-library/jest-dom/vitest'
+// Dimuat di setup agar biaya import pertama Ant Design (lambat di jsdom) tidak dihitung ke batas waktu tes pertama.
+import 'antd'
 
 // jsdom tidak menyediakan matchMedia, sedangkan komponen antd (Sider, Grid) memakainya.
 Object.defineProperty(window, 'matchMedia', {

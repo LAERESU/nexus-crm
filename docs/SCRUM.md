@@ -134,7 +134,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | NX-027 | Milestone proyek | 3 | 4 | ✅ |
 | NX-028 | Outbox pattern + publish event proyek | 5 | 4 | ✅ |
 | NX-029 | Cache proyek & anggota di Redis | 3 | 4 | ✅ |
-| NX-030 | Halaman daftar proyek + form proyek | 5 | 4 | ⬜ |
+| NX-030 | Halaman daftar proyek + form proyek | 5 | 4 | 🔍 |
 | NX-031 | Halaman detail proyek (tab ringkasan, anggota, milestone) | 5 | 4 | ⬜ |
 
 ### E4 · Task Management

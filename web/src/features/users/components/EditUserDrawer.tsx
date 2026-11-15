@@ -1,4 +1,5 @@
 import { App, Drawer } from 'antd'
+import { withCurrentDepartment } from '@/features/users/api/departmentOptions'
 import type { Department, User } from '@/features/users/api/usersApi'
 import { UserForm } from '@/features/users/components/UserForm'
 import type { UserFormValues } from '@/features/users/components/UserForm'
@@ -18,18 +19,7 @@ export function EditUserDrawer({ user, departments, onClose }: EditUserDrawerPro
   const closable = !update.isPending
 
   // Departemen user saat ini tetap bisa ditampilkan walau tidak termasuk daftar pilihan yang dimuat.
-  const options =
-    user?.departmentId && !departments.some((d) => d.id === user.departmentId)
-      ? [
-          ...departments,
-          {
-            id: user.departmentId,
-            code: '',
-            name: user.departmentName ?? 'Departemen saat ini',
-            parentId: null,
-          },
-        ]
-      : departments
+  const options = withCurrentDepartment(departments, user?.departmentId, user?.departmentName)
 
   const submit = async (values: UserFormValues) => {
     if (!user) return
