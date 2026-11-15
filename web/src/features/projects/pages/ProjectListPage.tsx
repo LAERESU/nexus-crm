@@ -15,6 +15,7 @@ import {
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { usePermission } from '@/features/auth/hooks/usePermission'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import {
@@ -106,7 +107,11 @@ export default function ProjectListPage() {
 
   const columns: TableColumnsType<Project> = [
     { title: 'Kode', dataIndex: 'code', width: 120 },
-    { title: 'Nama', dataIndex: 'name' },
+    {
+      title: 'Nama',
+      dataIndex: 'name',
+      render: (name: string, p) => <Link to={`/projects/${p.id}`}>{name}</Link>,
+    },
     {
       title: 'Status',
       dataIndex: 'status',

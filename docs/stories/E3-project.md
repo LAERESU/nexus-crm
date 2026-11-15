@@ -81,4 +81,5 @@ Referensi utama: `ARCHITECTURE.md` A.2, A.3, B.3, C.2 (PRJ_SCHEMA), D.4–D.6.
 - **Sprint:** 4 · **SP:** 5 · **Bergantung pada:** NX-026, NX-027, NX-030
 - **Langkah:** `ProjectDetailPage` dengan tab Ringkasan, Anggota (`MemberPicker`), Milestone (`MilestoneTimeline`); tab Board dan SOP disiapkan sebagai placeholder untuk E4/E6.
 - **Acceptance criteria:**
-  - [ ] Manager bisa menambah/menghapus anggota dari UI; anggota biasa hanya melihat.
+  - [x] Manager bisa menambah/menghapus anggota dari UI; anggota biasa hanya melihat.
+- **Catatan:** halaman di `/projects/:id` (nama proyek di daftar menjadi tautan). Tab Anggota: `MemberPicker` mencari user aktif lewat `/users`, ubah peran, keluarkan; tab Milestone: timeline, buat, tandai selesai/buka lagi. Role bawaan `PROJECT_MANAGER` kini juga memegang `user.read` agar bisa memilih anggota (disinkronkan seeder saat start). Bukan anggota melihat pesan 403. Tombol kelola hanya tampilan; backend tetap memeriksa peran MANAGER.
