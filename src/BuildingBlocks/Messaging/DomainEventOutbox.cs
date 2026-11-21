@@ -44,6 +44,20 @@ public static class DomainEventOutbox
         return events;
     }
 
+    /// <summary>
+    /// Menetapkan versi yang diharapkan klien (header <c>If-Match</c>, CONTEXT.md bagian 6). Dicek langsung, bukan hanya
+    /// lewat klausa UPDATE: bila tidak ada perubahan (PUT yang sama) tidak ada UPDATE, tetapi klien dengan versi basi tetap
+    /// berhak mendapat 409.
+    /// </summary>
+    public static void ExpectRowVersionOf(this DbContext db, object entity, long expectedRowVersion)
+    {
+        var rowVersion = db.Entry(entity).Property(nameof(Entity.RowVersion));
+        if ((long)rowVersion.CurrentValue! != expectedRowVersion)
+            throw new NexUS.BuildingBlocks.Common.Exceptions.ConcurrencyException("Data sudah diubah oleh proses lain; muat ulang lalu coba lagi.");
+
+        rowVersion.OriginalValue = expectedRowVersion;
+    }
+
     /// <summary>Pemetaan tabel <c>OUTBOX_MESSAGES</c> (dibuat migrasi baseline setiap schema).</summary>
     public static ModelBuilder MapOutboxMessages(this ModelBuilder model)
     {

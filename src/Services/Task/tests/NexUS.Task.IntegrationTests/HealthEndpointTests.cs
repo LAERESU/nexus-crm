@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace NexUS.Tasks.IntegrationTests;
 
-public class HealthEndpointTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class HealthEndpointTests(TaskApiFactory factory) : IClassFixture<TaskApiFactory>
 {
     [Fact]
     public async Task Health_live_mengembalikan_200()

@@ -136,17 +136,7 @@ public sealed class ProjectDbContext(DbContextOptions<ProjectDbContext> options,
         e.HasIndex(x => x.PublicId).IsUnique();
     }
 
-    public void ExpectRowVersion(object entity, long expectedRowVersion)
-    {
-        var rowVersion = Entry(entity).Property(nameof(Entity.RowVersion));
-
-        // Dicek langsung, bukan hanya lewat klausa UPDATE: bila tidak ada perubahan (PUT yang sama) tidak ada UPDATE,
-        // tetapi klien dengan versi basi tetap berhak mendapat 409 (CONTEXT.md bagian 6).
-        if ((long)rowVersion.CurrentValue! != expectedRowVersion)
-            throw new ConcurrencyException("Data sudah diubah oleh proses lain; muat ulang lalu coba lagi.");
-
-        rowVersion.OriginalValue = expectedRowVersion;
-    }
+    public void ExpectRowVersion(object entity, long expectedRowVersion) => this.ExpectRowVersionOf(entity, expectedRowVersion);
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
