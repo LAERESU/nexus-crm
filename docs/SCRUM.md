@@ -1,7 +1,7 @@
 # NexUS — Scrum & Pelacak Progres
 
 > File ini dipakai untuk melihat **sudah sampai mana pengembangan**. Langkah rinci setiap story ada di `docs/stories/`. Perbarui status story setiap hari, dan isi bagian Sprint Log di akhir setiap sprint.
-> Terakhir diperbarui: 2026-11-21
+> Terakhir diperbarui: 2026-11-22
 
 ---
 
@@ -14,7 +14,7 @@
 | Tanggal mulai sprint | 2026-11-15 |
 | Tanggal selesai sprint | 2026-11-29 |
 | Sprint goal | Tugas, kanban, dashboard dasar |
-| Progres keseluruhan | 30 / 64 story selesai (47%) |
+| Progres keseluruhan | 31 / 64 story selesai (48%) |
 | Hambatan aktif | NX-008 ditunda: butuh cluster Kubernetes dan keputusan D3 |
 
 Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 🔍 Review · ✅ Done · 🟥 Blocked
@@ -77,7 +77,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | E1 | Auth & Gateway | 1 | 7 | 7 | 100% |
 | E2 | User & RBAC | 2 | 7 | 7 | 100% |
 | E3 | Project Management | 2 | 7 | 7 | 100% |
-| E4 | Task Management | 2 | 9 | 0 | 0% |
+| E4 | Task Management | 2 | 9 | 1 | 11% |
 | E5 | Dashboard | 2 | 3 | 0 | 0% |
 | E6 | SOP Builder | 3 | 11 | 0 | 0% |
 | E7 | Notification | 3 | 4 | 0 | 0% |
@@ -141,7 +141,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 
 | ID | Story | SP | Sprint | Status |
 | --- | --- | --- | --- | --- |
-| NX-032 | Schema & CRUD tugas + subtask | 8 | 5 | 🔍 |
+| NX-032 | Schema & CRUD tugas + subtask | 8 | 5 | ✅ |
 | NX-033 | State machine status tugas + riwayat status | 5 | 5 | ⬜ |
 | NX-034 | Assignee + validasi keanggotaan proyek (read model) | 5 | 5 | ⬜ |
 | NX-035 | Komentar tugas | 3 | 5 | ⬜ |
