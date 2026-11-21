@@ -131,6 +131,7 @@ public static class PermissionServiceCollectionExtensions
         services.TryAddSingleton<IPermissionCache, RedisPermissionCache>();
         services.TryAddScoped<IPermissionSource, UserServicePermissionSource>();
         services.TryAddScoped<IPermissionService, PermissionService>();
+        services.TryAddScoped<CurrentUserGrants>();
 
         services.AddHttpClient(UserServicePermissionSource.HttpClientName)
             .ConfigureHttpClient((sp, client) =>

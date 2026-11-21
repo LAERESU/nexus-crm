@@ -39,7 +39,7 @@ public sealed class ProjectRef : Entity
 }
 
 /// <summary>
-/// Keanggotaan seorang user di satu proyek (tabel <c>PROJECT_MEMBER_REF</c>). Baris anggota yang dikeluarkan dipertahankan
+/// Keanggotaan seorang user di satu proyek (tabel <c>PROJECT_MEMBER_REFS</c>). Baris anggota yang dikeluarkan dipertahankan
 /// (<see cref="IsRemoved"/>) agar event lama yang tiba belakangan bisa dikenali dan diabaikan.
 /// </summary>
 public sealed class ProjectMemberRef : Entity

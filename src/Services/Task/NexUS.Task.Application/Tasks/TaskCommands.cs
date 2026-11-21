@@ -27,7 +27,7 @@ public sealed class CreateTaskCommandValidator : AbstractValidator<CreateTaskCom
 }
 
 public sealed class CreateTaskCommandHandler(
-    ITaskRepository tasks, ITaskReadService readService, TaskGuard guard, IUnitOfWork unitOfWork, ICurrentUser currentUser)
+    ITaskRepository tasks, TaskGuard guard, IUnitOfWork unitOfWork, ICurrentUser currentUser)
     : IRequestHandler<CreateTaskCommand, TaskDto>
 {
     public async Task<TaskDto> Handle(CreateTaskCommand request, CancellationToken ct)
@@ -36,7 +36,12 @@ public sealed class CreateTaskCommandHandler(
 
         TaskItem? parent = null;
         if (request.ParentTaskId is { } parentId)
-            parent = await tasks.FindAsync(parentId, ct) ?? throw new NotFoundException("Tugas induk tidak ditemukan.");
+        {
+            parent = await tasks.FindAsync(parentId, ct);
+            // Induk di proyek lain dijawab sama dengan induk yang tidak ada: keberadaan tugas di proyek yang mungkin tidak
+            // diikuti user tidak boleh bisa ditebak dari kode error.
+            if (parent is null || parent.ProjectId != request.ProjectId) throw new NotFoundException("Tugas induk tidak ditemukan.");
+        }
 
         var priority = TaskNames.TryParsePriority(request.Priority, out var parsed) ? parsed : TaskPriority.Medium;
         var task = TaskItem.Create(
@@ -45,7 +50,8 @@ public sealed class CreateTaskCommandHandler(
         await tasks.AddAsync(task, ct);
         await unitOfWork.SaveChangesAsync(ct); // juga menyimpan event TaskCreated ke outbox
 
-        return await readService.GetAsync(task.PublicId, ct) ?? throw new InvalidOperationException("Tugas yang baru dibuat tidak terbaca.");
+        // Tugas baru belum punya assignee dan induknya sudah dimuat: DTO dibentuk tanpa membaca ulang.
+        return TaskDto.From(task, parent?.PublicId, []);
     }
 }
 

@@ -72,10 +72,7 @@ public sealed class TaskReadService(TaskDbContext db) : ITaskReadService
         var assignees = (await db.TaskAssignees.AsNoTracking().Where(a => ids.Contains(a.TaskId)).Select(a => new { a.TaskId, a.UserId }).ToListAsync(ct))
             .ToLookup(a => a.TaskId, a => a.UserId);
 
-        return rows.Select(r => new TaskDto(
-            r.Task.PublicId, r.Task.ProjectId, r.ParentId, r.Task.Title, r.Task.Description, TaskNames.ToApi(r.Task.Status),
-            TaskNames.ToApi(r.Task.Priority), r.Task.DueDate, r.Task.ReporterId, r.Task.CompletedAt,
-            assignees[r.Task.Id].ToList(), r.Task.RowVersion, r.Task.CreatedAt)).ToList();
+        return rows.Select(r => TaskDto.From(r.Task, r.ParentId, assignees[r.Task.Id].ToList())).ToList();
     }
 }
 

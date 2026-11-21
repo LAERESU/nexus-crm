@@ -32,7 +32,7 @@ public sealed record TaskFilter(
 /// <summary>Proyek seperti yang dikenal Task Service (read model dari event Project Service).</summary>
 public sealed record ProjectInfo(Guid ProjectId, bool IsArchived);
 
-/// <summary>Read model proyek dan anggotanya (<c>PROJECT_REF</c>, <c>PROJECT_MEMBER_REF</c>).</summary>
+/// <summary>Read model proyek dan anggotanya (<c>PROJECT_REF</c>, <c>PROJECT_MEMBER_REFS</c>).</summary>
 public interface IProjectDirectory
 {
     /// <summary>Null bila proyek belum dikenal (event-nya belum tiba) atau tidak ada.</summary>
@@ -57,4 +57,7 @@ public interface ITaskAccess
 {
     /// <summary>User memegang <paramref name="permission"/> dengan scope global.</summary>
     Task<bool> HoldsGloballyAsync(string permission, CancellationToken ct);
+
+    /// <summary>Scope <paramref name="permission"/> mencakup proyek ini (global atau proyek itu).</summary>
+    Task<bool> CoversProjectAsync(string permission, Guid projectId, CancellationToken ct);
 }

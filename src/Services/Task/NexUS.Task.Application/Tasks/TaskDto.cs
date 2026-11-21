@@ -19,7 +19,12 @@ public sealed record TaskDto(
     DateTimeOffset? CompletedAt,
     IReadOnlyList<Guid> AssigneeIds,
     long RowVersion,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt)
+{
+    public static TaskDto From(TaskItem t, Guid? parentPublicId, IReadOnlyList<Guid> assigneeIds) => new(
+        t.PublicId, t.ProjectId, parentPublicId, t.Title, t.Description, TaskNames.ToApi(t.Status), TaskNames.ToApi(t.Priority),
+        t.DueDate, t.ReporterId, t.CompletedAt, assigneeIds, t.RowVersion, t.CreatedAt);
+}
 
 /// <summary>Nama status dan prioritas di API (huruf kecil); kolom memakai huruf besar.</summary>
 public static class TaskNames

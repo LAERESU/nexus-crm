@@ -7,7 +7,7 @@ using NexUS.Tasks.Infrastructure.Persistence;
 namespace NexUS.Tasks.Infrastructure.Messaging;
 
 /// <summary>
-/// Memperbarui read model proyek (<c>PROJECT_REF</c>, <c>PROJECT_MEMBER_REF</c>) dari event Project Service, idempotent
+/// Memperbarui read model proyek (<c>PROJECT_REF</c>, <c>PROJECT_MEMBER_REFS</c>) dari event Project Service, idempotent
 /// lewat <see cref="IdempotentEventHandler{TEvent, TContext}"/>. Event berbeda jenis bisa tiba tidak berurutan; entitas
 /// read model mengabaikan event yang lebih lama. Bentrok membuat baris yang sama melempar exception dan pesan diulang.
 /// </summary>

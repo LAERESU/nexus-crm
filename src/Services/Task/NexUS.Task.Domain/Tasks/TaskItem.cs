@@ -74,6 +74,9 @@ public sealed class TaskItem : AggregateRoot
             ReporterId = reporterId,
         };
         task.SetDetails(title, description, priority, dueDate);
+        // Versi induk ikut naik, sehingga menghapus induk bersamaan dengan membuat subtask-nya tidak bisa sama-sama lolos
+        // (yang kedua bentrok versi, 409) dan tidak tersisa subtask hidup di bawah induk yang terhapus.
+        parent?.MarkChildrenChanged();
         task.AddDomainEvent(new TaskCreatedDomainEvent(tenantId, task.PublicId, projectId, parent?.PublicId, task.Title, reporterId));
         return task;
     }

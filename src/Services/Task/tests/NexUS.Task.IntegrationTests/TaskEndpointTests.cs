@@ -94,7 +94,7 @@ public class TaskEndpointTests(OracleTaskFixture fixture)
         child.ParentTaskId.Should().Be(parent.Id);
 
         (await CreateAsync(client, project, "Cucu", child.Id)).StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        (await CreateAsync(client, other, "Lintas proyek", parent.Id)).StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await CreateAsync(client, other, "Lintas proyek", parent.Id)).StatusCode.Should().Be(HttpStatusCode.NotFound, "induk di proyek lain dianggap tidak ada");
         (await CreateAsync(client, project, "Induk hilang", Guid.NewGuid())).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -104,9 +104,12 @@ public class TaskEndpointTests(OracleTaskFixture fixture)
         var user = fixture.NewUser(A);
         var project = await fixture.SeedProjectAsync(A, members: (user, "MEMBER"));
         var client = fixture.ClientAs(A, user);
-        var task = await CreatedAsync(client, project, "Awal");
-        var child = await CreatedAsync(client, project, "Anak", task.Id);
-        var url = $"/api/v1/tasks/{task.Id}";
+        var created = await CreatedAsync(client, project, "Awal");
+        var child = await CreatedAsync(client, project, "Anak", created.Id);
+        var url = $"/api/v1/tasks/{created.Id}";
+        // Subtask baru menaikkan versi induk; versi terbaru dibaca ulang.
+        var task = (await client.GetFromJsonAsync<TaskBody>(url))!;
+        task.RowVersion.Should().Be(created.RowVersion + 1);
 
         var updated = await client.SendAsync(WithIfMatch(HttpMethod.Put, url, task.RowVersion,
             new { title = "Diubah", description = (string?)null, priority = "urgent", dueDate = "2026-12-31" }));
@@ -158,6 +161,7 @@ public class TaskEndpointTests(OracleTaskFixture fixture)
 
         (await ListAsync(client, $"projectId={project}")).Select(t => t.Id).Should().Equal(early.Id, late.Id, none.Id);
         (await ListAsync(client, $"projectId={project}&dueBefore=2026-12-01")).Select(t => t.Id).Should().Equal(early.Id);
+        (await ListAsync(client, $"projectId={project}&due_before=2026-12-01")).Select(t => t.Id).Should().Equal(early.Id);
         (await ListAsync(client, $"projectId={project}&status=todo")).Should().HaveCount(3);
         (await ListAsync(client, $"projectId={project}&status=done")).Should().BeEmpty();
 
@@ -175,6 +179,35 @@ public class TaskEndpointTests(OracleTaskFixture fixture)
 
         (await client.GetAsync("/api/v1/tasks?status=selesai")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await client.GetAsync("/api/v1/tasks?size=101")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Permission_tulis_berscope_proyek_lain_tidak_berlaku_dan_bukan_anggota_tidak_tahu_status_arsip()
+    {
+        var user = Guid.NewGuid();
+        var other = await fixture.SeedProjectAsync(A);
+        var project = await fixture.SeedProjectAsync(A, members: (user, "MEMBER"));
+        // task.create hanya untuk proyek lain; anggota proyek ini.
+        fixture.GrantScoped(A, user, ("task.read", "global", null), ("task.create", "project", other));
+        (await CreateAsync(fixture.ClientAs(A, user), project)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var outsider = fixture.NewUser(A);
+        var archived = await fixture.SeedProjectAsync(A, archived: true);
+        (await CreateAsync(fixture.ClientAs(A, outsider), archived)).StatusCode.Should().Be(HttpStatusCode.Forbidden, "bukan 422 arsip");
+    }
+
+    [Fact]
+    public async Task Membuat_subtask_menaikkan_versi_induk_sehingga_hapus_induk_yang_basi_bentrok()
+    {
+        var user = fixture.NewUser(A);
+        var project = await fixture.SeedProjectAsync(A, members: (user, "MEMBER"));
+        var client = fixture.ClientAs(A, user);
+        var parent = await CreatedAsync(client, project, "Induk");
+
+        await CreatedAsync(client, project, "Anak", parent.Id);
+
+        (await client.SendAsync(WithIfMatch(HttpMethod.Delete, $"/api/v1/tasks/{parent.Id}", parent.RowVersion)))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict, "subtask baru menaikkan versi induk");
     }
 
     [Fact]

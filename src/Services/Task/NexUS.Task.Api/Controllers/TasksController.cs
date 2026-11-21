@@ -27,7 +27,7 @@ public sealed class TasksController(ISender mediator) : ControllerBase
 {
     /// <summary>
     /// Daftar tugas dengan filter proyek, assignee, status, dan jatuh tempo (pada atau sebelum <c>dueBefore</c>), dengan
-    /// paging. Tanpa <c>projectId</c>: tugas di semua proyek yang diikuti user.
+    /// paging. Tanpa <c>projectId</c>: tugas di semua proyek yang diikuti user. <c>due_before</c> sama dengan <c>dueBefore</c>.
     /// </summary>
     [HttpGet]
     [Authorize(Policy = Policies.TaskRead)]
@@ -36,8 +36,10 @@ public sealed class TasksController(ISender mediator) : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public Task<PagedResult<TaskDto>> List(
         [FromQuery] Guid? projectId, [FromQuery] Guid? assigneeId, [FromQuery] string? status, [FromQuery] DateOnly? dueBefore,
+        [FromQuery(Name = "due_before")] DateOnly? dueBeforeAlias,
         [FromQuery] int page = 1, [FromQuery] int size = PagedResult<TaskDto>.DefaultSize, CancellationToken ct = default) =>
-        mediator.Send(new ListTasksQuery(projectId, assigneeId, status, dueBefore, page, size), ct);
+        // due_before (nama di story/ARCHITECTURE) dan dueBefore (camelCase) sama-sama diterima.
+        mediator.Send(new ListTasksQuery(projectId, assigneeId, status, dueBefore ?? dueBeforeAlias, page, size), ct);
 
     [HttpGet("{id:guid}")]
     [Authorize(Policy = Policies.TaskRead)]

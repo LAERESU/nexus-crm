@@ -92,6 +92,10 @@ public sealed class OracleTaskFixture : IAsyncLifetime
     public void Grant(long tenantId, Guid userId, params string[] permissions) =>
         _permissions.Set(tenantId, userId, permissions.Select(code => new GrantedPermission(code, "global", null)).ToList());
 
+    /// <summary>Permission dengan scope tertentu (<c>global</c>, <c>project</c>, <c>department</c>).</summary>
+    public void GrantScoped(long tenantId, Guid userId, params (string Code, string ScopeType, Guid? ScopeId)[] permissions) =>
+        _permissions.Set(tenantId, userId, permissions.Select(p => new GrantedPermission(p.Code, p.ScopeType, p.ScopeId)).ToList());
+
     /// <summary>User baru dengan permission <see cref="Worker"/> (atau yang diberikan).</summary>
     public Guid NewUser(long tenantId, params string[] permissions)
     {
@@ -122,7 +126,7 @@ public sealed class OracleTaskFixture : IAsyncLifetime
     }
 
     public Task AddMemberAsync(long tenantId, Guid projectId, Guid userId, string role) => ExecuteAsync(
-        "INSERT INTO PROJECT_MEMBER_REF (TENANT_ID, PROJECT_ID, USER_ID, PROJECT_ROLE, LAST_EVENT_AT, CREATED_AT, CREATED_BY) " +
+        "INSERT INTO PROJECT_MEMBER_REFS (TENANT_ID, PROJECT_ID, USER_ID, PROJECT_ROLE, LAST_EVENT_AT, CREATED_AT, CREATED_BY) " +
         "VALUES (:t, :p, :u, :r, SYSTIMESTAMP, SYSTIMESTAMP, 0)",
         new OracleParameter("t", tenantId), Raw("p", projectId), Raw("u", userId), new OracleParameter("r", role));
 
