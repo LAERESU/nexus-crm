@@ -14,9 +14,10 @@ Referensi utama: `ARCHITECTURE.md` A.2 (contoh alur assign), B.4, C.2 (TSK_SCHEM
   4. Endpoint create, get, update (If-Match), delete (soft), list dengan filter `projectId`, `assigneeId`, `status`, `due_before`, paging.
   5. Tugas pada proyek yang diarsipkan menjadi read-only (consumer `ProjectArchived`).
 - **Acceptance criteria:**
-  - [ ] Hanya anggota proyek yang bisa membuat/melihat tugas proyek itu.
-  - [ ] Subtask dari subtask ditolak.
-  - [ ] Query list memakai index (cek `EXPLAIN PLAN`).
+  - [x] Hanya anggota proyek yang bisa membuat/melihat tugas proyek itu.
+  - [x] Subtask dari subtask ditolak.
+  - [x] Query list memakai index (cek `EXPLAIN PLAN`).
+- **Catatan:** `PROJECT_ID`/`REPORTER_ID`/`USER_ID` menyimpan ID publik dari service lain (bukan NUMBER seperti DDL contoh ARCHITECTURE C.4). Pengamat proyek hanya bisa melihat tugas; admin tenant/auditor (`project.all.read`) melihat semua (ADR-0011). Proyek yang belum dikenal read model dijawab 404 (fallback HTTP ke Project Service menyusul di NX-034). Menghapus tugas ikut menghapus subtask-nya (soft delete). Filter `dueBefore` inklusif. Event tugas tersimpan di outbox tetapi belum dipublikasikan (belum ada consumer).
 
 ---
 

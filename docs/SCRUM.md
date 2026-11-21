@@ -1,7 +1,7 @@
 # NexUS — Scrum & Pelacak Progres
 
 > File ini dipakai untuk melihat **sudah sampai mana pengembangan**. Langkah rinci setiap story ada di `docs/stories/`. Perbarui status story setiap hari, dan isi bagian Sprint Log di akhir setiap sprint.
-> Terakhir diperbarui: 2026-11-15
+> Terakhir diperbarui: 2026-11-21
 
 ---
 
@@ -10,10 +10,10 @@
 | Item | Nilai |
 | --- | --- |
 | Fase | 2 · Layanan inti |
-| Sprint aktif | Sprint 4 |
-| Tanggal mulai sprint | 2026-11-13 |
-| Tanggal selesai sprint | 2026-11-27 |
-| Sprint goal | Proyek & anggota berjalan |
+| Sprint aktif | Sprint 5 |
+| Tanggal mulai sprint | 2026-11-15 |
+| Tanggal selesai sprint | 2026-11-29 |
+| Sprint goal | Tugas, kanban, dashboard dasar |
 | Progres keseluruhan | 30 / 64 story selesai (47%) |
 | Hambatan aktif | NX-008 ditunda: butuh cluster Kubernetes dan keputusan D3 |
 
@@ -141,7 +141,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 
 | ID | Story | SP | Sprint | Status |
 | --- | --- | --- | --- | --- |
-| NX-032 | Schema & CRUD tugas + subtask | 8 | 5 | ⬜ |
+| NX-032 | Schema & CRUD tugas + subtask | 8 | 5 | 🔍 |
 | NX-033 | State machine status tugas + riwayat status | 5 | 5 | ⬜ |
 | NX-034 | Assignee + validasi keanggotaan proyek (read model) | 5 | 5 | ⬜ |
 | NX-035 | Komentar tugas | 3 | 5 | ⬜ |
@@ -204,7 +204,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | 2 | Fondasi | Login end-to-end via Gateway, deploy otomatis ke dev | NX-010–017 (NX-008 ditunda) | ✅ |
 | 3 | Layanan inti | User & RBAC berjalan | NX-018–024 | ✅ |
 | 4 | Layanan inti | Proyek & anggota berjalan | NX-025–031 | ✅ |
-| 5 | Layanan inti | Tugas, kanban, dashboard dasar | NX-032–042 | ⬜ |
+| 5 | Layanan inti | Tugas, kanban, dashboard dasar | NX-032–042 | 🟨 |
 | 6 | SOP Builder | Editor SOP + notifikasi in-app | NX-044–048, NX-055–056 | ⬜ |
 | 7 | SOP Builder | Versioning, approval, publish, email | NX-049–052, NX-057 | ⬜ |
 | 8 | SOP Builder | Acknowledgement, SOP → checklist, widget | NX-043, NX-053–054, NX-058 | ⬜ |
