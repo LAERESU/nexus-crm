@@ -17,6 +17,9 @@ public sealed record CreateTaskRequest(
 /// <param name="Priority"><c>low</c>, <c>medium</c>, <c>high</c>, atau <c>urgent</c>.</param>
 public sealed record UpdateTaskRequest(string Title, string? Description, string Priority, DateOnly? DueDate);
 
+/// <param name="Status"><c>todo</c>, <c>in_progress</c>, <c>in_review</c>, <c>blocked</c>, <c>done</c>, atau <c>cancelled</c>.</param>
+public sealed record ChangeTaskStatusRequest(string Status);
+
 /// <summary>
 /// Tugas proyek. Hanya anggota proyek yang bisa melihat tugasnya, dan hanya anggota bukan pengamat yang bisa
 /// membuat/mengubah/menghapus; tugas proyek yang diarsipkan hanya bisa dilihat.
@@ -72,6 +75,22 @@ public sealed class TasksController(ISender mediator) : ControllerBase
         WithEtag(await mediator.Send(new UpdateTaskCommand(
             id, request.Title, request.Description, request.Priority, request.DueDate, RequireIfMatch()), ct));
 
+    /// <summary>
+    /// Memindah status tugas. Transisi yang diizinkan: <c>todo → in_progress → in_review → done</c>; status aktif ke dan
+    /// dari <c>blocked</c>; status aktif dan <c>blocked</c> ke <c>cancelled</c> (final); <c>done → in_progress</c> (buka
+    /// ulang). Transisi lain dijawab 422. Header <c>If-Match</c> opsional; bila dikirim dan basi, 409.
+    /// </summary>
+    [HttpPatch("{id:guid}/status")]
+    [Authorize(Policy = Policies.TaskUpdate)]
+    [ProducesResponseType<TaskDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<TaskDto> ChangeStatus(Guid id, ChangeTaskStatusRequest request, CancellationToken ct) =>
+        WithEtag(await mediator.Send(new ChangeTaskStatusCommand(id, request.Status, OptionalIfMatch()), ct));
+
     /// <summary>Menghapus (soft delete) tugas beserta subtask-nya. Wajib header <c>If-Match</c>.</summary>
     [HttpDelete("{id:guid}")]
     [Authorize(Policy = Policies.TaskDelete)]
@@ -84,12 +103,17 @@ public sealed class TasksController(ISender mediator) : ControllerBase
     }
 
     /// <summary>Header <c>If-Match</c> berisi <c>ROW_VERSION</c> (CONTEXT.md bagian 6); ETag di response memakai format yang sama.</summary>
-    private long RequireIfMatch()
+    private long RequireIfMatch() =>
+        OptionalIfMatch() ?? throw new ValidationException([new ValidationFailure("If-Match", "Header If-Match berisi versi data (rowVersion) wajib diisi.")]);
+
+    /// <summary>Null bila header tidak dikirim; isi yang tidak valid tetap 400.</summary>
+    private long? OptionalIfMatch()
     {
+        if (Request.Headers.IfMatch.Count == 0) return null;
         var raw = Request.Headers.IfMatch.ToString().Trim().Trim('"');
         if (long.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out var version)) return version;
 
-        throw new ValidationException([new ValidationFailure("If-Match", "Header If-Match berisi versi data (rowVersion) wajib diisi.")]);
+        throw new ValidationException([new ValidationFailure("If-Match", "Header If-Match harus berisi versi data (rowVersion).")]);
     }
 
     private TaskDto WithEtag(TaskDto task)

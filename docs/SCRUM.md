@@ -1,7 +1,7 @@
 # NexUS — Scrum & Pelacak Progres
 
 > File ini dipakai untuk melihat **sudah sampai mana pengembangan**. Langkah rinci setiap story ada di `docs/stories/`. Perbarui status story setiap hari, dan isi bagian Sprint Log di akhir setiap sprint.
-> Terakhir diperbarui: 2026-11-21
+> Terakhir diperbarui: 2026-11-22
 
 ---
 
@@ -142,7 +142,7 @@ Legenda status: ⬜ Backlog · 📋 To Do (masuk sprint) · 🟨 In Progress · 
 | ID | Story | SP | Sprint | Status |
 | --- | --- | --- | --- | --- |
 | NX-032 | Schema & CRUD tugas + subtask | 8 | 5 | 🔍 |
-| NX-033 | State machine status tugas + riwayat status | 5 | 5 | ⬜ |
+| NX-033 | State machine status tugas + riwayat status | 5 | 5 | 🔍 |
 | NX-034 | Assignee + validasi keanggotaan proyek (read model) | 5 | 5 | ⬜ |
 | NX-035 | Komentar tugas | 3 | 5 | ⬜ |
 | NX-036 | Lampiran tugas (object storage + validasi file) | 5 | 5 | ⬜ |

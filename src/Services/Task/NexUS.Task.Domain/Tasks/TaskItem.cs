@@ -23,7 +23,8 @@ public enum TaskPriority
 
 /// <summary>
 /// Tugas dalam satu proyek (ARCHITECTURE.md D.3). Subtask menunjuk tugas induk lewat <see cref="ParentTaskId"/> dan
-/// hanya boleh satu tingkat. Status berubah lewat state machine (NX-033); di sini tugas baru selalu <c>TODO</c>.
+/// hanya boleh satu tingkat. Tugas baru selalu <c>TODO</c>; status berubah lewat <see cref="ChangeStatus"/> mengikuti
+/// <see cref="TaskStatusRules"/>, dan setiap perubahan dicatat di riwayat status.
 /// </summary>
 public sealed class TaskItem : AggregateRoot
 {
@@ -45,7 +46,13 @@ public sealed class TaskItem : AggregateRoot
     /// <summary>ID publik user pembuat (milik User Service).</summary>
     public Guid ReporterId { get; private set; }
 
+    /// <summary>Waktu tugas menjadi <c>DONE</c>; kosong lagi saat dibuka ulang.</summary>
     public DateTimeOffset? CompletedAt { get; private set; }
+
+    private readonly List<TaskStatusChange> _statusHistory = [];
+
+    /// <summary>Perubahan status baru pada instance ini (riwayat yang tersimpan tidak dimuat).</summary>
+    public IReadOnlyCollection<TaskStatusChange> StatusHistory => _statusHistory;
 
     private TaskItem() { } // untuk EF Core
 
@@ -91,6 +98,36 @@ public sealed class TaskItem : AggregateRoot
         if (before != (Title, Description, Priority, DueDate))
             AddDomainEvent(new TaskUpdatedDomainEvent(TenantId, PublicId, ProjectId, Title));
     }
+
+    /// <summary>
+    /// Memindah status sesuai <see cref="TaskStatusRules"/>, mencatat riwayat, dan mengisi/mengosongkan
+    /// <see cref="CompletedAt"/>. Status yang sama tidak berbuat apa-apa (false), sehingga request yang diulang aman.
+    /// </summary>
+    public bool ChangeStatus(TaskItemStatus next, Guid actorId, DateTimeOffset now)
+    {
+        if (IsDeleted) throw new DomainException("Status tugas yang dihapus tidak bisa diubah.");
+        if (!Enum.IsDefined(next)) throw new DomainException("Status tugas tidak dikenal.");
+        if (actorId == Guid.Empty) throw new DomainException("Pengubah status wajib diisi.");
+        if (next == Status) return false;
+
+        if (!TaskStatusRules.CanTransition(Status, next))
+        {
+            var allowed = TaskStatusRules.AllowedFrom(Status);
+            var hint = allowed.Count == 0
+                ? $"Tugas berstatus {ApiName(Status)} sudah final."
+                : $"Dari {ApiName(Status)} hanya bisa ke: {string.Join(", ", allowed.Select(ApiName))}.";
+            throw new DomainException($"Status tugas tidak bisa diubah dari {ApiName(Status)} ke {ApiName(next)}. {hint}");
+        }
+
+        var previous = Status;
+        Status = next;
+        CompletedAt = next == TaskItemStatus.Done ? now : null;
+        _statusHistory.Add(new TaskStatusChange(TenantId, previous, next, actorId, now));
+        AddDomainEvent(new TaskStatusChangedDomainEvent(TenantId, PublicId, ProjectId, ToName(previous), ToName(next), actorId, now));
+        return true;
+    }
+
+    private static string ApiName(TaskItemStatus status) => ToName(status).ToLowerInvariant();
 
     /// <summary>Soft delete; mengulang tidak berbuat apa-apa.</summary>
     public void Delete()
@@ -153,6 +190,34 @@ public sealed record TaskCreatedDomainEvent(long TenantId, Guid TaskId, Guid Pro
 public sealed record TaskUpdatedDomainEvent(long TenantId, Guid TaskId, Guid ProjectId, string Title) : DomainEvent;
 
 public sealed record TaskDeletedDomainEvent(long TenantId, Guid TaskId, Guid ProjectId) : DomainEvent;
+
+/// <param name="FromStatus">Nama kolom (huruf besar), mis. <c>IN_PROGRESS</c>.</param>
+public sealed record TaskStatusChangedDomainEvent(
+    long TenantId, Guid TaskId, Guid ProjectId, string FromStatus, string ToStatus, Guid ChangedBy, DateTimeOffset ChangedAt) : DomainEvent;
+
+/// <summary>Satu baris riwayat status (<c>TASK_STATUS_HISTORY</c>); hanya ditambah, tidak pernah diubah.</summary>
+public sealed class TaskStatusChange : Entity
+{
+    public long TaskId { get; private set; }
+    public TaskItemStatus FromStatus { get; private set; }
+    public TaskItemStatus ToStatus { get; private set; }
+
+    /// <summary>ID publik user pengubah (milik User Service).</summary>
+    public Guid ChangedBy { get; private set; }
+
+    public DateTimeOffset ChangedAt { get; private set; }
+
+    private TaskStatusChange() { } // untuk EF Core
+
+    internal TaskStatusChange(long tenantId, TaskItemStatus from, TaskItemStatus to, Guid changedBy, DateTimeOffset changedAt)
+    {
+        TenantId = tenantId;
+        FromStatus = from;
+        ToStatus = to;
+        ChangedBy = changedBy;
+        ChangedAt = changedAt;
+    }
+}
 
 /// <summary>Assignee satu tugas. Endpoint pengaturannya menyusul di NX-034.</summary>
 public sealed class TaskAssignee : Entity
