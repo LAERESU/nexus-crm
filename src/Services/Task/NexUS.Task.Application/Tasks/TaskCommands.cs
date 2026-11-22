@@ -103,3 +103,37 @@ public sealed class DeleteTaskCommandHandler(ITaskRepository tasks, TaskGuard gu
         await unitOfWork.SaveChangesAsync(ct);
     }
 }
+
+/// <param name="ExpectedRowVersion">Dari header <c>If-Match</c> bila dikirim; tanpa header, perubahan bersamaan tetap
+/// tertangkap lewat ROW_VERSION yang dimuat (409).</param>
+public sealed record ChangeTaskStatusCommand(Guid Id, string Status, long? ExpectedRowVersion) : IRequest<TaskDto>;
+
+public sealed class ChangeTaskStatusCommandValidator : AbstractValidator<ChangeTaskStatusCommand>
+{
+    public ChangeTaskStatusCommandValidator()
+    {
+        RuleFor(x => x.Status).Must(s => TaskNames.TryParseStatus(s, out _))
+            .WithMessage($"Status harus salah satu dari: {TaskNames.AllowedStatuses}.");
+        RuleFor(x => x.ExpectedRowVersion).GreaterThanOrEqualTo(0);
+    }
+}
+
+/// <summary>Memindah status tugas (state machine di Domain) dan mencatat riwayatnya dalam transaksi yang sama.</summary>
+public sealed class ChangeTaskStatusCommandHandler(
+    ITaskRepository tasks, ITaskReadService readService, TaskGuard guard, IUnitOfWork unitOfWork, ICurrentUser currentUser,
+    TimeProvider timeProvider)
+    : IRequestHandler<ChangeTaskStatusCommand, TaskDto>
+{
+    public async Task<TaskDto> Handle(ChangeTaskStatusCommand request, CancellationToken ct)
+    {
+        var task = await tasks.FindAsync(request.Id, ct) ?? throw new NotFoundException("Tugas tidak ditemukan.");
+        await guard.EnsureCanWriteAsync(task.ProjectId, TaskPermissions.Update, ct);
+
+        if (request.ExpectedRowVersion is { } expected) unitOfWork.ExpectRowVersion(task, expected);
+        TaskNames.TryParseStatus(request.Status, out var status); // sudah divalidasi
+        if (task.ChangeStatus(status, currentUser.UserId, timeProvider.GetUtcNow()))
+            await unitOfWork.SaveChangesAsync(ct); // riwayat + event TaskStatusChanged ke outbox
+
+        return await readService.GetAsync(task.PublicId, ct) ?? throw new InvalidOperationException("Tugas yang baru diubah tidak terbaca.");
+    }
+}

@@ -28,9 +28,10 @@ Referensi utama: `ARCHITECTURE.md` A.2 (contoh alur assign), B.4, C.2 (TSK_SCHEM
   2. `PATCH /tasks/{id}/status`, tabel `TASK_STATUS_HISTORY`, isi `COMPLETED_AT`.
   3. Event `TaskStatusChanged`.
 - **Acceptance criteria:**
-  - [ ] Transisi tidak valid → 422 dengan pesan jelas.
-  - [ ] Setiap perubahan status tercatat di riwayat.
-  - [ ] Unit test mencakup semua transisi.
+  - [x] Transisi tidak valid → 422 dengan pesan jelas.
+  - [x] Setiap perubahan status tercatat di riwayat.
+  - [x] Unit test mencakup semua transisi.
+- **Catatan:** aturan transisi ada di `TaskStatusRules` (enum `TaskItemStatus`, bukan value object `TaskStatus`, agar tidak bentrok dengan `System.Threading.Tasks.TaskStatus`). `BLOCKED` dan status aktif bisa dibatalkan; `CANCELLED` final; `IN_REVIEW → IN_PROGRESS` (revisi) belum diizinkan karena tidak ada di daftar story. Status yang sama dianggap tidak berubah (tanpa riwayat). Header `If-Match` opsional untuk endpoint status. Belum ada endpoint baca riwayat; event `TaskStatusChanged` tersimpan di outbox tetapi belum dipublikasikan. Partisi `TASK_STATUS_HISTORY` per kuartal (ARCHITECTURE C.6) belum dibuat.
 
 ---
 

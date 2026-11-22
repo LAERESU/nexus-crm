@@ -20,6 +20,7 @@ public sealed class TaskDbContext(DbContextOptions<TaskDbContext> options, TimeP
 
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<TaskAssignee> TaskAssignees => Set<TaskAssignee>();
+    public DbSet<TaskStatusChange> TaskStatusHistory => Set<TaskStatusChange>();
     public DbSet<ProjectRef> ProjectRefs => Set<ProjectRef>();
     public DbSet<ProjectMemberRef> ProjectMemberRefs => Set<ProjectMemberRef>();
 
@@ -50,6 +51,23 @@ public sealed class TaskDbContext(DbContextOptions<TaskDbContext> options, TimeP
                 value => value.HasValue ? DateOnly.FromDateTime(value.Value) : null);
             e.Property(x => x.ReporterId).HasColumnName("REPORTER_ID");
             e.Property(x => x.CompletedAt).HasColumnName("COMPLETED_AT");
+            e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
+            // Riwayat baru disimpan lewat navigasi; riwayat lama tidak dimuat bersama tugas.
+            e.HasMany(x => x.StatusHistory).WithOne().HasForeignKey(h => h.TaskId);
+            e.Navigation(x => x.StatusHistory).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        model.Entity<TaskStatusChange>(e =>
+        {
+            e.ToTable("TASK_STATUS_HISTORY");
+            MapEntity(e);
+            e.Property(x => x.TaskId).HasColumnName("TASK_ID");
+            e.Property(x => x.FromStatus).HasColumnName("FROM_STATUS").HasMaxLength(20).HasConversion(
+                status => TaskItem.ToName(status), value => ParseStatus(value));
+            e.Property(x => x.ToStatus).HasColumnName("TO_STATUS").HasMaxLength(20).HasConversion(
+                status => TaskItem.ToName(status), value => ParseStatus(value));
+            e.Property(x => x.ChangedBy).HasColumnName("CHANGED_BY");
+            e.Property(x => x.ChangedAt).HasColumnName("CHANGED_AT");
             e.HasQueryFilter(x => !x.IsDeleted && x.TenantId == CurrentTenantId);
         });
 
